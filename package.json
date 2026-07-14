@@ -1,0 +1,16 @@
+{
+  "name": "aurora-social-casino",
+  "private": true,
+  "version": "0.1.0",
+  "engines": { "node": ">=22" },
+  "workspaces": ["apps/api", "packages/*"],
+  "scripts": {
+    "build": "npm run build -w @aurora/slot-engine && npm run build -w @aurora/api",
+    "build:web": "./scripts/flutterw build web --release",
+    "dev": "npm run dev -w @aurora/api",
+    "play": "npm run build:web && env DEMO_MODE=true npm run dev",
+    "test": "npm run build -w @aurora/slot-engine && npm run test --workspaces --if-present",
+    "typecheck": "npm run build -w @aurora/slot-engine && npm run typecheck --workspaces --if-present",
+    "math:simulate": "npm run build -w @aurora/slot-engine && node scripts/simulate-slots.mjs"
+  }
+}

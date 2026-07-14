@@ -1,0 +1,653 @@
+import 'package:flutter/material.dart';
+
+import '../models/game_definition.dart';
+import '../services/casino_api.dart';
+import '../widgets/top_hud.dart';
+import 'meta_screens.dart';
+import 'slot_screen.dart';
+
+class LobbyScreen extends StatefulWidget {
+  const LobbyScreen({super.key});
+
+  @override
+  State<LobbyScreen> createState() => _LobbyScreenState();
+}
+
+class _LobbyScreenState extends State<LobbyScreen> {
+  int balance = 8400000;
+  int gems = 320;
+  int level = 12;
+  int xp = 625;
+  int spins = 0;
+  int totalWon = 0;
+  int totalFreeSpins = 0;
+  int vipPoints = 2450;
+  int vipTierStart = 1000;
+  int vipNextTier = 3000;
+  int tournamentRank = 6;
+  int tournamentScore = 0;
+  int tournamentPrizePool = 25000000;
+  int tournamentEntrants = 1;
+  String tournamentName = 'WORLD FORTUNE CHAMPIONSHIP';
+  DateTime tournamentEndsAt = DateTime.now().toUtc().add(
+    const Duration(days: 7),
+  );
+  String vipTier = 'SILVER';
+  List<AchievementView> achievements = const [];
+  List<MissionView> missions = const [];
+  List<LiveEventView> liveEvents = const [];
+  List<ShopOfferView> shopOffers = const [];
+  TimedRewardView? hourlyReward;
+  TimedRewardView? dailyReward;
+  WheelView? rewardWheel;
+  List<Map<String, dynamic>> tournamentLeaders = const [];
+  int tab = 0;
+  bool rewardBusy = false;
+  String? shopBusyOfferId;
+  bool dailyClaimed = false;
+  final claimedQuests = <String>{};
+  final api = CasinoApi();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+    _loadShopOffers();
+  }
+
+  Future<void> _loadShopOffers() async {
+    try {
+      final loadedShopOffers = await api.shopOffers();
+      if (mounted) setState(() => shopOffers = loadedShopOffers);
+    } on StateError {
+      // The shop stays unavailable until the authoritative catalog responds.
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await api.profile();
+      final loadedMissions = await api.missions();
+      final loadedHourly = await api.timedReward('hourly');
+      final loadedDaily = await api.timedReward('daily');
+      final loadedWheel = await api.wheel();
+      final loadedEvents = await api.events();
+      if (!mounted) return;
+      setState(() {
+        balance = profile.balance;
+        gems = profile.gems;
+        level = profile.level;
+        xp = profile.xp;
+        spins = profile.spins;
+        totalWon = profile.totalWon;
+        totalFreeSpins = profile.freeSpins;
+        vipPoints = profile.vipPoints;
+        vipTier = profile.vipTier;
+        vipTierStart = profile.vipTierStart;
+        vipNextTier = profile.vipNextTier;
+        tournamentRank = profile.tournamentRank;
+        tournamentScore = profile.tournamentScore;
+        tournamentName = profile.tournamentName;
+        tournamentEndsAt = profile.tournamentEndsAt;
+        tournamentPrizePool = profile.tournamentPrizePool;
+        tournamentEntrants = profile.tournamentEntrants;
+        achievements = profile.achievements;
+        missions = loadedMissions;
+        hourlyReward = loadedHourly;
+        dailyReward = loadedDaily;
+        rewardWheel = loadedWheel;
+        liveEvents = loadedEvents;
+        tournamentLeaders = profile.leaders;
+        claimedQuests.addAll(profile.claimedRewards);
+        dailyClaimed = profile.claimedRewards.any(
+          (id) => id.startsWith('daily:'),
+        );
+      });
+    } on StateError {
+      // The bundled defaults keep widget tests and offline startup usable.
+    }
+  }
+
+  Future<void> _purchaseShopOffer(ShopOfferView offer) async {
+    if (shopBusyOfferId != null) return;
+    setState(() => shopBusyOfferId = offer.id);
+    try {
+      final purchase = await api.purchaseShopOffer(offer.id);
+      if (!mounted) return;
+      setState(() {
+        balance = purchase.coinBalance;
+        gems = purchase.gemBalance;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('+${_fmt(purchase.coins)} COINS'),
+          backgroundColor: const Color(0xff6b2bd9),
+        ),
+      );
+    } on ShopPurchaseException catch (error) {
+      if (!mounted) return;
+      final message = switch (error.code) {
+        'INSUFFICIENT_GEMS' => 'Nicht genug Gems für dieses Angebot.',
+        'SHOP_OFFER_LIMIT_REACHED' =>
+          'Dieses Tagesangebot wurde bereits gekauft.',
+        _ => 'Dieses Angebot kann gerade nicht gekauft werden.',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } on StateError {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Der Shop ist gerade nicht erreichbar.')),
+      );
+    } finally {
+      if (mounted) setState(() => shopBusyOfferId = null);
+    }
+  }
+
+  Future<void> _openRewardCenter() async {
+    final result = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RewardCenterSheet(
+        api: api,
+        hourly: hourlyReward,
+        daily: dailyReward,
+        wheel: rewardWheel,
+      ),
+    );
+    if (result != null && mounted) setState(() => balance = result);
+    await _loadProfile();
+  }
+
+  Future<void> _claimMission(String missionId) async {
+    if (rewardBusy) return;
+    setState(() => rewardBusy = true);
+    try {
+      final reward = await api.claimMission(missionId);
+      if (!mounted) return;
+      setState(() => balance = reward.balance);
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('+${_fmt(reward.coins)} MISSIONS-COINS'),
+          backgroundColor: const Color(0xff6b2bd9),
+        ),
+      );
+    } on RewardClaimException {
+      if (!mounted) return;
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Diese Mission ist noch nicht einlösbar.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => rewardBusy = false);
+    }
+  }
+
+  Future<void> _claimEventMilestone(String eventId, String milestoneId) async {
+    if (rewardBusy) return;
+    setState(() => rewardBusy = true);
+    try {
+      final reward = await api.claimEventMilestone(eventId, milestoneId);
+      if (!mounted) return;
+      setState(() => balance = reward.balance);
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('+${_fmt(reward.coins)} EVENT-COINS'),
+          backgroundColor: const Color(0xff8b3df0),
+        ),
+      );
+    } on RewardClaimException {
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Diese Event-Stufe ist noch nicht einlösbar.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => rewardBusy = false);
+    }
+  }
+
+  Future<void> _play(GameDefinition game) async {
+    final result = await Navigator.of(context).push<Map<String, int>>(
+      MaterialPageRoute(
+        builder: (_) => SlotScreen(
+          game: game,
+          balance: balance,
+          level: level,
+          xp: xp,
+          vipPoints: vipPoints,
+          gems: gems,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      balance = result['balance']!;
+      level = result['level']!;
+      xp = result['xp']!;
+      spins = result['spins'] ?? spins;
+      totalWon = result['totalWon'] ?? totalWon;
+      totalFreeSpins = result['totalFreeSpins'] ?? totalFreeSpins;
+      vipPoints = result['vipPoints'] ?? vipPoints;
+    });
+    await _loadProfile();
+  }
+
+  Future<void> _claimReward(String rewardId) async {
+    if (rewardBusy) return;
+    setState(() => rewardBusy = true);
+    try {
+      final reward = await api.claimReward(rewardId);
+      if (!mounted) return;
+      setState(() {
+        balance = reward.balance;
+        if (rewardId == 'daily') {
+          dailyClaimed = true;
+        } else {
+          claimedQuests.add(rewardId);
+        }
+      });
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('+${_fmt(reward.coins)} COINS'),
+          backgroundColor: const Color(0xff6b2bd9),
+        ),
+      );
+    } on RewardClaimException catch (error) {
+      if (!mounted) return;
+      if (error.alreadyClaimed) {
+        setState(() {
+          if (rewardId == 'daily') {
+            dailyClaimed = true;
+          } else {
+            claimedQuests.add(rewardId);
+          }
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.alreadyClaimed
+                ? 'Belohnung wurde bereits abgeholt.'
+                : 'Das Ziel ist noch nicht erreicht.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => rewardBusy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          children: [
+            TopHud(
+              balance: balance,
+              level: level,
+              xp: xp,
+              gems: gems,
+              vipTier: vipTier,
+              onVipTap: _showVip,
+            ),
+            Expanded(child: _content()),
+            _nav(),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _content() => switch (tab) {
+    1 => QuestsScreen(
+      spins: spins,
+      totalWon: totalWon,
+      freeSpins: totalFreeSpins,
+      claimed: claimedQuests,
+      onClaim: _claimReward,
+      achievements: achievements,
+      missions: missions,
+      onMissionClaim: _claimMission,
+    ),
+    2 => const ClubScreen(),
+    3 => EventsScreen(
+      events: liveEvents,
+      rewardBusy: rewardBusy,
+      onClaim: _claimEventMilestone,
+      tournamentRank: tournamentRank,
+      tournamentScore: tournamentScore,
+      tournamentName: tournamentName,
+      tournamentEndsAt: tournamentEndsAt,
+      tournamentPrizePool: tournamentPrizePool,
+      tournamentEntrants: tournamentEntrants,
+      leaders: tournamentLeaders,
+    ),
+    4 => ShopScreen(
+      offers: shopOffers,
+      gems: gems,
+      busyOfferId: shopBusyOfferId,
+      onPurchase: _purchaseShopOffer,
+    ),
+    _ => _worldJourney(),
+  };
+
+  void _showVip() => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => VipSheet(
+      tier: vipTier,
+      points: vipPoints,
+      tierStart: vipTierStart,
+      nextTier: vipNextTier,
+    ),
+  );
+
+  Widget _worldJourney() => SingleChildScrollView(
+    child: SizedBox(
+      height: 2100,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/world/world_map.png',
+              fit: BoxFit.fitWidth,
+              repeat: ImageRepeat.repeatY,
+              alignment: Alignment.topCenter,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0x33030b2a),
+                    Colors.transparent,
+                    const Color(0x99030b2a),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(left: 12, width: 190, top: 16, child: _event()),
+          Positioned(right: 12, top: 16, child: _reward()),
+          for (var index = 0; index < games.length; index++) ...[
+            _journeyCard(
+              games[index],
+              top: 160 + index * 245,
+              alignRight: index.isOdd,
+              centered: index == 0,
+            ),
+            if (index < games.length - 1)
+              _pathMarker(
+                top: 375 + index * 245,
+                right: index.isEven ? 84 : 270,
+                label: '${index + 2}',
+              ),
+          ],
+        ],
+      ),
+    ),
+  );
+
+  Widget _event() => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xff4d167c), Color(0xff180a3e)],
+      ),
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: const Color(0xffffd24a), width: 2),
+      boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
+    ),
+    child: const Column(
+      children: [
+        Text(
+          'WORLD FORTUNE\nTOURNAMENT',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+        ),
+        SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.timer_outlined, size: 14),
+            SizedBox(width: 4),
+            Text('2d 12h 45m', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        SizedBox(height: 4),
+        Icon(Icons.emoji_events, size: 30, color: Color(0xffffd24a)),
+        Text(
+          'TOP PRIZE 25.000.000',
+          style: TextStyle(
+            color: Color(0xffffd24a),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _reward() => GestureDetector(
+    onTap: rewardBusy ? null : _openRewardCenter,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: 100,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        color: dailyReward?.claimable == true
+            ? const Color(0xee6b237f)
+            : const Color(0xee302447),
+        borderRadius: BorderRadius.circular(48),
+        border: Border.all(color: const Color(0xffffdc58), width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 8)],
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'DAILY REWARD',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Icon(
+            dailyReward?.claimable == true
+                ? Icons.card_giftcard
+                : Icons.schedule_rounded,
+            size: 36,
+            color: const Color(0xffffdc58),
+          ),
+          Text(
+            dailyReward?.claimable == true
+                ? '+${_fmt(dailyReward!.nextCoins)}'
+                : 'REWARDS',
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _journeyCard(
+    GameDefinition game, {
+    required double top,
+    required bool alignRight,
+    bool centered = false,
+  }) {
+    final locked = level < game.unlockLevel;
+    return Positioned(
+      top: top,
+      left: centered ? 74 : (alignRight ? 148 : 14),
+      right: centered ? 74 : (alignRight ? 14 : 148),
+      child: GestureDetector(
+        onTap: locked ? null : () => _play(game),
+        child: Container(
+          height: 200,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: game.primary, width: 3),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black87,
+                blurRadius: 16,
+                offset: Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(game.asset, fit: BoxFit.cover),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xf20a041b)],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 11,
+                right: 11,
+                bottom: 9,
+                child: Column(
+                  children: [
+                    Text(
+                      game.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        shadows: [Shadow(color: game.secondary, blurRadius: 9)],
+                      ),
+                    ),
+                    Text(
+                      '${game.jackpot} JACKPOT',
+                      style: TextStyle(
+                        color: game.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            game.features,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: locked ? Colors.grey : game.primary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            locked ? 'LEVEL ${game.unlockLevel}' : 'PLAY',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (locked)
+                Container(
+                  color: Colors.black54,
+                  child: Center(
+                    child: Icon(Icons.lock, size: 48, color: game.primary),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pathMarker({
+    required double top,
+    required double right,
+    required String label,
+  }) => Positioned(
+    top: top,
+    right: right,
+    child: Container(
+      width: 42,
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xff25124f),
+        border: Border.all(color: const Color(0xffffd24a), width: 3),
+        boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 8)],
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xffffd24a),
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ),
+  );
+
+  Widget _nav() => NavigationBar(
+    height: 68,
+    selectedIndex: tab,
+    onDestinationSelected: (value) => setState(() => tab = value),
+    backgroundColor: const Color(0xff1a073c),
+    indicatorColor: const Color(0xff7a29ba),
+    destinations: const [
+      NavigationDestination(icon: Icon(Icons.castle), label: 'HOME'),
+      NavigationDestination(
+        icon: Badge(label: Text('4'), child: Icon(Icons.task_alt)),
+        label: 'QUESTS',
+      ),
+      NavigationDestination(icon: Icon(Icons.groups), label: 'CLUB'),
+      NavigationDestination(
+        icon: Badge(label: Text('2'), child: Icon(Icons.event)),
+        label: 'EVENTS',
+      ),
+      NavigationDestination(icon: Icon(Icons.shopping_cart), label: 'SHOP'),
+    ],
+  );
+
+  String _fmt(int value) => value.toString().replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (_) => '.',
+  );
+}

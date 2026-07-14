@@ -1,0 +1,115 @@
+import 'package:flutter/material.dart';
+
+class GameDefinition {
+  const GameDefinition({
+    required this.id,
+    required this.name,
+    required this.asset,
+    required this.symbolSet,
+    required this.jackpot,
+    required this.unlockLevel,
+    required this.features,
+    required this.primary,
+    required this.secondary,
+    this.bonusBuyMultiplier,
+  });
+
+  final String id, name, asset, symbolSet, jackpot, features;
+  final int unlockLevel;
+  final int? bonusBuyMultiplier;
+  final Color primary, secondary;
+}
+
+const games = [
+  GameDefinition(
+    id: 'pharaoh-oasis',
+    name: 'PHARAOH OASIS',
+    asset: 'assets/slots/pharaoh_oasis.png',
+    symbolSet: 'pharaoh',
+    jackpot: '72.450.000',
+    unlockLevel: 1,
+    features: 'EXPANDING WILDS • 2× FREE SPINS • RESPINS',
+    primary: Color(0xffffb52c),
+    secondary: Color(0xff6b2bd9),
+  ),
+  GameDefinition(
+    id: 'dragon-peak',
+    name: 'DRAGON PEAK',
+    asset: 'assets/slots/dragon_peak.png',
+    symbolSet: 'dragon',
+    jackpot: '58.320.000',
+    unlockLevel: 4,
+    features: 'CASCADES UP TO 10× • DRAGON WILD MULTIPLIER',
+    primary: Color(0xffff5b25),
+    secondary: Color(0xff821411),
+  ),
+  GameDefinition(
+    id: 'candy-carnival',
+    name: 'CANDY CARNIVAL',
+    asset: 'assets/slots/candy_carnival.png',
+    symbolSet: 'candy',
+    jackpot: '41.680.000',
+    unlockLevel: 8,
+    features: 'STICKY WILDS • 3 CASCADES • 5 FREE SPINS',
+    primary: Color(0xffff4fc3),
+    secondary: Color(0xff7b2cff),
+  ),
+  GameDefinition(
+    id: 'pirate-bay',
+    name: 'PIRATE BAY',
+    asset: 'assets/slots/pirate_bay.png',
+    symbolSet: 'pirate',
+    jackpot: '96.750.000',
+    unlockLevel: 12,
+    features: '3× FREE SPIN WINS • TREASURE PICK BONUS',
+    primary: Color(0xff24a9df),
+    secondary: Color(0xff073f8c),
+    bonusBuyMultiplier: 50,
+  ),
+  GameDefinition(
+    id: 'neon-nights',
+    name: 'NEON NIGHTS',
+    asset: 'assets/slots/neon_nights.png',
+    symbolSet: 'neon',
+    jackpot: '88.400.000',
+    unlockLevel: 5,
+    features: 'WALKING NEON WILDS • 8 FREE SPINS',
+    primary: Color(0xffff35dc),
+    secondary: Color(0xff1369ff),
+  ),
+  GameDefinition(
+    id: 'frozen-kingdom',
+    name: 'FROZEN KINGDOM',
+    asset: 'assets/slots/frozen_kingdom.png',
+    symbolSet: 'frozen',
+    jackpot: '64.750.000',
+    unlockLevel: 7,
+    features: 'STICKY ICE WILDS • 5 FREE SPINS',
+    primary: Color(0xff52e7ff),
+    secondary: Color(0xff2453b8),
+  ),
+  GameDefinition(
+    id: 'jungle-temple',
+    name: 'JUNGLE TEMPLE',
+    asset: 'assets/slots/jungle_temple.png',
+    symbolSet: 'jungle',
+    jackpot: '105.600.000',
+    unlockLevel: 9,
+    features: 'CASCADES UP TO 12× • TEMPLE WHEEL',
+    primary: Color(0xffffc82f),
+    secondary: Color(0xff087a55),
+    bonusBuyMultiplier: 50,
+  ),
+  GameDefinition(
+    id: 'vegas-gold',
+    name: 'VEGAS GOLD',
+    asset: 'assets/slots/vegas_gold.png',
+    symbolSet: 'vegas',
+    jackpot: '150.000.000',
+    unlockLevel: 11,
+    features: 'BOTH WAYS PAYS • HOLD & WIN',
+    primary: Color(0xffffc52f),
+    secondary: Color(0xff8b101c),
+    bonusBuyMultiplier: 50,
+  ),
+];

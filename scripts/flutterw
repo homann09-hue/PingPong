@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+USER_HOME="$HOME"
+WORKSPACE_SDK="$ROOT/.tools/flutter"
+LOCAL_SDK="$USER_HOME/Developer/flutter"
+if [[ -n "${FLUTTER_SDK:-}" ]]; then
+  SDK="$FLUTTER_SDK"
+elif [[ -x "$LOCAL_SDK/bin/flutter" ]]; then
+  SDK="$LOCAL_SDK"
+else
+  SDK="$WORKSPACE_SDK"
+fi
+
+if [[ ! -x "$SDK/bin/flutter" ]]; then
+  echo "Flutter SDK missing at $SDK. See README.md for setup." >&2
+  exit 1
+fi
+
+RUNTIME_HOME="${TMPDIR:-/tmp}/aurora-flutter-home"
+if [[ "$SDK" == "$LOCAL_SDK" ]]; then
+  PUB_CACHE_DIR="${AURORA_PUB_CACHE:-$USER_HOME/Developer/flutter-pub-cache}"
+else
+  PUB_CACHE_DIR="${AURORA_PUB_CACHE:-$ROOT/.tools/home/.pub-cache}"
+fi
+mkdir -p "$PUB_CACHE_DIR" "$RUNTIME_HOME/config"
+LOCK_DIR="$RUNTIME_HOME/flutterw.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "Another Aurora Flutter command is already running." >&2
+  exit 1
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+cd "$ROOT/apps/mobile"
+HOME="$RUNTIME_HOME" XDG_CONFIG_HOME="$RUNTIME_HOME/config" \
+  PUB_CACHE="$PUB_CACHE_DIR" \
+  FLUTTER_ALREADY_LOCKED=true \
+  "$SDK/bin/flutter" --no-version-check "$@"

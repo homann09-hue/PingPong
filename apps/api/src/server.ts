@@ -1,0 +1,35 @@
+import { buildApp } from "./app.js";
+import { PostgresSpinStore } from "./spins/postgres-spin-store.js";
+import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
+import { IdentityService } from "./identity/identity-service.js";
+import { InMemoryIdentityStore } from "./identity/in-memory-identity-store.js";
+import { PostgresIdentityStore } from "./identity/postgres-identity-store.js";
+
+const port = Number(process.env.PORT ?? 8080);
+const host = process.env.HOST ?? "0.0.0.0";
+
+const databaseUrl = process.env.DATABASE_URL;
+const jwtSecret = process.env.JWT_SECRET;
+const demoMode = process.env.DEMO_MODE === "true";
+if (!demoMode && (!databaseUrl || !jwtSecret)) throw new Error("DATABASE_URL and JWT_SECRET are required outside DEMO_MODE");
+const demoPlayerId = "00000000-0000-4000-8000-000000000001";
+const identityService = demoMode
+  ? new IdentityService(new InMemoryIdentityStore(), "local-demo-jwt-secret-at-least-32-bytes")
+  : new IdentityService(PostgresIdentityStore.connect(databaseUrl!), jwtSecret!);
+const app = buildApp({
+  authenticator: demoMode
+    ? {
+        authenticate: async (authorization) => authorization === "Bearer local-demo"
+          ? demoPlayerId
+          : identityService.authenticate(authorization),
+      }
+    : identityService,
+  spinStore: demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStore.connect(databaseUrl!),
+  identityService,
+});
+try {
+  await app.listen({ port, host });
+} catch (error) {
+  app.log.error(error);
+  process.exitCode = 1;
+}
