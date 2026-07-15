@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../models/game_definition.dart';
 import '../services/casino_api.dart';
+import '../services/store_purchase_bridge.dart';
+import '../services/store_purchase_bridge_factory.dart';
 import '../widgets/top_hud.dart';
 import 'meta_screens.dart';
 import 'slot_screen.dart';
@@ -39,6 +41,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<MissionView> missions = const [];
   List<LiveEventView> liveEvents = const [];
   List<ShopOfferView> shopOffers = const [];
+  List<PurchasableStoreProductView> storeProducts = const [];
   SocialOverviewView? socialOverview;
   LiveOpsCampaignView? activeCampaign;
   PushPreferencesView? pushPreferences;
@@ -50,19 +53,52 @@ class _LobbyScreenState extends State<LobbyScreen> {
   bool rewardBusy = false;
   bool socialBusy = false;
   String? shopBusyOfferId;
+  String? storeBusyProductId;
+  String? playerId;
   bool dailyClaimed = false;
   final claimedQuests = <String>{};
   final api = CasinoApi();
+  final storeBridge = createStorePurchaseBridge();
+  StreamSubscription<StorePurchaseUpdate>? storeUpdates;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _loadShopOffers();
+    storeUpdates = storeBridge.updates.listen(_handleStorePurchaseUpdate);
+    unawaited(_loadPlatformStore());
     _loadSocial();
     _loadLiveOps();
     _loadMessaging();
     unawaited(api.trackEvent('screen.viewed', screen: 'lobby'));
+  }
+
+  Future<void> _loadPlatformStore() async {
+    try {
+      await storeBridge.initialize();
+      final platform = storeBridge.platform;
+      if (!storeBridge.available || platform == null) return;
+      final catalog = await api.storeProducts(platform);
+      final details = await storeBridge.loadProducts(
+        catalog.map((product) => product.storeProductId).toList(),
+      );
+      final prices = {
+        for (final detail in details) detail.productId: detail.localizedPrice,
+      };
+      final purchasable = catalog
+          .where((product) => prices.containsKey(product.storeProductId))
+          .map(
+            (product) => PurchasableStoreProductView(
+              product: product,
+              localizedPrice: prices[product.storeProductId]!,
+            ),
+          )
+          .toList(growable: false);
+      if (mounted) setState(() => storeProducts = purchasable);
+    } on StateError {
+      // Native shop remains unavailable until StoreKit/Google Play responds.
+    }
   }
 
   Future<void> _loadMessaging() async {
@@ -164,6 +200,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       final loadedEvents = await api.events();
       if (!mounted) return;
       setState(() {
+        playerId = profile.playerId;
         balance = profile.balance;
         gems = profile.gems;
         level = profile.level;
@@ -196,6 +233,132 @@ class _LobbyScreenState extends State<LobbyScreen> {
     } on StateError {
       // The bundled defaults keep widget tests and offline startup usable.
     }
+  }
+
+  Future<void> _purchaseStoreProduct(
+    PurchasableStoreProductView package,
+  ) async {
+    final accountId = playerId;
+    if (accountId == null || storeBusyProductId != null) return;
+    setState(() => storeBusyProductId = package.product.storeProductId);
+    try {
+      await storeBridge.purchase(
+        package.product.storeProductId,
+        accountId: accountId,
+        consumable: package.product.storeKind == 'consumable',
+      );
+    } on StateError {
+      if (!mounted) return;
+      setState(() => storeBusyProductId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Der App Store konnte nicht geöffnet werden.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _restoreStorePurchases() async {
+    final accountId = playerId;
+    if (accountId == null || storeBusyProductId != null) return;
+    try {
+      await storeBridge.restore(accountId: accountId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Frühere Käufe werden geprüft.')),
+        );
+      }
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Käufe konnten nicht wiederhergestellt werden.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleStorePurchaseUpdate(StorePurchaseUpdate update) async {
+    if (!mounted) return;
+    if (update.status == StorePurchaseStatus.pending) {
+      setState(() => storeBusyProductId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Zahlung ausstehend. Coins werden erst nach Bestätigung gutgeschrieben.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (update.status == StorePurchaseStatus.canceled ||
+        update.status == StorePurchaseStatus.error) {
+      setState(() => storeBusyProductId = null);
+      if (update.status == StorePurchaseStatus.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Der Kauf konnte nicht abgeschlossen werden.'),
+          ),
+        );
+      }
+      return;
+    }
+    final proof = update.proof;
+    if (proof == null) return;
+    setState(() => storeBusyProductId = update.productId);
+    try {
+      final purchase = await api.verifyStorePurchase(
+        platform: proof.platform,
+        productId: proof.productId,
+        transactionId: proof.transactionId,
+        verificationToken: proof.verificationToken,
+      );
+      await storeBridge.complete(proof);
+      if (!mounted) return;
+      setState(() {
+        balance = purchase.coinBalance;
+        gems = purchase.gemBalance;
+        storeBusyProductId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('+${_fmt(purchase.coins)} COINS'),
+          backgroundColor: const Color(0xff6b2bd9),
+        ),
+      );
+    } on ShopPurchaseException catch (error) {
+      if (!mounted) return;
+      setState(() => storeBusyProductId = null);
+      final message = switch (error.code) {
+        'PURCHASE_PENDING' => 'Zahlung ist noch nicht bestätigt.',
+        'PRODUCT_LIMIT_REACHED' => 'Dieses Paket wurde bereits gekauft.',
+        'PURCHASE_REVOKED' => 'Diese Transaktion wurde zurückerstattet.',
+        'PURCHASE_REVIEW_REQUIRED' => 'Der Kauf benötigt eine Kontoprüfung.',
+        _ => 'Der Kauf konnte nicht verifiziert werden.',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      // Do not complete an unverified transaction; the provider will redeliver it for a safe retry.
+    } on StateError {
+      if (!mounted) return;
+      setState(() => storeBusyProductId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Kaufprüfung vorübergehend nicht verfügbar. Es wurde nichts verloren.',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(storeUpdates?.cancel());
+    unawaited(storeBridge.dispose());
+    super.dispose();
   }
 
   Future<void> _purchaseShopOffer(ShopOfferView offer) async {
@@ -445,6 +608,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
       gems: gems,
       busyOfferId: shopBusyOfferId,
       onPurchase: _purchaseShopOffer,
+      storeProducts: storeProducts,
+      storeAvailable: storeBridge.available,
+      storeBusyProductId: storeBusyProductId,
+      onStorePurchase: _purchaseStoreProduct,
+      onRestoreStorePurchases: _restoreStorePurchases,
     ),
     _ => _worldJourney(),
   };

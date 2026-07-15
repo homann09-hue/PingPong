@@ -6,6 +6,8 @@ import '../services/casino_api.dart';
 
 typedef RewardClaimCallback = Future<void> Function(String rewardId);
 typedef ShopPurchaseCallback = Future<void> Function(ShopOfferView offer);
+typedef StorePurchaseCallback =
+    Future<void> Function(PurchasableStoreProductView product);
 
 class NotificationSettingsSheet extends StatefulWidget {
   const NotificationSettingsSheet({super.key, required this.initial});
@@ -1226,12 +1228,22 @@ class ShopScreen extends StatelessWidget {
     required this.gems,
     required this.busyOfferId,
     required this.onPurchase,
+    this.storeProducts = const [],
+    this.storeAvailable = false,
+    this.storeBusyProductId,
+    this.onStorePurchase,
+    this.onRestoreStorePurchases,
   });
 
   final List<ShopOfferView> offers;
   final int gems;
   final String? busyOfferId;
   final ShopPurchaseCallback onPurchase;
+  final List<PurchasableStoreProductView> storeProducts;
+  final bool storeAvailable;
+  final String? storeBusyProductId;
+  final StorePurchaseCallback? onStorePurchase;
+  final Future<void> Function()? onRestoreStorePurchases;
 
   @override
   Widget build(BuildContext context) => MetaPage(
@@ -1241,6 +1253,43 @@ class ShopScreen extends StatelessWidget {
     icon: Icons.shopping_bag_rounded,
     child: Column(
       children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('APP STORE PACKAGES', style: MetaStyle.title),
+        ),
+        const SizedBox(height: 10),
+        if (!storeAvailable)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 20),
+            child: Text(
+              'Echte Pakete sind nur in der iOS- oder Android-App verfügbar. Preise werden direkt vom jeweiligen Store geladen.',
+              style: MetaStyle.caption,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        for (final package in storeProducts)
+          _StoreOfferCard(
+            package: package,
+            busy: storeBusyProductId == package.product.storeProductId,
+            enabled: storeBusyProductId == null && onStorePurchase != null,
+            onPurchase: () => onStorePurchase!(package),
+          ),
+        if (storeAvailable)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: TextButton.icon(
+              onPressed: storeBusyProductId == null
+                  ? onRestoreStorePurchases
+                  : null,
+              icon: const Icon(Icons.restore_rounded),
+              label: const Text('KÄUFE WIEDERHERSTELLEN'),
+            ),
+          ),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('GEM OFFERS', style: MetaStyle.title),
+        ),
+        const SizedBox(height: 10),
         if (offers.isEmpty)
           const Padding(
             padding: EdgeInsets.all(24),
@@ -1268,6 +1317,72 @@ class ShopScreen extends StatelessWidget {
   static String _coins(int value) => value.toString().replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (_) => '.',
+  );
+}
+
+class _StoreOfferCard extends StatelessWidget {
+  const _StoreOfferCard({
+    required this.package,
+    required this.busy,
+    required this.enabled,
+    required this.onPurchase,
+  });
+  final PurchasableStoreProductView package;
+  final bool busy, enabled;
+  final VoidCallback onPurchase;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.all(16),
+    decoration: MetaStyle.card(
+      package.product.featured
+          ? const Color(0xffffc52f)
+          : const Color(0xff42e3ff),
+    ),
+    child: Row(
+      children: [
+        const CircleAvatar(
+          radius: 28,
+          backgroundColor: Color(0xff6b2bd9),
+          child: Icon(
+            Icons.account_balance_wallet_rounded,
+            color: Color(0xffffd45c),
+            size: 32,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                package.product.badge,
+                style: const TextStyle(
+                  color: Color(0xffffd45c),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(package.product.title, style: MetaStyle.title),
+              Text(
+                '${ShopScreen._coins(package.product.grantCoins)} COINS  •  ${ShopScreen._coins(package.product.grantGems)} GEMS',
+                style: MetaStyle.caption,
+              ),
+            ],
+          ),
+        ),
+        FilledButton(
+          onPressed: enabled ? onPurchase : null,
+          child: busy
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(package.localizedPrice),
+        ),
+      ],
+    ),
   );
 }
 

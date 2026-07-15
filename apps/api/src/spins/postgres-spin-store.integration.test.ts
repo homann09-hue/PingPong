@@ -75,6 +75,10 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/018_store_monetization.sql", import.meta.url), "utf8",
     );
     await pool.query(storeMigration);
+    const nativeStoreMigration = await readFile(
+      new URL("../../../../infra/postgres/019_native_store_semantics.sql", import.meta.url), "utf8",
+    );
+    await pool.query(nativeStoreMigration);
     await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4)", [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId]);
     await pool.query(
       `INSERT INTO wallets (player_id, currency, balance) VALUES
@@ -252,7 +256,7 @@ databaseSuite("PostgresSpinStore integration", () => {
     const command = { playerId: storePlayerId, product, verificationHash: "b".repeat(64), verified: {
       platform: "ios" as const, storeProductId: product.storeProductIds.ios, transactionId,
       originalTransactionId: transactionId, accountId: storePlayerId, environment: "sandbox" as const,
-      purchasedAt: new Date(), quantity: 1 as const, providerFinalized: true, revokedAt: null,
+      purchasedAt: new Date(), quantity: 1 as const, purchaseState: "purchased" as const, revokedAt: null,
     } };
     const first = await store.grantStorePurchase(command);
     const replay = await store.grantStorePurchase(command);

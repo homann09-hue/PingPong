@@ -32,7 +32,8 @@ describe("verified store monetization API", () => {
     const response = await storeApp.inject({ method: "GET", url: "/v1/store/products?platform=ios" });
     expect(response.statusCode).toBe(200);
     expect(response.json().products).toHaveLength(4);
-    expect(response.json().products[0]).toMatchObject({ storeProductId: "com.aurora.socialcasino.starter_vault", grantCoins: 2_000_000 });
+    expect(response.json().products[0]).toMatchObject({ storeProductId: "com.aurora.socialcasino.starter_vault", grantCoins: 2_000_000,
+      purchaseLimit: "once", storeKind: "nonConsumable" });
     expect(response.body).not.toContain("price");
   });
 
@@ -215,6 +216,7 @@ describe("spin API", () => {
       method: "GET", url: "/v1/profile", headers: { authorization: "Bearer valid" },
     });
     expect(response.statusCode).toBe(200);
+    expect(response.json().playerId).toBe(playerId);
     expect(response.json().vip.tier).toBe("SILVER");
     expect(response.json().achievements).toHaveLength(3);
     expect(response.json().tournament.name).toBe("WORLD FORTUNE CHAMPIONSHIP");

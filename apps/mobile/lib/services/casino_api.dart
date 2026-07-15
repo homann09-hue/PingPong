@@ -109,6 +109,7 @@ class MissionView {
 
 class ProfileResponse {
   const ProfileResponse({
+    required this.playerId,
     required this.balance,
     required this.gems,
     required this.level,
@@ -131,6 +132,7 @@ class ProfileResponse {
     required this.leaders,
   });
 
+  final String playerId;
   final int balance, gems, level, xp, spins, totalWon, freeSpins;
   final int vipPoints, vipTierStart, vipNextTier;
   final String vipTier;
@@ -188,11 +190,27 @@ class StoreProductView {
     required this.grantCoins,
     required this.grantGems,
     required this.purchaseLimit,
+    required this.storeKind,
     required this.storeProductId,
   });
-  final String key, title, description, badge, purchaseLimit, storeProductId;
+  final String key,
+      title,
+      description,
+      badge,
+      purchaseLimit,
+      storeKind,
+      storeProductId;
   final bool featured;
   final int grantCoins, grantGems;
+}
+
+class PurchasableStoreProductView {
+  const PurchasableStoreProductView({
+    required this.product,
+    required this.localizedPrice,
+  });
+  final StoreProductView product;
+  final String localizedPrice;
 }
 
 class VerifiedStorePurchaseView {
@@ -418,6 +436,8 @@ class CasinoApi {
       ? _configuredBase
       : kIsWeb
       ? Uri.base.origin
+      : defaultTargetPlatform == TargetPlatform.android
+      ? 'http://10.0.2.2:8080'
       : 'http://localhost:8080';
   final Random _random = Random.secure();
 
@@ -567,6 +587,7 @@ class CasinoApi {
     final vip = data['vip'] as Map<String, dynamic>;
     final tournament = data['tournament'] as Map<String, dynamic>;
     return ProfileResponse(
+      playerId: data['playerId'] as String,
       balance: data['coinBalance'] as int,
       gems: data['gemBalance'] as int,
       level: progression['level'] as int,
@@ -629,8 +650,9 @@ class CasinoApi {
     final response = await http.get(
       Uri.parse('$base/v1/store/products?platform=$platform'),
     );
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Store-Katalog konnte nicht geladen werden');
+    }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return (data['products'] as List)
         .map((value) {
@@ -644,6 +666,7 @@ class CasinoApi {
             grantCoins: item['grantCoins'] as int,
             grantGems: item['grantGems'] as int,
             purchaseLimit: item['purchaseLimit'] as String,
+            storeKind: item['storeKind'] as String,
             storeProductId: item['storeProductId'] as String,
           );
         })
@@ -675,8 +698,9 @@ class CasinoApi {
         data['code'] as String? ?? 'PURCHASE_REJECTED',
       );
     }
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Store-Kauf konnte nicht verifiziert werden');
+    }
     return VerifiedStorePurchaseView(
       coins: data['coins'] as int,
       gems: data['gems'] as int,

@@ -18,7 +18,7 @@ export interface VerifiedStoreTransaction {
   readonly environment: "production" | "sandbox";
   readonly purchasedAt: Date;
   readonly quantity: 1;
-  readonly providerFinalized: boolean;
+  readonly purchaseState: "purchased";
   readonly revokedAt: Date | null;
 }
 
@@ -37,7 +37,7 @@ const gatewayResponse = z.object({
   storeProductId: z.string().min(1).max(200), transactionId: z.string().min(1).max(256),
   originalTransactionId: z.string().min(1).max(256), accountId: z.string().uuid(),
   environment: z.enum(["production", "sandbox"]), purchasedAt: z.string().datetime(),
-  quantity: z.literal(1), providerFinalized: z.boolean(), revokedAt: z.string().datetime().nullable(),
+  quantity: z.literal(1), purchaseState: z.literal("purchased"), revokedAt: z.string().datetime().nullable(),
 }).strict();
 
 /** Delegates volatile App Store/Play APIs to a hardened internal verification gateway. */
@@ -80,7 +80,7 @@ export class DemoReceiptVerifier implements ReceiptVerifier {
     return {
       platform: command.platform, storeProductId: command.storeProductId, transactionId: command.transactionId,
       originalTransactionId: command.transactionId, accountId: command.playerId, environment: "sandbox",
-      purchasedAt: new Date(), quantity: 1, providerFinalized: true, revokedAt: null,
+      purchasedAt: new Date(), quantity: 1, purchaseState: "purchased", revokedAt: null,
     };
   }
   public async close(): Promise<void> {}

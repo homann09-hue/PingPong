@@ -274,6 +274,7 @@ export function buildApp(dependencies: AppDependencies) {
     const vip = vipStatus(progression.vipPoints);
     const claimed = new Set(profile.claimedRewards);
     return {
+      playerId,
       ...profile,
       vip,
       achievements: [

@@ -1,17 +1,25 @@
-# aurora_mobile
+# Aurora mobile client
 
-A new Flutter project.
+Flutter 3.44.6 client for iOS 13+, Android API 24+, and Web. Game settlement,
+wallet grants, progression, social state, and store entitlements remain server
+authoritative.
 
-## Getting Started
+## Local targets
 
-This project is a starting point for a Flutter application.
+From the repository root:
 
-A few resources to get you started if this is your first Flutter project:
+```sh
+./scripts/flutterw analyze
+./scripts/flutterw test
+./scripts/flutterw build web --release --no-web-resources-cdn
+./scripts/flutterw build apk --debug
+./scripts/flutterw build ios --simulator --debug --no-codesign
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Android emulator development resolves the local API at `10.0.2.2:8080`; iOS
+Simulator uses `localhost:8080`. Release builds must provide an HTTPS endpoint
+with `--dart-define=API_URL=https://api.example.com`.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Native billing uses Flutter's maintained `in_app_purchase` plugin. Product IDs
+must exist in App Store Connect and Google Play Console before catalog queries
+return localized prices. See `docs/work-packages/phase10-native-store.md`.

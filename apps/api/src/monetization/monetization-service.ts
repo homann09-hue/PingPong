@@ -28,7 +28,7 @@ export class MonetizationService {
     return storeProducts.map((product) => ({
       key: product.key, title: product.title, description: product.description, badge: product.badge,
       featured: product.featured, grantCoins: product.grantCoins, grantGems: product.grantGems,
-      purchaseLimit: product.purchaseLimit, storeProductId: product.storeProductIds[platform],
+      purchaseLimit: product.purchaseLimit, storeKind: product.storeKind, storeProductId: product.storeProductIds[platform],
     }));
   }
 
@@ -39,7 +39,7 @@ export class MonetizationService {
     const verified = await this.verifier.verify(command);
     if (verified.platform !== request.platform || verified.storeProductId !== request.storeProductId
       || verified.transactionId !== request.transactionId || verified.accountId !== playerId
-      || verified.quantity !== 1 || !verified.providerFinalized) throw new ReceiptInvalidError();
+      || verified.quantity !== 1 || verified.purchaseState !== "purchased") throw new ReceiptInvalidError();
     if (verified.purchasedAt > new Date(Date.now() + 5 * 60_000)) throw new ReceiptInvalidError();
     if (verified.revokedAt) throw new StorePurchaseRevokedError();
     return this.store.grantStorePurchase({

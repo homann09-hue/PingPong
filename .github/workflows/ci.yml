@@ -35,7 +35,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: 3.44.6, channel: stable, cache: true }
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - run: flutter build web --release --no-web-resources-cdn --no-pub
+      - run: flutter build apk --debug --no-pub
+  ios:
+    runs-on: macos-latest
+    defaults: { run: { working-directory: apps/mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: 3.44.6, channel: stable, cache: true }
+      - run: flutter pub get
+      - run: flutter build ios --simulator --debug --no-codesign --no-pub

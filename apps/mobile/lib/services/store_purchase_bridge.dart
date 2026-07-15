@@ -1,3 +1,5 @@
+enum StorePurchaseStatus { pending, purchased, restored, canceled, error }
+
 /// Localized product metadata supplied by StoreKit or Google Play Billing.
 class StoreProductDetails {
   const StoreProductDetails({
@@ -19,23 +21,61 @@ class StorePurchaseProof {
   final String platform, productId, transactionId, verificationToken;
 }
 
-/// Port implemented by the production StoreKit/Play Billing adapter.
-abstract interface class StorePurchaseBridge {
-  bool get available;
-  Future<List<StoreProductDetails>> loadProducts(List<String> productIds);
-  Future<StorePurchaseProof> purchase(String productId);
+class StorePurchaseUpdate {
+  const StorePurchaseUpdate({
+    required this.productId,
+    required this.status,
+    this.proof,
+    this.errorCode,
+  });
+  final String productId;
+  final StorePurchaseStatus status;
+  final StorePurchaseProof? proof;
+  final String? errorCode;
 }
 
-/// Safe default for web, tests, and native builds without a configured store adapter.
+/// Port implemented by the production StoreKit/Play Billing adapter.
+abstract interface class StorePurchaseBridge {
+  String? get platform;
+  bool get available;
+  Stream<StorePurchaseUpdate> get updates;
+  Future<void> initialize();
+  Future<List<StoreProductDetails>> loadProducts(List<String> productIds);
+  Future<void> purchase(
+    String productId, {
+    required String accountId,
+    required bool consumable,
+  });
+  Future<void> restore({required String accountId});
+  Future<void> complete(StorePurchaseProof proof);
+  Future<void> dispose();
+}
+
+/// Safe default for web, tests, and unsupported native targets.
 class UnavailableStorePurchaseBridge implements StorePurchaseBridge {
   const UnavailableStorePurchaseBridge();
   @override
+  String? get platform => null;
+  @override
   bool get available => false;
+  @override
+  Stream<StorePurchaseUpdate> get updates => const Stream.empty();
+  @override
+  Future<void> initialize() async {}
   @override
   Future<List<StoreProductDetails>> loadProducts(
     List<String> productIds,
   ) async => const [];
   @override
-  Future<StorePurchaseProof> purchase(String productId) =>
-      Future.error(StateError('Platform store is not configured'));
+  Future<void> purchase(
+    String productId, {
+    required String accountId,
+    required bool consumable,
+  }) => Future.error(StateError('Platform store is not configured'));
+  @override
+  Future<void> restore({required String accountId}) async {}
+  @override
+  Future<void> complete(StorePurchaseProof proof) async {}
+  @override
+  Future<void> dispose() async {}
 }

@@ -9,6 +9,7 @@ export interface StoreProduct {
   readonly grantCoins: number;
   readonly grantGems: number;
   readonly purchaseLimit: "once" | "repeatable";
+  readonly storeKind: "consumable" | "nonConsumable";
   readonly storeProductIds: Readonly<Record<StorePlatform, string>>;
 }
 
@@ -16,22 +17,22 @@ export interface StoreProduct {
 export const storeProducts: readonly StoreProduct[] = [
   {
     key: "starter-vault", title: "STARTER VAULT", description: "Einmaliges Willkommenspaket",
-    badge: "STARTER +200%", featured: true, grantCoins: 2_000_000, grantGems: 100, purchaseLimit: "once",
+    badge: "STARTER +200%", featured: true, grantCoins: 2_000_000, grantGems: 100, purchaseLimit: "once", storeKind: "nonConsumable",
     storeProductIds: { ios: "com.aurora.socialcasino.starter_vault", android: "aurora_starter_vault" },
   },
   {
     key: "coin-stack", title: "COIN STACK", description: "1.000.000 virtuelle Coins",
-    badge: "POPULAR", featured: false, grantCoins: 1_000_000, grantGems: 0, purchaseLimit: "repeatable",
+    badge: "POPULAR", featured: false, grantCoins: 1_000_000, grantGems: 0, purchaseLimit: "repeatable", storeKind: "consumable",
     storeProductIds: { ios: "com.aurora.socialcasino.coin_stack", android: "aurora_coin_stack" },
   },
   {
     key: "fortune-chest", title: "FORTUNE CHEST", description: "5.000.000 virtuelle Coins",
-    badge: "+25% BONUS", featured: false, grantCoins: 5_000_000, grantGems: 150, purchaseLimit: "repeatable",
+    badge: "+25% BONUS", featured: false, grantCoins: 5_000_000, grantGems: 150, purchaseLimit: "repeatable", storeKind: "consumable",
     storeProductIds: { ios: "com.aurora.socialcasino.fortune_chest", android: "aurora_fortune_chest" },
   },
   {
     key: "royal-treasury", title: "ROYAL TREASURY", description: "15.000.000 virtuelle Coins",
-    badge: "BEST VALUE", featured: false, grantCoins: 15_000_000, grantGems: 600, purchaseLimit: "repeatable",
+    badge: "BEST VALUE", featured: false, grantCoins: 15_000_000, grantGems: 600, purchaseLimit: "repeatable", storeKind: "consumable",
     storeProductIds: { ios: "com.aurora.socialcasino.royal_treasury", android: "aurora_royal_treasury" },
   },
 ] as const;

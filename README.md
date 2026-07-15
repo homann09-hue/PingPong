@@ -34,6 +34,10 @@ After the project-local Flutter SDK has been installed in `.tools/flutter`, run:
 npm run play
 ```
 
+Native iOS and Android runners are included. Their pinned toolchain, StoreKit /
+Google Play Billing lifecycle, simulator endpoints, product configuration, and
+release gates are documented in `docs/work-packages/phase10-native-store.md`.
+
 Open `http://localhost:8080`. The playable world-tour lobby contains eight
 config-driven slot themes with jackpots, progression, free spins, expanding
 wilds, sticky wilds, walking wilds, bounded respins, cascades, treasure picks,
@@ -171,7 +175,8 @@ Virtual coin bundles use the separate `/v1/store` purchase boundary. The server
 verifies account-bound provider transactions before an atomic wallet grant,
 deduplicates transaction IDs globally, stores only proof hashes, and idempotently
 reconciles refunds without allowing negative balances. Apply
-`infra/postgres/018_store_monetization.sql` and configure
+`infra/postgres/018_store_monetization.sql` and
+`infra/postgres/019_native_store_semantics.sql` in order, then configure
 `STORE_VERIFICATION_URL`, `STORE_GATEWAY_TOKEN`, and `STORE_WEBHOOK_TOKEN`.
 Localized prices always come from StoreKit or Google Play. See
 `docs/work-packages/phase9-store-monetization.md`.

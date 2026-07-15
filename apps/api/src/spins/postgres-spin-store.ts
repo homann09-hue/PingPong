@@ -335,13 +335,13 @@ export class PostgresSpinStore implements SpinStore {
       };
       await client.query(
         `INSERT INTO verified_store_purchases
-          (id,player_id,platform,product_key,store_product_id,transaction_id,original_transaction_id,environment,
-           purchased_at,verification_hash,provider_finalized,purchase_limit_key,coins_granted,gems_granted,
+          (id,player_id,platform,product_key,store_product_id,store_kind,transaction_id,original_transaction_id,environment,
+           purchased_at,verification_hash,provider_state,purchase_limit_key,coins_granted,gems_granted,
            coin_balance_after,gem_balance_after)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
         [purchaseId, command.playerId, command.verified.platform, command.product.key, command.verified.storeProductId,
-          command.verified.transactionId, command.verified.originalTransactionId, command.verified.environment,
-          command.verified.purchasedAt, command.verificationHash, command.verified.providerFinalized, purchaseLimitKey,
+          command.product.storeKind, command.verified.transactionId, command.verified.originalTransactionId, command.verified.environment,
+          command.verified.purchasedAt, command.verificationHash, command.verified.purchaseState, purchaseLimitKey,
           settlement.coins, settlement.gems, settlement.coinBalance, settlement.gemBalance],
       );
       await client.query(

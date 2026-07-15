@@ -105,6 +105,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     ShopOfferView? purchased;
+    PurchasableStoreProductView? storePurchased;
     const offer = ShopOfferView(
       id: 'daily-fortune',
       title: 'DAILY FORTUNE',
@@ -114,6 +115,21 @@ void main() {
       featured: true,
       expiresAt: null,
     );
+    const storeProduct = PurchasableStoreProductView(
+      product: StoreProductView(
+        key: 'coin-stack',
+        title: 'COIN STACK',
+        description: 'Virtuelle Coins',
+        badge: 'POPULAR',
+        featured: false,
+        grantCoins: 1000000,
+        grantGems: 0,
+        purchaseLimit: 'repeatable',
+        storeKind: 'consumable',
+        storeProductId: 'aurora_coin_stack',
+      ),
+      localizedPrice: '4,99 €',
+    );
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -122,6 +138,9 @@ void main() {
             gems: 320,
             busyOfferId: null,
             onPurchase: (selected) async => purchased = selected,
+            storeProducts: const [storeProduct],
+            storeAvailable: true,
+            onStorePurchase: (selected) async => storePurchased = selected,
           ),
         ),
       ),
@@ -130,6 +149,10 @@ void main() {
     expect(find.text('DAILY FORTUNE'), findsOneWidget);
     expect(find.text('200.000 COINS  •  20 GEMS'), findsOneWidget);
     expect(find.text('SOON'), findsNothing);
+    expect(find.text('4,99 €'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '4,99 €'));
+    await tester.pump();
+    expect(storePurchased?.product.storeProductId, 'aurora_coin_stack');
     await tester.tap(find.widgetWithText(FilledButton, '20 GEMS'));
     await tester.pump();
     expect(purchased?.id, 'daily-fortune');
