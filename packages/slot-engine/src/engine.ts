@@ -356,12 +356,50 @@ export class SlotEngine {
     if (!hold) return;
     const count = grid.flat().filter((symbol) => symbol === hold.scatterSymbol).length;
     if (!force && count < hold.minimumCount) return;
+    const boardSize = this.config.reels.length * this.config.rows;
     const spots = hold.spotRange[0] + rng.nextInt(hold.spotRange[1] - hold.spotRange[0] + 1);
-    let multiplier = 0;
-    for (let index = 0; index < spots; index++) {
-      multiplier += hold.multipliers[rng.nextInt(hold.multipliers.length)]!;
+    const positions = Array.from({ length: boardSize }, (_, index) => index);
+    for (let index = positions.length - 1; index > 0; index--) {
+      const swap = rng.nextInt(index + 1);
+      [positions[index], positions[swap]] = [positions[swap]!, positions[index]!];
     }
-    this.pushBonusRound(grid, multiplier * bet, multiplier, "hold_and_win", rounds, { spots, respins: 3 });
+    const awards = positions.slice(0, spots).map((position) => ({
+      position,
+      multiplier: hold.multipliers[rng.nextInt(hold.multipliers.length)]!,
+    }));
+    const multiplier = awards.reduce((sum, award) => sum + award.multiplier, 0);
+    const initialCount = Math.min(hold.minimumCount, awards.length);
+    const initial = awards.slice(0, initialCount);
+    const pending = awards.slice(initialCount);
+    const steps: { lives: number; awards: typeof pending }[] = [];
+    let cursor = 0;
+    let lives = 3;
+    while (cursor < pending.length) {
+      const misses = rng.nextInt(3);
+      for (let miss = 0; miss < misses; miss++) {
+        lives--;
+        steps.push({ lives, awards: [] });
+      }
+      const revealCount = Math.min(1 + rng.nextInt(3), pending.length - cursor);
+      const revealed = pending.slice(cursor, cursor + revealCount);
+      cursor += revealCount;
+      lives = 3;
+      steps.push({ lives, awards: revealed });
+    }
+    while (lives > 0) {
+      lives--;
+      steps.push({ lives, awards: [] });
+    }
+    const encode = (values: readonly { position: number; multiplier: number }[]) =>
+      values.map((value) => `${value.position}=${value.multiplier}`).join(",");
+    const encodedSteps = steps.map((step) => `${step.lives}:${encode(step.awards)}`).join(";");
+    this.pushBonusRound(grid, multiplier * bet, multiplier, "hold_and_win", rounds, {
+      spots,
+      respins: 3,
+      boardSize,
+      initialSpots: encode(initial),
+      respinSteps: encodedSteps,
+    });
   }
 
   private pushBonusRound(

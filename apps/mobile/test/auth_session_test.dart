@@ -46,6 +46,56 @@ void main() {
     },
   );
 
+  test(
+    'installation identity is stable before authentication bootstrap',
+    () async {
+      final storage = MemorySessionStorage();
+      final session = AuthSessionManager(
+        baseUrl: baseUrl,
+        client: MockClient((_) async => http.Response('', 500)),
+        storage: storage,
+        platform: 'android',
+        installationIdFactory: () => installationId,
+      );
+
+      expect(await session.installationId(), installationId);
+      expect(await session.installationId(), installationId);
+    },
+  );
+
+  test(
+    'authenticated DELETE refreshes once and preserves its method',
+    () async {
+      final storage = MemorySessionStorage();
+      var deleteCalls = 0;
+      final client = MockClient((request) async {
+        if (request.url.path == '/v1/auth/guest') {
+          return _tokens(201, access: 'old', refresh: _token('o'));
+        }
+        if (request.url.path == '/v1/auth/refresh') {
+          return _tokens(200, access: 'new', refresh: _token('n'));
+        }
+        expect(request.method, 'DELETE');
+        deleteCalls++;
+        return http.Response('', deleteCalls == 1 ? 401 : 204);
+      });
+      final session = AuthSessionManager(
+        baseUrl: baseUrl,
+        client: client,
+        storage: storage,
+        platform: 'android',
+        installationIdFactory: () => installationId,
+      );
+
+      final response = await AuthenticatedHttpClient(client, session).delete(
+        Uri.parse('$baseUrl/v1/messaging/installations/$installationId'),
+      );
+
+      expect(response.statusCode, 204);
+      expect(deleteCalls, 2);
+    },
+  );
+
   test('stored refresh token rotates without creating another guest', () async {
     final storage = MemorySessionStorage();
     await storage.write('aurora.identity.refresh-token.v1', _token('a'));

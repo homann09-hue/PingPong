@@ -31,3 +31,26 @@ use HTTPS and retain the repository's CSP/XSS protections. See
 Native billing uses Flutter's maintained `in_app_purchase` plugin. Product IDs
 must exist in App Store Connect and Google Play Console before catalog queries
 return localized prices. See `docs/work-packages/phase10-native-store.md`.
+
+## Push provisioning
+
+The client uses Firebase Messaging for Android, APNs-backed iOS messaging, and
+Web Push. Public Firebase application identifiers are compiled into each
+environment; provider credentials and token encryption remain server-only.
+
+```sh
+./scripts/flutterw run \
+  --dart-define=FIREBASE_API_KEY=... \
+  --dart-define=FIREBASE_APP_ID=... \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=... \
+  --dart-define=FIREBASE_PROJECT_ID=... \
+  --dart-define=FIREBASE_AUTH_DOMAIN=... \
+  --dart-define=FIREBASE_STORAGE_BUCKET=... \
+  --dart-define=FIREBASE_WEB_VAPID_KEY=...
+```
+
+Without the four required identifiers (and the VAPID key on Web), push stays
+unavailable and no placeholder token is registered. iOS release builds use the
+production APNs entitlement; debug/profile builds use development. Firebase
+project setup, APNs credentials, Android application registration and an HTTPS
+Web origin are still deployment prerequisites.

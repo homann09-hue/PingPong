@@ -66,17 +66,19 @@ PostgreSQL constraints and a functional Flutter surface. LiveOps campaigns now
 support UTC scheduling, level/VIP targeting, separate workforce JWTs, editor /
 publisher / auditor RBAC, mandatory second-actor publication, an append-only
 PostgreSQL audit trail and a server-driven Flutter lobby banner. Clan roles
-beyond owner and member, chat, invitations, moderation, inbox, push, targeting
-previews, enterprise SSO and the broader player/economy/health admin modules
-remain planned. A responsive LiveOps console for campaign drafts, publication
-and audit review is implemented at `/admin/`.
+capabilities now include role-checked invitations and a moderated, paginated
+clan feed. Player reports, automated trust-and-safety review, clan
+sanctions, social inbox push, targeting previews, enterprise SSO and the broader
+player/economy/health admin modules remain planned. A responsive LiveOps console
+for campaign drafts, publication and audit review is implemented at `/admin/`.
 
 Push messaging now includes explicit per-category preferences, quiet hours,
 encrypted APNs/FCM/Web Push token registration, idempotent audience fan-out from
 published campaigns, an audited publisher action, durable multi-worker leasing,
-bounded retries, invalid-token retirement and delivery metrics. Native provider
-permission/token bootstraps, production gateway provisioning, deep-link routing,
-receipt reconciliation and push capacity tests remain launch work.
+bounded retries, invalid-token retirement and delivery metrics. Flutter now owns
+native/Web permission prompts, real token acquisition, rotation and removal.
+Production provider provisioning, deep-link routing, receipt reconciliation and
+push capacity tests remain launch work.
 
 ## Phase 4 — scale and launch readiness
 

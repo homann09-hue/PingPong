@@ -160,6 +160,12 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   if (holdFeature && holdFeature.spotRange[0] > holdFeature.spotRange[1]) {
     throw new Error("Hold and win spot range must be ascending");
   }
+  if (holdFeature && holdFeature.spotRange[0] < holdFeature.minimumCount) {
+    throw new Error("Hold and win spot range must include every trigger spot");
+  }
+  if (holdFeature && holdFeature.spotRange[1] > config.reels.length * config.rows) {
+    throw new Error("Hold and win spot range must fit the configured grid");
+  }
   if (config.features?.bonusBuy && !(
     config.features.pickBonus || config.features.wheelBonus || config.features.holdAndWinBonus
   )) {

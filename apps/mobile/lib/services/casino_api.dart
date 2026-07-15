@@ -17,6 +17,9 @@ class SpinRoundView {
     required this.bonusTier,
     required this.bonusSpots,
     required this.bonusSegment,
+    required this.bonusBoardSize,
+    required this.bonusInitialSpots,
+    required this.bonusRespinSteps,
     required this.featureLabel,
     required this.winningCells,
     required this.winLabel,
@@ -30,9 +33,25 @@ class SpinRoundView {
   final String? bonusMode;
   final String? bonusTier;
   final int? bonusSpots, bonusSegment;
+  final int? bonusBoardSize;
+  final List<HoldAndWinSpotView> bonusInitialSpots;
+  final List<HoldAndWinStepView> bonusRespinSteps;
   final String? featureLabel;
   final Set<String> winningCells;
   final String? winLabel;
+}
+
+class HoldAndWinSpotView {
+  const HoldAndWinSpotView({required this.position, required this.multiplier});
+
+  final int position, multiplier;
+}
+
+class HoldAndWinStepView {
+  const HoldAndWinStepView({required this.lives, required this.spots});
+
+  final int lives;
+  final List<HoldAndWinSpotView> spots;
 }
 
 class SpinResponse {
@@ -402,18 +421,55 @@ class ClanView {
   final String? role;
 }
 
+class ClanInvitationView {
+  const ClanInvitationView({
+    required this.id,
+    required this.clan,
+    required this.inviter,
+    required this.expiresAt,
+  });
+  final String id;
+  final ClanView clan;
+  final SocialPlayerView inviter;
+  final DateTime expiresAt;
+}
+
+class ClanMessageView {
+  const ClanMessageView({
+    required this.id,
+    required this.author,
+    required this.body,
+    required this.status,
+    required this.createdAt,
+  });
+  final String id, status;
+  final SocialPlayerView author;
+  final String? body;
+  final DateTime createdAt;
+}
+
+class ClanFeedPageView {
+  const ClanFeedPageView({required this.messages, required this.nextCursor});
+  final List<ClanMessageView> messages;
+  final String? nextCursor;
+}
+
 class SocialOverviewView {
   const SocialOverviewView({
+    required this.player,
     required this.friends,
     required this.incomingRequests,
     required this.suggestions,
     required this.currentClan,
     required this.discoverClans,
+    required this.incomingClanInvitations,
   });
+  final SocialPlayerView player;
   final List<SocialPlayerView> friends, suggestions;
   final List<FriendRequestView> incomingRequests;
   final ClanView? currentClan;
   final List<ClanView> discoverClans;
+  final List<ClanInvitationView> incomingClanInvitations;
 }
 
 class LiveOpsCampaignView {
@@ -504,6 +560,7 @@ class CasinoApi {
       final bonusEvents = events.where(
         (event) => event['type'] == 'bonus.awarded',
       );
+
       final bonusData = bonusEvents.isEmpty
           ? null
           : bonusEvents.first['data'] as Map<String, dynamic>;
@@ -541,6 +598,13 @@ class CasinoApi {
         bonusTier: bonusData?['tier'] as String?,
         bonusSpots: bonusData?['spots'] as int?,
         bonusSegment: bonusData?['segment'] as int?,
+        bonusBoardSize: bonusData?['boardSize'] as int?,
+        bonusInitialSpots: _holdAndWinSpots(
+          bonusData?['initialSpots'] as String?,
+        ),
+        bonusRespinSteps: _holdAndWinSteps(
+          bonusData?['respinSteps'] as String?,
+        ),
         featureLabel: eventTypes.contains('max_win.reached')
             ? 'MAX WIN'
             : eventTypes.contains('wild.walked')
@@ -724,6 +788,7 @@ class CasinoApi {
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return SocialOverviewView(
+      player: _socialPlayer(data['player']),
       friends: (data['friends'] as List).map(_socialPlayer).toList(),
       incomingRequests: (data['incomingRequests'] as List).map((value) {
         final item = value as Map<String, dynamic>;
@@ -737,6 +802,17 @@ class CasinoApi {
           ? null
           : _clan(data['currentClan']),
       discoverClans: (data['discoverClans'] as List).map(_clan).toList(),
+      incomingClanInvitations: (data['incomingClanInvitations'] as List)
+          .map((value) {
+            final invitation = value as Map<String, dynamic>;
+            return ClanInvitationView(
+              id: invitation['id'] as String,
+              clan: _clan(invitation['clan']),
+              inviter: _socialPlayer(invitation['inviter']),
+              expiresAt: DateTime.parse(invitation['expiresAt'] as String),
+            );
+          })
+          .toList(growable: false),
     );
   }
 
@@ -820,6 +896,18 @@ class CasinoApi {
     }
   }
 
+  /// Stable identifier for this app installation.
+  Future<String> installationId() => _sharedSession.installationId();
+
+  Future<void> removePushInstallation(String installationId) async {
+    final response = await _client.delete(
+      Uri.parse('$base/v1/messaging/installations/$installationId'),
+    );
+    if (response.statusCode != 204 && response.statusCode != 404) {
+      throw StateError('Push-Gerät konnte nicht abgemeldet werden');
+    }
+  }
+
   Future<void> sendFriendRequest(String playerId) async {
     final response = await _client.post(
       Uri.parse('$base/v1/social/friend-requests'),
@@ -864,6 +952,73 @@ class CasinoApi {
     final response = await _client.post(Uri.parse('$base/v1/clans/leave'));
     if (response.statusCode != 204) {
       throw StateError('Clan konnte nicht verlassen werden');
+    }
+  }
+
+  Future<void> inviteToClan(String playerId) async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/clans/invitations'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'playerId': playerId}),
+    );
+    if (response.statusCode != 201) {
+      throw StateError('Clan-Einladung konnte nicht gesendet werden');
+    }
+  }
+
+  Future<void> acceptClanInvitation(String invitationId) async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/clans/invitations/$invitationId/accept'),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Clan-Einladung konnte nicht angenommen werden');
+    }
+  }
+
+  Future<ClanFeedPageView> clanFeed({String? cursor, int limit = 30}) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (cursor != null) query['cursor'] = cursor;
+    final response = await _client.get(
+      Uri.parse('$base/v1/clans/feed').replace(queryParameters: query),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Clan-Feed konnte nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return ClanFeedPageView(
+      messages: (data['messages'] as List)
+          .map((value) {
+            final message = value as Map<String, dynamic>;
+            return ClanMessageView(
+              id: message['id'] as String,
+              author: _socialPlayer(message['author']),
+              body: message['body'] as String?,
+              status: message['status'] as String,
+              createdAt: DateTime.parse(message['createdAt'] as String),
+            );
+          })
+          .toList(growable: false),
+      nextCursor: data['nextCursor'] as String?,
+    );
+  }
+
+  Future<void> postClanMessage(String body) async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/clans/feed'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'body': body}),
+    );
+    if (response.statusCode != 201) {
+      throw StateError('Clan-Nachricht konnte nicht gesendet werden');
+    }
+  }
+
+  Future<void> removeClanMessage(String messageId) async {
+    final response = await _client.delete(
+      Uri.parse('$base/v1/clans/feed/$messageId'),
+    );
+    if (response.statusCode != 204) {
+      throw StateError('Clan-Nachricht konnte nicht entfernt werden');
     }
   }
 
@@ -1171,6 +1326,40 @@ class CasinoApi {
 
   static List<List<String>> _grid(Object? value) =>
       (value as List).map((reel) => (reel as List).cast<String>()).toList();
+
+  static List<HoldAndWinSpotView> _holdAndWinSpots(String? value) {
+    if (value == null || value.isEmpty) return const [];
+    return value
+        .split(',')
+        .map((entry) {
+          final separator = entry.indexOf('=');
+          if (separator <= 0 || separator == entry.length - 1) {
+            throw const FormatException('Invalid hold-and-win spot');
+          }
+          return HoldAndWinSpotView(
+            position: int.parse(entry.substring(0, separator)),
+            multiplier: int.parse(entry.substring(separator + 1)),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  static List<HoldAndWinStepView> _holdAndWinSteps(String? value) {
+    if (value == null || value.isEmpty) return const [];
+    return value
+        .split(';')
+        .map((entry) {
+          final separator = entry.indexOf(':');
+          if (separator <= 0) {
+            throw const FormatException('Invalid hold-and-win respin');
+          }
+          return HoldAndWinStepView(
+            lives: int.parse(entry.substring(0, separator)),
+            spots: _holdAndWinSpots(entry.substring(separator + 1)),
+          );
+        })
+        .toList(growable: false);
+  }
 
   String _uuid() {
     final bytes = List.generate(16, (_) => _random.nextInt(256));

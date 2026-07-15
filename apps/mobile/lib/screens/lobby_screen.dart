@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/game_definition.dart';
 import '../services/casino_api.dart';
+import '../services/push_messaging_bridge.dart';
 import '../services/store_purchase_bridge.dart';
 import '../services/store_purchase_bridge_factory.dart';
 import '../widgets/top_hud.dart';
@@ -43,6 +44,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<ShopOfferView> shopOffers = const [];
   List<PurchasableStoreProductView> storeProducts = const [];
   SocialOverviewView? socialOverview;
+  List<ClanMessageView> clanMessages = const [];
+  String? clanFeedCursor;
   LiveOpsCampaignView? activeCampaign;
   PushPreferencesView? pushPreferences;
   TimedRewardView? hourlyReward;
@@ -59,7 +62,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
   final claimedQuests = <String>{};
   final api = CasinoApi();
   final storeBridge = createStorePurchaseBridge();
+  final pushBridge = PushMessagingBridge();
   StreamSubscription<StorePurchaseUpdate>? storeUpdates;
+  StreamSubscription<String>? pushTokenUpdates;
 
   @override
   void initState() {
@@ -105,8 +110,44 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       final loaded = await api.pushPreferences();
       if (mounted) setState(() => pushPreferences = loaded);
+      await pushBridge.initialize();
+      await pushTokenUpdates?.cancel();
+      pushTokenUpdates = pushBridge.tokenRefreshes.listen((token) {
+        if (pushPreferences?.enabled ?? false) {
+          unawaited(_registerPushToken(token));
+        }
+      });
+      if (loaded.enabled &&
+          _permissionAllowsPush(await pushBridge.permissionStatus())) {
+        await _registerPushToken();
+      }
     } on StateError {
       // Messaging settings stay unavailable until the authoritative API responds.
+    }
+  }
+
+  bool _permissionAllowsPush(PushPermissionStatus status) =>
+      status == PushPermissionStatus.authorized ||
+      status == PushPermissionStatus.provisional;
+
+  Future<bool> _registerPushToken([String? refreshedToken]) async {
+    await pushBridge.initialize();
+    if (!pushBridge.available) return false;
+    final token = refreshedToken ?? await pushBridge.token();
+    if (token == null || token.isEmpty) return false;
+    await api.registerPushInstallation(
+      installationId: await api.installationId(),
+      provider: pushBridge.provider,
+      token: token,
+    );
+    return true;
+  }
+
+  Future<void> _removePushInstallation() async {
+    try {
+      await api.removePushInstallation(await api.installationId());
+    } finally {
+      await pushBridge.deleteToken();
     }
   }
 
@@ -127,13 +168,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
       builder: (_) => NotificationSettingsSheet(initial: current),
     );
     if (changed == null) return;
+    late final PushPreferencesView saved;
     try {
-      final saved = await api.updatePushPreferences(changed);
-      if (!mounted) return;
-      setState(() => pushPreferences = saved);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Benachrichtigungen gespeichert.')),
-      );
+      saved = await api.updatePushPreferences(changed);
     } on StateError {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,7 +178,37 @@ class _LobbyScreenState extends State<LobbyScreen> {
           content: Text('Einstellungen konnten nicht gespeichert werden.'),
         ),
       );
+      return;
     }
+    if (!mounted) return;
+    setState(() => pushPreferences = saved);
+
+    var statusMessage = 'Benachrichtigungen gespeichert.';
+    try {
+      if (saved.enabled) {
+        await pushBridge.initialize();
+        if (!pushBridge.available) {
+          statusMessage =
+              'Gespeichert. Push ist auf diesem Gerät nicht konfiguriert.';
+        } else {
+          final permission = await pushBridge.requestPermission();
+          if (!_permissionAllowsPush(permission)) {
+            statusMessage = 'Gespeichert. Systemfreigabe wurde nicht erteilt.';
+          } else if (!await _registerPushToken()) {
+            statusMessage = 'Gespeichert. Push-Token ist noch nicht verfügbar.';
+          }
+        }
+      } else if (current.enabled) {
+        await _removePushInstallation();
+      }
+    } on StateError {
+      statusMessage =
+          'Einstellungen gespeichert, Geräteanmeldung wird später wiederholt.';
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(statusMessage)));
   }
 
   Future<void> _loadLiveOps() async {
@@ -156,9 +223,43 @@ class _LobbyScreenState extends State<LobbyScreen> {
   Future<void> _loadSocial() async {
     try {
       final loaded = await api.socialOverview();
-      if (mounted) setState(() => socialOverview = loaded);
+      if (!mounted) return;
+      setState(() => socialOverview = loaded);
+      if (loaded.currentClan == null) {
+        setState(() {
+          clanMessages = const [];
+          clanFeedCursor = null;
+        });
+      } else {
+        await _loadClanFeed();
+      }
     } on StateError {
       // The social surface communicates unavailable state without fake data.
+    }
+  }
+
+  Future<void> _loadClanFeed({bool append = false}) async {
+    try {
+      final page = await api.clanFeed(cursor: append ? clanFeedCursor : null);
+      if (!mounted) return;
+      setState(() {
+        clanMessages = append
+            ? [...clanMessages, ...page.messages]
+            : page.messages;
+        clanFeedCursor = page.nextCursor;
+      });
+    } on StateError {
+      // Existing messages remain visible during a transient feed failure.
+    }
+  }
+
+  Future<void> _loadOlderClanMessages() async {
+    if (socialBusy || clanFeedCursor == null) return;
+    setState(() => socialBusy = true);
+    try {
+      await _loadClanFeed(append: true);
+    } finally {
+      if (mounted) setState(() => socialBusy = false);
     }
   }
 
@@ -357,6 +458,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   @override
   void dispose() {
     unawaited(storeUpdates?.cancel());
+    unawaited(pushTokenUpdates?.cancel());
     unawaited(storeBridge.dispose());
     super.dispose();
   }
@@ -581,6 +683,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
     ),
     2 => ClubScreen(
       overview: socialOverview,
+      messages: clanMessages,
+      hasOlderMessages: clanFeedCursor != null,
       busy: socialBusy,
       onAddFriend: (playerId) =>
           _socialAction(() => api.sendFriendRequest(playerId)),
@@ -590,6 +694,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
       onCreateClan: (name, tag) =>
           _socialAction(() => api.createClan(name, tag)),
       onLeaveClan: () => _socialAction(api.leaveClan),
+      onInviteToClan: (playerId) =>
+          _socialAction(() => api.inviteToClan(playerId)),
+      onAcceptClanInvitation: (invitationId) =>
+          _socialAction(() => api.acceptClanInvitation(invitationId)),
+      onPostClanMessage: (body) =>
+          _socialAction(() => api.postClanMessage(body)),
+      onRemoveClanMessage: (messageId) =>
+          _socialAction(() => api.removeClanMessage(messageId)),
+      onLoadOlderMessages: _loadOlderClanMessages,
     ),
     3 => EventsScreen(
       events: liveEvents,

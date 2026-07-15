@@ -51,7 +51,8 @@ and six optimized transparent symbols (48 bespoke symbols total). Spin results
 are animated round by round so base wins, cascades, and awarded free spins are
 visible instead of being collapsed into one final result. Pirate Bay contains a
 server-authoritative treasure-pick bonus, Jungle Temple a wheel bonus, and Vegas
-Gold a hold-and-win bonus.
+Gold a deterministic hold-and-win sequence with persistent coin positions,
+three visible respin lives, reset-on-hit behavior and server-assigned values.
 Neon Nights now walks wilds across deterministic respin rounds, Frozen Kingdom
 retains sticky wild positions through its free-spin sequence, and Pharaoh Oasis
 awards two bounded scatter-triggered respins.
@@ -136,6 +137,10 @@ widget state. It supports durable friend requests, accepted friendships, clan
 creation, clan discovery, membership and leave operations. PostgreSQL enforces
 one clan per player, canonical friendship pairs, unique pending requests and
 unique clan names/tags. Apply `infra/postgres/014_social.sql` for this slice.
+Owners and officers can now issue durable clan invitations, while members share
+a cursor-paginated, rate-limited feed with author and role-based moderation.
+Apply `infra/postgres/020_clan_community.sql` and see
+`docs/work-packages/phase13-clan-community.md`.
 
 The lobby promotion is backed by the LiveOps campaign API. Workforce tokens use
 a dedicated issuer/audience and secret, with separate editor, publisher and

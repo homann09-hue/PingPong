@@ -72,23 +72,37 @@ void main() {
       role: null,
     );
     const overview = SocialOverviewView(
+      player: SocialPlayerView(
+        id: '00000000-0000-4000-8000-000000000001',
+        displayName: 'Aurora Player',
+        level: 12,
+        online: true,
+      ),
       friends: [],
       incomingRequests: [],
       suggestions: [],
       currentClan: null,
       discoverClans: [clan],
+      incomingClanInvitations: [],
     );
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: ClubScreen(
             overview: overview,
+            messages: const [],
+            hasOlderMessages: false,
             busy: false,
             onAddFriend: (_) async {},
             onAcceptFriend: (_) async {},
             onJoinClan: (id) async => joinedClan = id,
             onCreateClan: (_, _) async {},
             onLeaveClan: () async {},
+            onInviteToClan: (_) async {},
+            onAcceptClanInvitation: (_) async {},
+            onPostClanMessage: (_) async {},
+            onRemoveClanMessage: (_) async {},
+            onLoadOlderMessages: () async {},
           ),
         ),
       ),

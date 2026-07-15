@@ -333,6 +333,71 @@ describe("spin API", () => {
     expect(overview.json().friends).toHaveLength(1);
     await socialApp.close();
   });
+  it("enforces clan invitation roles and exposes a moderated paginated feed", async () => {
+    const socialStore = new InMemorySocialStore(playerId);
+    const memberId = "00000000-0000-4000-8000-000000000102";
+    const ownerApp = buildApp({
+      authenticator: { authenticate: async () => playerId }, spinStore: new InMemorySpinStore(1_000), socialStore,
+    });
+    const memberApp = buildApp({
+      authenticator: { authenticate: async () => memberId }, spinStore: new InMemorySpinStore(1_000), socialStore,
+    });
+    expect((await ownerApp.inject({
+      method: "POST", url: "/v1/clans", headers: { authorization: "Bearer valid" }, payload: { name: "Feed Testers", tag: "FEED" },
+    })).statusCode).toBe(201);
+    const invitation = await ownerApp.inject({
+      method: "POST", url: "/v1/clans/invitations", headers: { authorization: "Bearer valid" }, payload: { playerId: memberId },
+    });
+    expect(invitation.statusCode).toBe(201);
+    expect((await ownerApp.inject({
+      method: "POST", url: "/v1/clans/invitations", headers: { authorization: "Bearer valid" }, payload: { playerId: memberId },
+    })).statusCode).toBe(409);
+    expect((await memberApp.inject({
+      method: "GET", url: "/v1/social/overview", headers: { authorization: "Bearer valid" },
+    })).json().incomingClanInvitations).toHaveLength(1);
+    expect((await memberApp.inject({
+      method: "POST", url: `/v1/clans/invitations/${invitation.json().invitation.id}/accept`, headers: { authorization: "Bearer valid" },
+    })).statusCode).toBe(200);
+
+    const ownerMessage = await ownerApp.inject({
+      method: "POST", url: "/v1/clans/feed", headers: { authorization: "Bearer valid" }, payload: { body: "Welcome aboard" },
+    });
+    const memberMessage = await memberApp.inject({
+      method: "POST", url: "/v1/clans/feed", headers: { authorization: "Bearer valid" }, payload: { body: "Ready to spin" },
+    });
+    const firstPage = await memberApp.inject({
+      method: "GET", url: "/v1/clans/feed?limit=1", headers: { authorization: "Bearer valid" },
+    });
+    const nextPage = await memberApp.inject({
+      method: "GET", url: `/v1/clans/feed?limit=1&cursor=${encodeURIComponent(firstPage.json().nextCursor)}`, headers: { authorization: "Bearer valid" },
+    });
+    expect(firstPage.json().messages).toHaveLength(1);
+    expect(nextPage.json().messages).toHaveLength(1);
+    expect((await memberApp.inject({
+      method: "DELETE", url: `/v1/clans/feed/${ownerMessage.json().message.id}`, headers: { authorization: "Bearer valid" },
+    })).statusCode).toBe(403);
+    expect((await ownerApp.inject({
+      method: "DELETE", url: `/v1/clans/feed/${memberMessage.json().message.id}`, headers: { authorization: "Bearer valid" },
+    })).statusCode).toBe(204);
+    const moderated = await ownerApp.inject({ method: "GET", url: "/v1/clans/feed", headers: { authorization: "Bearer valid" } });
+    expect(moderated.json().messages.find((message: { id: string }) => message.id === memberMessage.json().message.id)
+      .body).toBeNull();
+    expect((await ownerApp.inject({
+      method: "POST", url: "/v1/clans/feed", headers: { authorization: "Bearer valid" }, payload: { body: "bad\nmessage" },
+    })).statusCode).toBe(400);
+    expect((await ownerApp.inject({
+      method: "GET", url: "/v1/clans/feed?cursor=bm90LWEtY3Vyc29y", headers: { authorization: "Bearer valid" },
+    })).statusCode).toBe(400);
+    for (let index = 0; index < 4; index++) {
+      expect((await ownerApp.inject({
+        method: "POST", url: "/v1/clans/feed", headers: { authorization: "Bearer valid" }, payload: { body: `Update ${index + 1}` },
+      })).statusCode).toBe(201);
+    }
+    expect((await ownerApp.inject({
+      method: "POST", url: "/v1/clans/feed", headers: { authorization: "Bearer valid" }, payload: { body: "One too many" },
+    })).statusCode).toBe(429);
+    await Promise.all([ownerApp.close(), memberApp.close()]);
+  });
   it("publishes targeted LiveOps campaigns through separate editor and publisher identities", async () => {
     const liveOpsStore = new InMemoryLiveOpsStore(false);
     const liveOpsApp = buildApp({

@@ -82,7 +82,7 @@ describe("configuration-driven layouts", () => {
 
   it("bounds and settles hold-and-win spot awards", () => {
     const config = parseSlotConfig({
-      id: "hold-test", version: 1, name: "Hold Test", rows: 1,
+      id: "hold-test", version: 1, name: "Hold Test", rows: 2,
       reels: [["S"], ["S"], ["S"]], paylines: [[0,0,0]],
       symbols: { S: { kind: "scatter", payouts: { 3: 1 } } },
       math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
@@ -93,7 +93,34 @@ describe("configuration-driven layouts", () => {
     const result = new SlotEngine(config).spin({ bet: 10, seed: 3n });
     const bonus = result.rounds.find((round) => round.phase === "bonus");
     expect(bonus?.totalWin).toBe(120);
-    expect(bonus?.events[0]?.data).toMatchObject({ mode: "hold_and_win", spots: 6, respins: 3 });
+    expect(bonus?.events[0]?.data).toMatchObject({
+      mode: "hold_and_win", spots: 6, respins: 3, boardSize: 6,
+    });
+    const data = bonus!.events[0]!.data;
+    const encoded = `${data.initialSpots};${data.respinSteps}`;
+    const awards = [...encoded.matchAll(/(\d+)=(\d+)/g)].map((match) => ({
+      position: Number(match[1]), multiplier: Number(match[2]),
+    }));
+    expect(awards).toHaveLength(6);
+    expect(new Set(awards.map((award) => award.position)).size).toBe(6);
+    expect(awards.reduce((sum, award) => sum + award.multiplier, 0)).toBe(12);
+    expect(String(data.respinSteps).split(";").some((step) => step.startsWith("3:") && step.includes("="))).toBe(true);
+    expect(String(data.respinSteps).split(";").slice(-3).map((step) => step.split(":")[0])).toEqual(["2", "1", "0"]);
+
+    const replay = new SlotEngine(config).spin({ bet: 10, seed: 3n });
+    expect(replay).toEqual(result);
+  });
+
+  it("rejects hold-and-win spot ranges that cannot fit the grid", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-hold", version: 1, name: "Invalid Hold", rows: 1,
+      reels: [["S"], ["S"], ["S"]], paylines: [[0,0,0]],
+      symbols: { S: { kind: "scatter", payouts: {} } },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        holdAndWinBonus: { scatterSymbol: "S", minimumCount: 3, spotRange: [3, 4], multipliers: [1, 2] },
+      },
+    })).toThrow("fit the configured grid");
   });
 
   it("keeps sticky wild positions throughout a bounded free-spin sequence", () => {

@@ -97,6 +97,15 @@ class AuthSessionManager {
 
   String? get playerId => _playerId;
 
+  /// Stable app-install identity shared by authentication and push registration.
+  Future<String> installationId() async {
+    var value = await storage.read(_installationIdKey);
+    if (value != null) return value;
+    value = _installationIdFactory();
+    await storage.write(_installationIdKey, value);
+    return value;
+  }
+
   Future<String> accessToken() async {
     if (_hasUsableAccessToken) return _accessToken!;
     await _establishSerialized();
@@ -178,11 +187,7 @@ class AuthSessionManager {
   }
 
   Future<void> _createGuestSession() async {
-    var installationId = await storage.read(_installationIdKey);
-    if (installationId == null) {
-      installationId = _installationIdFactory();
-      await storage.write(_installationIdKey, installationId);
-    }
+    final installationId = await this.installationId();
     final response = await client.post(
       Uri.parse('$baseUrl/v1/auth/guest'),
       headers: const {'content-type': 'application/json'},
@@ -284,6 +289,9 @@ class AuthenticatedHttpClient {
     Object? body,
   }) => _send('PUT', uri, headers: headers, body: body);
 
+  Future<http.Response> delete(Uri uri, {Map<String, String>? headers}) =>
+      _send('DELETE', uri, headers: headers);
+
   Future<http.Response> _send(
     String method,
     Uri uri, {
@@ -311,6 +319,7 @@ class AuthenticatedHttpClient {
       'GET' => client.get(uri, headers: requestHeaders),
       'POST' => client.post(uri, headers: requestHeaders, body: body),
       'PUT' => client.put(uri, headers: requestHeaders, body: body),
+      'DELETE' => client.delete(uri, headers: requestHeaders),
       _ => throw UnsupportedError('Unsupported HTTP method: $method'),
     };
   }

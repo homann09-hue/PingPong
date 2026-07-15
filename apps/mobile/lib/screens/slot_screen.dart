@@ -334,6 +334,9 @@ class _SlotScreenState extends State<SlotScreen> {
         reward: round.win,
         multiplier: round.bonusMultiplier ?? 1,
         spots: round.bonusSpots ?? 6,
+        boardSize: round.bonusBoardSize ?? 15,
+        initialSpots: round.bonusInitialSpots,
+        steps: round.bonusRespinSteps,
       ),
       'jackpot' => _JackpotDialog(
         reward: round.win,
@@ -1195,28 +1198,55 @@ class _HoldAndWinDialog extends StatefulWidget {
     required this.reward,
     required this.multiplier,
     required this.spots,
+    required this.boardSize,
+    required this.initialSpots,
+    required this.steps,
   });
 
-  final int reward, multiplier, spots;
+  final int reward, multiplier, spots, boardSize;
+  final List<HoldAndWinSpotView> initialSpots;
+  final List<HoldAndWinStepView> steps;
 
   @override
   State<_HoldAndWinDialog> createState() => _HoldAndWinDialogState();
 }
 
 class _HoldAndWinDialogState extends State<_HoldAndWinDialog> {
-  int revealed = 0;
+  final revealed = <int, int>{};
+  int lives = 3;
+  int step = 0;
+  bool complete = false;
   Timer? timer;
 
   @override
   void initState() {
     super.initState();
-    timer = Timer.periodic(const Duration(milliseconds: 150), (value) {
-      if (!mounted) return;
-      if (revealed >= widget.spots) {
-        value.cancel();
-      } else {
-        setState(() => revealed++);
+    for (final spot in widget.initialSpots) {
+      revealed[spot.position] = spot.multiplier;
+    }
+    if (widget.steps.isEmpty) {
+      for (var index = 0; index < widget.spots; index++) {
+        revealed[index] = max(1, widget.multiplier ~/ widget.spots);
       }
+      complete = true;
+      return;
+    }
+    timer = Timer.periodic(const Duration(milliseconds: 620), (value) {
+      if (!mounted) return;
+      if (step >= widget.steps.length) {
+        setState(() => complete = true);
+        value.cancel();
+        return;
+      }
+      final update = widget.steps[step++];
+      setState(() {
+        lives = update.lives;
+        for (final spot in update.spots) {
+          revealed[spot.position] = spot.multiplier;
+        }
+        complete = step >= widget.steps.length;
+      });
+      if (complete) value.cancel();
     });
   }
 
@@ -1228,7 +1258,7 @@ class _HoldAndWinDialogState extends State<_HoldAndWinDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final complete = revealed >= widget.spots;
+    final columns = widget.boardSize % 5 == 0 ? 5 : 3;
     return AlertDialog(
       backgroundColor: const Color(0xff250409),
       title: const Text(
@@ -1239,30 +1269,74 @@ class _HoldAndWinDialogState extends State<_HoldAndWinDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('3 RESPINS  •  GOLD COINS LOCKED'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('RESPINS  '),
+              for (var index = 0; index < 3; index++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Icon(
+                    Icons.bolt,
+                    size: 22,
+                    color: index < lives
+                        ? const Color(0xffffd45c)
+                        : const Color(0xff5c3d31),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
           SizedBox(
             width: 270,
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 5,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
                 mainAxisSpacing: 4,
                 crossAxisSpacing: 4,
               ),
-              itemCount: 15,
+              itemCount: widget.boardSize,
               itemBuilder: (_, index) => AnimatedScale(
-                duration: const Duration(milliseconds: 180),
-                scale: index < revealed ? 1 : .72,
+                key: ValueKey('hold-$index-${revealed[index]}'),
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.elasticOut,
+                scale: revealed.containsKey(index) ? 1 : .72,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: const Color(0xffffc52f)),
                   ),
-                  child: index < revealed
-                      ? Image.asset('assets/symbols/vegas/scatter.png')
+                  child: revealed[index] != null
+                      ? Stack(
+                          fit: StackFit.expand,
+                          alignment: Alignment.center,
+                          children: [
+                            Image.asset('assets/symbols/vegas/scatter.png'),
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '×${revealed[index]}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
                       : const Icon(
                           Icons.lock_outline,
                           color: Color(0xff70511c),
@@ -1275,7 +1349,7 @@ class _HoldAndWinDialogState extends State<_HoldAndWinDialog> {
           Text(
             complete
                 ? 'x${widget.multiplier}  •  ${_formatCoins(widget.reward)} COINS'
-                : '${widget.spots - revealed} COINS VERBLEIBEN',
+                : '${revealed.length} / ${widget.spots} GOLD COINS LOCKED',
             style: const TextStyle(
               color: Color(0xffffd45c),
               fontSize: 18,

@@ -48,12 +48,13 @@ are exposed through `aurora_push_deliveries_total` without player or token label
 
 ## Client boundary
 
-Flutter exposes server-backed notification settings from the lobby. Native system
-permission prompts and provider-token acquisition are deliberately not faked:
-they require the final Apple/Google/Web application identifiers, entitlements and
-gateway credentials. Once those are provisioned, the platform bootstrap supplies
-the real token to the existing installation endpoint. Until then the demo proves
-preference behavior and backend delivery without claiming device-provider receipt.
+Flutter exposes server-backed notification settings from the lobby and uses a
+Firebase Messaging adapter for Android, APNs-backed iOS messaging and Web Push.
+Enabling notifications requests the operating-system permission, obtains a real
+provider token, registers it against the stable installation identity, follows
+token rotation and removes both server registration and provider token when the
+player disables notifications. Missing public Firebase configuration degrades to
+an explicit unavailable state and never produces a placeholder token.
 
 ## Verification and remaining launch work
 
@@ -63,7 +64,7 @@ delivery, invalid-token removal and DST-aware cross-midnight quiet hours. A
 PostgreSQL integration test proves encrypted persistence, fan-out, leasing,
 settlement and immutable audit output.
 
-Production still needs native permission/token adapters, APNs/FCM/Web Push account
-provisioning, deep-link routing, gateway capacity tests, provider receipt
+Production still needs APNs/FCM/Web Push account provisioning, deep-link routing,
+gateway capacity tests, provider receipt
 reconciliation, encryption-key rotation procedures, alert thresholds and regional
 consent/legal review.

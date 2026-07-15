@@ -137,7 +137,7 @@ class _NotificationSettingsSheetState extends State<NotificationSettingsSheet> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Die Systemfreigabe und das Push-Token werden separat durch iOS, Android oder den Browser verwaltet.',
+                  'Beim Aktivieren fragt Aurora die Systemfreigabe an und registriert dieses Gerät sicher für Push-Nachrichten.',
                   textAlign: TextAlign.center,
                   style: MetaStyle.caption,
                 ),
@@ -790,19 +790,31 @@ class ClubScreen extends StatelessWidget {
   const ClubScreen({
     super.key,
     required this.overview,
+    required this.messages,
+    required this.hasOlderMessages,
     required this.busy,
     required this.onAddFriend,
     required this.onAcceptFriend,
     required this.onJoinClan,
     required this.onCreateClan,
     required this.onLeaveClan,
+    required this.onInviteToClan,
+    required this.onAcceptClanInvitation,
+    required this.onPostClanMessage,
+    required this.onRemoveClanMessage,
+    required this.onLoadOlderMessages,
   });
 
   final SocialOverviewView? overview;
+  final List<ClanMessageView> messages;
+  final bool hasOlderMessages;
   final bool busy;
   final SocialIdCallback onAddFriend, onAcceptFriend, onJoinClan;
+  final SocialIdCallback onInviteToClan, onAcceptClanInvitation;
+  final SocialIdCallback onPostClanMessage, onRemoveClanMessage;
   final ClanCreateCallback onCreateClan;
   final Future<void> Function() onLeaveClan;
+  final Future<void> Function() onLoadOlderMessages;
 
   @override
   Widget build(BuildContext context) => MetaPage(
@@ -833,14 +845,32 @@ class ClubScreen extends StatelessWidget {
       children: [
         const Text('DEIN CLAN', style: MetaStyle.hero),
         const SizedBox(height: 10),
-        if (current != null)
+        if (current != null) ...[
           _ClanCard(
             clan: current,
             busy: busy,
             actionLabel: current.role == 'owner' ? 'ANFÜHRER' : 'VERLASSEN',
             onAction: current.role == 'owner' || busy ? null : onLeaveClan,
-          )
-        else ...[
+          ),
+          const SizedBox(height: 12),
+          _clanFeed(context, current),
+        ] else ...[
+          for (final invitation in overview!.incomingClanInvitations)
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(
+                  child: Icon(Icons.mark_email_unread_rounded),
+                ),
+                title: Text('${invitation.clan.name} lädt dich ein'),
+                subtitle: Text('VON ${invitation.inviter.displayName}'),
+                trailing: FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () => onAcceptClanInvitation(invitation.id),
+                  child: const Text('ANNEHMEN'),
+                ),
+              ),
+            ),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(18),
@@ -886,7 +916,20 @@ class ClubScreen extends StatelessWidget {
           onPressed: busy ? null : () => onAcceptFriend(request.id),
         ),
       for (final friend in overview!.friends)
-        _SocialPlayerTile(player: friend, label: 'FREUND', onPressed: null),
+        _SocialPlayerTile(
+          player: friend,
+          label:
+              overview!.currentClan?.role == 'owner' ||
+                  overview!.currentClan?.role == 'officer'
+              ? 'EINLADEN'
+              : 'FREUND',
+          onPressed:
+              (overview!.currentClan?.role == 'owner' ||
+                      overview!.currentClan?.role == 'officer') &&
+                  !busy
+              ? () => onInviteToClan(friend.id)
+              : null,
+        ),
       if (overview!.friends.isEmpty && overview!.incomingRequests.isEmpty)
         const Text('Noch keine Freunde verbunden.', style: MetaStyle.caption),
       const SizedBox(height: 14),
@@ -900,6 +943,102 @@ class ClubScreen extends StatelessWidget {
         ),
     ],
   );
+
+  Widget _clanFeed(BuildContext context, ClanView clan) {
+    final canModerate = clan.role == 'owner' || clan.role == 'officer';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: MetaStyle.card(const Color(0xffff8a3d)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Text('CLAN FEED', style: MetaStyle.title)),
+              FilledButton.icon(
+                onPressed: busy ? null : () => _showClanMessage(context),
+                icon: const Icon(Icons.edit_rounded, size: 18),
+                label: const Text('POSTEN'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (messages.isEmpty)
+            const Text(
+              'Noch keine Clan-Nachrichten.',
+              style: MetaStyle.caption,
+            ),
+          for (final message in messages)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                radius: 17,
+                child: Icon(Icons.person, size: 18),
+              ),
+              title: Text(message.author.displayName),
+              subtitle: Text(
+                message.status == 'removed'
+                    ? 'Nachricht wurde moderiert.'
+                    : message.body ?? '',
+                style: message.status == 'removed'
+                    ? const TextStyle(fontStyle: FontStyle.italic)
+                    : null,
+              ),
+              trailing:
+                  message.status == 'active' &&
+                      (canModerate || message.author.id == overview!.player.id)
+                  ? IconButton(
+                      tooltip: 'Nachricht entfernen',
+                      onPressed: busy
+                          ? null
+                          : () => onRemoveClanMessage(message.id),
+                      icon: const Icon(Icons.delete_outline, size: 19),
+                    )
+                  : null,
+            ),
+          if (hasOlderMessages)
+            TextButton(
+              onPressed: busy ? null : onLoadOlderMessages,
+              child: const Text('ÄLTERE NACHRICHTEN LADEN'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showClanMessage(BuildContext context) async {
+    final controller = TextEditingController();
+    final send = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('CLAN-NACHRICHT'),
+        content: TextField(
+          controller: controller,
+          maxLength: 280,
+          minLines: 2,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'Schreibe etwas für deinen Clan …',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ABBRECHEN'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('SENDEN'),
+          ),
+        ],
+      ),
+    );
+    final body = controller.text.trim();
+    controller.dispose();
+    if (send == true && body.isNotEmpty) await onPostClanMessage(body);
+  }
 
   Future<void> _showCreateClan(BuildContext context) async {
     final name = TextEditingController();
