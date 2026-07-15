@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'auth_session.dart';
+
 class SpinRoundView {
   SpinRoundView({
     required this.phase,
@@ -439,10 +441,25 @@ class CasinoApi {
       : defaultTargetPlatform == TargetPlatform.android
       ? 'http://10.0.2.2:8080'
       : 'http://localhost:8080';
+  static final _sharedSession = AuthSessionManager(
+    baseUrl: base,
+    client: http.Client(),
+    storage: createDefaultSessionStorage(),
+    platform: currentClientPlatform(),
+  );
+  static final _sharedClient = AuthenticatedHttpClient(
+    http.Client(),
+    _sharedSession,
+  );
+
+  CasinoApi({AuthenticatedHttpClient? client})
+    : _client = client ?? _sharedClient;
+
+  final AuthenticatedHttpClient _client;
   final Random _random = Random.secure();
 
   Future<SlotPaytable> paytable(String gameId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$base/v1/slots/$gameId/paytable'),
     );
     if (response.statusCode != 200) {
@@ -470,13 +487,9 @@ class CasinoApi {
     int bet, {
     bool bonusBuy = false,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/slots/$gameId/spins'),
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'Bearer local-demo',
-        'idempotency-key': _uuid(),
-      },
+      headers: {'content-type': 'application/json', 'idempotency-key': _uuid()},
       body: jsonEncode({'bet': bet, 'bonusBuy': bonusBuy}),
     );
     if (response.statusCode != 200) {
@@ -566,7 +579,7 @@ class CasinoApi {
   }
 
   Future<List<JackpotPoolView>> jackpots() async {
-    final response = await http.get(Uri.parse('$base/v1/jackpots'));
+    final response = await _client.get(Uri.parse('$base/v1/jackpots'));
     if (response.statusCode != 200) {
       throw StateError('Jackpots konnten nicht geladen werden');
     }
@@ -575,10 +588,7 @@ class CasinoApi {
   }
 
   Future<ProfileResponse> profile() async {
-    final response = await http.get(
-      Uri.parse('$base/v1/profile'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.get(Uri.parse('$base/v1/profile'));
     if (response.statusCode != 200) {
       throw StateError('Profil konnte nicht geladen werden');
     }
@@ -624,7 +634,7 @@ class CasinoApi {
   }
 
   Future<List<ShopOfferView>> shopOffers() async {
-    final response = await http.get(Uri.parse('$base/v1/shop/offers'));
+    final response = await _client.get(Uri.parse('$base/v1/shop/offers'));
     if (response.statusCode != 200) {
       throw StateError('Shop-Angebote konnten nicht geladen werden');
     }
@@ -647,7 +657,7 @@ class CasinoApi {
   }
 
   Future<List<StoreProductView>> storeProducts(String platform) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$base/v1/store/products?platform=$platform'),
     );
     if (response.statusCode != 200) {
@@ -679,12 +689,9 @@ class CasinoApi {
     required String transactionId,
     required String verificationToken,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/store/purchases/verify'),
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'Bearer local-demo',
-      },
+      headers: {'content-type': 'application/json'},
       body: jsonEncode({
         'platform': platform,
         'storeProductId': productId,
@@ -711,10 +718,7 @@ class CasinoApi {
   }
 
   Future<SocialOverviewView> socialOverview() async {
-    final response = await http.get(
-      Uri.parse('$base/v1/social/overview'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.get(Uri.parse('$base/v1/social/overview'));
     if (response.statusCode != 200) {
       throw StateError('Social-Daten konnten nicht geladen werden');
     }
@@ -737,10 +741,7 @@ class CasinoApi {
   }
 
   Future<List<LiveOpsCampaignView>> liveOpsCampaigns() async {
-    final response = await http.get(
-      Uri.parse('$base/v1/liveops'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.get(Uri.parse('$base/v1/liveops'));
     if (response.statusCode != 200) {
       throw StateError('LiveOps-Kampagnen konnten nicht geladen werden');
     }
@@ -761,9 +762,8 @@ class CasinoApi {
   }
 
   Future<PushPreferencesView> pushPreferences() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$base/v1/messaging/preferences'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode != 200) {
       throw StateError('Benachrichtigungseinstellungen nicht verfügbar');
@@ -774,12 +774,9 @@ class CasinoApi {
   Future<PushPreferencesView> updatePushPreferences(
     PushPreferencesView preferences,
   ) async {
-    final response = await http.put(
+    final response = await _client.put(
       Uri.parse('$base/v1/messaging/preferences'),
-      headers: {
-        'authorization': 'Bearer local-demo',
-        'content-type': 'application/json',
-      },
+      headers: {'content-type': 'application/json'},
       body: jsonEncode({
         'enabled': preferences.enabled,
         'marketing': preferences.marketing,
@@ -808,12 +805,9 @@ class CasinoApi {
         : defaultTargetPlatform == TargetPlatform.iOS
         ? 'ios'
         : 'android';
-    final response = await http.put(
+    final response = await _client.put(
       Uri.parse('$base/v1/messaging/installations/current'),
-      headers: {
-        'authorization': 'Bearer local-demo',
-        'content-type': 'application/json',
-      },
+      headers: {'content-type': 'application/json'},
       body: jsonEncode({
         'installationId': installationId,
         'platform': platform,
@@ -827,12 +821,9 @@ class CasinoApi {
   }
 
   Future<void> sendFriendRequest(String playerId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/social/friend-requests'),
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'Bearer local-demo',
-      },
+      headers: {'content-type': 'application/json'},
       body: jsonEncode({'playerId': playerId}),
     );
     if (response.statusCode != 201) {
@@ -841,9 +832,8 @@ class CasinoApi {
   }
 
   Future<void> acceptFriendRequest(String requestId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/social/friend-requests/$requestId/accept'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode != 200) {
       throw StateError('Freundschaftsanfrage konnte nicht angenommen werden');
@@ -851,9 +841,8 @@ class CasinoApi {
   }
 
   Future<void> joinClan(String clanId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/clans/$clanId/join'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode != 200) {
       throw StateError('Clan-Beitritt fehlgeschlagen');
@@ -861,12 +850,9 @@ class CasinoApi {
   }
 
   Future<void> createClan(String name, String tag) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/clans'),
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'Bearer local-demo',
-      },
+      headers: {'content-type': 'application/json'},
       body: jsonEncode({'name': name, 'tag': tag}),
     );
     if (response.statusCode != 201) {
@@ -875,22 +861,16 @@ class CasinoApi {
   }
 
   Future<void> leaveClan() async {
-    final response = await http.post(
-      Uri.parse('$base/v1/clans/leave'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.post(Uri.parse('$base/v1/clans/leave'));
     if (response.statusCode != 204) {
       throw StateError('Clan konnte nicht verlassen werden');
     }
   }
 
   Future<ShopPurchaseView> purchaseShopOffer(String offerId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/shop/offers/$offerId/purchase'),
-      headers: {
-        'authorization': 'Bearer local-demo',
-        'idempotency-key': _uuid(),
-      },
+      headers: {'idempotency-key': _uuid()},
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 409) {
@@ -932,10 +912,7 @@ class CasinoApi {
   }
 
   Future<List<MissionView>> missions() async {
-    final response = await http.get(
-      Uri.parse('$base/v1/missions'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.get(Uri.parse('$base/v1/missions'));
     if (response.statusCode != 200) {
       throw StateError('Missionen konnten nicht geladen werden');
     }
@@ -961,9 +938,8 @@ class CasinoApi {
   }
 
   Future<RewardClaimResponse> claimMission(String missionId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/missions/$missionId/claim'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -980,9 +956,8 @@ class CasinoApi {
   }
 
   Future<RewardClaimResponse> claimReward(String rewardId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/rewards/$rewardId/claims'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -999,10 +974,7 @@ class CasinoApi {
   }
 
   Future<TimedRewardView> timedReward(String type) async {
-    final response = await http.get(
-      Uri.parse('$base/v1/rewards/$type'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.get(Uri.parse('$base/v1/rewards/$type'));
     if (response.statusCode != 200) {
       throw StateError('Zeitbelohnung konnte nicht geladen werden');
     }
@@ -1010,9 +982,8 @@ class CasinoApi {
   }
 
   Future<TimedRewardClaimView> claimTimedReward(String type) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/rewards/$type/claim'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode == 409) {
       throw const RewardClaimException('REWARD_NOT_AVAILABLE');
@@ -1029,9 +1000,8 @@ class CasinoApi {
   }
 
   Future<WheelView> wheel() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$base/v1/rewards/wheels/standard'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode != 200) {
       throw StateError('Bonusrad konnte nicht geladen werden');
@@ -1053,12 +1023,9 @@ class CasinoApi {
   }
 
   Future<WheelSpinView> spinWheel() async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/rewards/wheels/standard/spin'),
-      headers: {
-        'authorization': 'Bearer local-demo',
-        'idempotency-key': _uuid(),
-      },
+      headers: {'idempotency-key': _uuid()},
     );
     if (response.statusCode == 409) {
       throw const RewardClaimException('WHEEL_NOT_AVAILABLE');
@@ -1077,10 +1044,7 @@ class CasinoApi {
   }
 
   Future<List<LiveEventView>> events() async {
-    final response = await http.get(
-      Uri.parse('$base/v1/events'),
-      headers: {'authorization': 'Bearer local-demo'},
-    );
+    final response = await _client.get(Uri.parse('$base/v1/events'));
     if (response.statusCode != 200) {
       throw StateError('Live Events konnten nicht geladen werden');
     }
@@ -1120,9 +1084,8 @@ class CasinoApi {
     String eventId,
     String milestoneId,
   ) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$base/v1/events/$eventId/milestones/$milestoneId/claim'),
-      headers: {'authorization': 'Bearer local-demo'},
     );
     if (response.statusCode == 409) {
       throw const RewardClaimException('EVENT_MILESTONE_NOT_CLAIMABLE');
@@ -1145,12 +1108,9 @@ class CasinoApi {
     String? campaignId,
   }) async {
     try {
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$base/v1/analytics/events'),
-        headers: {
-          'authorization': 'Bearer local-demo',
-          'content-type': 'application/json',
-        },
+        headers: {'content-type': 'application/json'},
         body: jsonEncode({
           'events': [
             {

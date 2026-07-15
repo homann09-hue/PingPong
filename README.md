@@ -189,7 +189,10 @@ are constrained by PostgreSQL to form a valid arithmetic transition.
 Identity endpoints are `POST /v1/auth/guest`, `POST /v1/auth/refresh` and
 `POST /v1/auth/logout`. Access tokens expire after 15 minutes and are accepted
 only while their server session remains active. Opaque refresh tokens rotate on
-every use; only their SHA-256 hashes are stored.
+every use; only their SHA-256 hashes are stored. Flutter keeps access tokens in
+memory, stores refresh credentials in platform secure storage, serializes token
+rotation, and retries an authenticated request at most once after `401`. See
+`docs/work-packages/phase11-client-session.md`.
 
 Authenticated account management is available through `GET /v1/auth/sessions`,
 `DELETE /v1/auth/sessions/{sessionId}`, `POST /v1/auth/logout-all`, and

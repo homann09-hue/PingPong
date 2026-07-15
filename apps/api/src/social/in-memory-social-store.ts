@@ -30,7 +30,7 @@ export class InMemorySocialStore implements SocialStore {
   }
 
   public async getOverview(playerId: string): Promise<SocialOverview> {
-    const player = this.requirePlayer(playerId);
+    const player = this.ensureAuthenticatedPlayer(playerId);
     const friends = [...this.friendships].filter((key) => key.includes(playerId)).map((key) => {
       const [left, right] = key.split(":"); return this.requirePlayer(left === playerId ? right! : left!);
     });
@@ -50,7 +50,7 @@ export class InMemorySocialStore implements SocialStore {
   }
 
   public async sendFriendRequest(playerId: string, targetPlayerId: string): Promise<FriendRequestView> {
-    this.requirePlayer(playerId); const target = this.requirePlayer(targetPlayerId);
+    this.ensureAuthenticatedPlayer(playerId); const target = this.requirePlayer(targetPlayerId);
     if (playerId === targetPlayerId || this.friendships.has(this.friendKey(playerId, targetPlayerId))) throw new SocialConflictError();
     if ([...this.requests.values()].some((item) =>
       (item.senderId === playerId && item.recipientId === targetPlayerId) ||
@@ -61,6 +61,7 @@ export class InMemorySocialStore implements SocialStore {
   }
 
   public async acceptFriendRequest(playerId: string, requestId: string): Promise<SocialPlayer> {
+    this.ensureAuthenticatedPlayer(playerId);
     const request = this.requests.get(requestId);
     if (!request || request.recipientId !== playerId) throw new FriendRequestNotFoundError();
     this.requests.delete(requestId); this.friendships.add(this.friendKey(request.senderId, request.recipientId));
@@ -68,7 +69,7 @@ export class InMemorySocialStore implements SocialStore {
   }
 
   public async createClan(playerId: string, name: string, tag: string): Promise<ClanView> {
-    this.requirePlayer(playerId);
+    this.ensureAuthenticatedPlayer(playerId);
     if (this.memberships.has(playerId) || [...this.clans.values()].some((clan) =>
       clan.name.toLowerCase() === name.toLowerCase() || clan.tag.toLowerCase() === tag.toLowerCase())) throw new ClanMembershipError();
     const clan = { id: randomUUID(), name, tag: tag.toUpperCase(), memberLimit: 50, weeklyScore: 0 };
@@ -77,19 +78,33 @@ export class InMemorySocialStore implements SocialStore {
   }
 
   public async joinClan(playerId: string, clanId: string): Promise<ClanView> {
-    this.requirePlayer(playerId); const clan = this.clans.get(clanId);
+    this.ensureAuthenticatedPlayer(playerId); const clan = this.clans.get(clanId);
     if (!clan) throw new ClanNotFoundError();
     if (this.memberships.has(playerId) || this.memberCount(clanId) >= clan.memberLimit) throw new ClanMembershipError();
     this.memberships.set(playerId, { clanId, role: "member" }); return this.clanView(clan, "member");
   }
 
   public async leaveClan(playerId: string): Promise<void> {
+    this.ensureAuthenticatedPlayer(playerId);
     const membership = this.memberships.get(playerId);
     if (!membership || membership.role === "owner") throw new ClanMembershipError();
     this.memberships.delete(playerId);
   }
 
   public async close(): Promise<void> {}
+
+  private ensureAuthenticatedPlayer(id: string): SocialPlayer {
+    const existing = this.players.get(id);
+    if (existing) return existing;
+    const player = {
+      id,
+      displayName: `AURORA ${id.slice(0, 8).toUpperCase()}`,
+      level: 12,
+      online: true,
+    };
+    this.players.set(id, player);
+    return player;
+  }
 
   private requirePlayer(id: string): SocialPlayer { const value = this.players.get(id); if (!value) throw new SocialPlayerNotFoundError(); return value; }
   private friendKey(left: string, right: string): string { return [left, right].sort().join(":"); }

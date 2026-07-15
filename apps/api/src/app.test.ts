@@ -296,6 +296,27 @@ describe("spin API", () => {
     expect(persisted.json().currentClan.id).toBe(clanId);
     await socialApp.close();
   });
+  it("provisions the social projection for a newly authenticated guest", async () => {
+    const newGuestId = randomUUID();
+    const socialStore = new InMemorySocialStore(playerId);
+    const socialApp = buildApp({
+      authenticator: { authenticate: async () => newGuestId },
+      spinStore: new InMemorySpinStore(1_000),
+      socialStore,
+    });
+    const overview = await socialApp.inject({
+      method: "GET", url: "/v1/social/overview", headers: { authorization: "Bearer valid" },
+    });
+    const clanId = (overview.json().discoverClans[0] as { id: string }).id;
+    const joined = await socialApp.inject({
+      method: "POST", url: `/v1/clans/${clanId}/join`, headers: { authorization: "Bearer valid" },
+    });
+    expect(overview.statusCode).toBe(200);
+    expect(overview.json().player).toMatchObject({ id: newGuestId, level: 12, online: true });
+    expect(overview.json().suggestions.length).toBeGreaterThan(0);
+    expect(joined.statusCode).toBe(200);
+    await socialApp.close();
+  });
   it("accepts only friend requests addressed to the authenticated player", async () => {
     const socialStore = new InMemorySocialStore(playerId);
     const senderId = "00000000-0000-4000-8000-000000000101";

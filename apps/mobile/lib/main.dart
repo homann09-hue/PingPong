@@ -3,7 +3,10 @@ import 'models/game_definition.dart';
 import 'screens/lobby_screen.dart';
 import 'screens/slot_screen.dart';
 
-void main() => runApp(const AuroraApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const AuroraApp());
+}
 
 class AuroraApp extends StatelessWidget {
   const AuroraApp({super.key});

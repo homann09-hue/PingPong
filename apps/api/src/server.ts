@@ -60,13 +60,7 @@ const pushWorker = new PushDeliveryWorker(
   (result) => metrics.recordPush(result),
 );
 const app = buildApp({
-  authenticator: demoMode
-    ? {
-        authenticate: async (authorization) => authorization === "Bearer local-demo"
-          ? demoPlayerId
-          : identityService.authenticate(authorization),
-      }
-    : identityService,
+  authenticator: identityService,
   spinStore,
   socialStore: demoMode ? new InMemorySocialStore(demoPlayerId) : PostgresSocialStore.connect(databaseUrl!),
   liveOpsStore: demoMode ? new InMemoryLiveOpsStore() : PostgresLiveOpsStore.connect(databaseUrl!),
