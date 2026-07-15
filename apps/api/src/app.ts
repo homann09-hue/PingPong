@@ -15,6 +15,9 @@ import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
 import type { SocialStore } from "./social/social-store.js";
 import { ClanMembershipError, ClanNotFoundError, FriendRequestNotFoundError, SocialConflictError, SocialPlayerNotFoundError } from "./social/social-store.js";
+import type { AdminAuthenticator, AdminRole } from "./admin/admin-auth.js";
+import type { LiveOpsStore } from "./liveops/liveops-store.js";
+import { CampaignNotFoundError, CampaignStateError, FourEyesViolationError } from "./liveops/liveops-store.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -34,6 +37,16 @@ const clanBody = z.object({
   name: z.string().trim().min(3).max(32).regex(/^[A-Za-z0-9 _-]+$/),
   tag: z.string().trim().min(3).max(8).regex(/^[A-Za-z0-9]+$/),
 });
+const campaignBody = z.object({
+  name: z.string().trim().min(3).max(80),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  audience: z.object({ minLevel: z.number().int().min(1).max(10_000), minVipPoints: z.number().int().min(0).max(1_000_000_000) }),
+  creative: z.object({
+    title: z.string().trim().min(3).max(60), subtitle: z.string().trim().min(3).max(140), ctaLabel: z.string().trim().min(2).max(24),
+  }),
+}).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { message: "endsAt must be after startsAt" });
+const adminAuditQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(100) });
 const rewardAmounts = new Map([
   ["daily", 250_000],
   ["spin-10", 100_000],
@@ -57,6 +70,8 @@ export interface AppDependencies {
   readonly spinStore: SpinStore;
   readonly identityService?: IdentityService;
   readonly socialStore?: SocialStore;
+  readonly adminAuthenticator?: AdminAuthenticator;
+  readonly liveOpsStore?: LiveOpsStore;
 }
 
 /** Builds the HTTP composition root with explicit, replaceable infrastructure ports. */
@@ -83,6 +98,11 @@ export function buildApp(dependencies: AppDependencies) {
       if (!rate.allowed) {
         return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
       }
+    }
+    if (request.url.startsWith("/admin/")) {
+      const rate = authRateLimiter.consume(`admin:${request.ip}`, 120, 60_000);
+      reply.header("x-ratelimit-remaining", rate.remaining);
+      if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
     }
   });
   const configs = new Map<string, SlotConfig>([classicConfig, auroraConfig, ...themedConfigs].map((config) => [config.id, config]));
@@ -188,6 +208,55 @@ export function buildApp(dependencies: AppDependencies) {
   });
   app.get("/v1/jackpots", async () => ({ jackpots: await dependencies.spinStore.getJackpots() }));
   app.get("/v1/shop/offers", async () => ({ offers: activeShopOffers(new Date()) }));
+  app.get("/v1/liveops", async (request, reply) => {
+    if (!dependencies.liveOpsStore) return reply.code(503).send({ code: "LIVEOPS_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const profile = await dependencies.spinStore.getProfile(playerId);
+    return { campaigns: await dependencies.liveOpsStore.listActive(profile.progression.level, profile.progression.vipPoints, new Date()) };
+  });
+  app.get("/admin/v1/liveops/campaigns", async (request, reply) => {
+    if (!dependencies.liveOpsStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "liveops_auditor")) return reply.code(403).send({ code: "FORBIDDEN" });
+    return { campaigns: await dependencies.liveOpsStore.listCampaigns() };
+  });
+  app.post("/admin/v1/liveops/campaigns", async (request, reply) => {
+    if (!dependencies.liveOpsStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "liveops_editor")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const body = campaignBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    return reply.code(201).send(await dependencies.liveOpsStore.createDraft({
+      ...body.data, startsAt: new Date(body.data.startsAt), endsAt: new Date(body.data.endsAt), actor: principal.subject,
+    }));
+  });
+  app.post("/admin/v1/liveops/campaigns/:campaignId/publish", async (request, reply) => {
+    if (!dependencies.liveOpsStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "liveops_publisher")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const campaignId = z.string().uuid().safeParse((request.params as { campaignId: string }).campaignId);
+    if (!campaignId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return await dependencies.liveOpsStore.publish(campaignId.data, principal.subject, new Date()); }
+    catch (error) {
+      if (error instanceof CampaignNotFoundError) return reply.code(404).send({ code: "CAMPAIGN_NOT_FOUND" });
+      if (error instanceof CampaignStateError) return reply.code(409).send({ code: "CAMPAIGN_STATE_CONFLICT" });
+      if (error instanceof FourEyesViolationError) return reply.code(409).send({ code: "FOUR_EYES_REQUIRED" });
+      throw error;
+    }
+  });
+  app.get("/admin/v1/audit", async (request, reply) => {
+    if (!dependencies.liveOpsStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "liveops_auditor")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const query = adminAuditQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    return { entries: await dependencies.liveOpsStore.listAudit(query.data.limit) };
+  });
   app.post("/v1/shop/offers/:offerId/purchase", async (request, reply) => {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
@@ -434,9 +503,12 @@ export function buildApp(dependencies: AppDependencies) {
     await dependencies.spinStore.close();
     await dependencies.identityService?.close();
     await dependencies.socialStore?.close();
+    await dependencies.liveOpsStore?.close();
   });
   return app;
 }
+
+function hasAdminRole(roles: readonly AdminRole[], required: AdminRole): boolean { return roles.includes(required); }
 
 function vipStatus(points: number) {
   const tiers = [

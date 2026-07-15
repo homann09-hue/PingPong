@@ -38,6 +38,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<LiveEventView> liveEvents = const [];
   List<ShopOfferView> shopOffers = const [];
   SocialOverviewView? socialOverview;
+  LiveOpsCampaignView? activeCampaign;
   TimedRewardView? hourlyReward;
   TimedRewardView? dailyReward;
   WheelView? rewardWheel;
@@ -56,6 +57,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadProfile();
     _loadShopOffers();
     _loadSocial();
+    _loadLiveOps();
+  }
+
+  Future<void> _loadLiveOps() async {
+    try {
+      final campaigns = await api.liveOpsCampaigns();
+      if (mounted) setState(() => activeCampaign = campaigns.firstOrNull);
+    } on StateError {
+      // The fallback tournament card remains available when LiveOps is offline.
+    }
   }
 
   Future<void> _loadSocial() async {
@@ -450,44 +461,66 @@ class _LobbyScreenState extends State<LobbyScreen> {
     ),
   );
 
-  Widget _event() => Container(
-    padding: const EdgeInsets.all(11),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xff4d167c), Color(0xff180a3e)],
+  Widget _event() => GestureDetector(
+    onTap: activeCampaign?.ctaLabel.toUpperCase() == 'EVENTS'
+        ? () => setState(() => tab = 3)
+        : null,
+    child: Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xff4d167c), Color(0xff180a3e)],
+        ),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xffffd24a), width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
       ),
-      borderRadius: BorderRadius.circular(15),
-      border: Border.all(color: const Color(0xffffd24a), width: 2),
-      boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
-    ),
-    child: const Column(
-      children: [
-        Text(
-          'WORLD FORTUNE\nTOURNAMENT',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-        ),
-        SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.timer_outlined, size: 14),
-            SizedBox(width: 4),
-            Text('2d 12h 45m', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        SizedBox(height: 4),
-        Icon(Icons.emoji_events, size: 30, color: Color(0xffffd24a)),
-        Text(
-          'TOP PRIZE 25.000.000',
-          style: TextStyle(
-            color: Color(0xffffd24a),
-            fontWeight: FontWeight.w900,
+      child: Column(
+        children: [
+          Text(
+            activeCampaign?.title ?? 'WORLD FORTUNE\nTOURNAMENT',
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.timer_outlined, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                _campaignRemaining(),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Icon(Icons.emoji_events, size: 30, color: Color(0xffffd24a)),
+          Text(
+            activeCampaign?.subtitle ?? 'TOP PRIZE 25.000.000',
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xffffd24a),
+              fontWeight: FontWeight.w900,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  String _campaignRemaining() {
+    final end = activeCampaign?.endsAt;
+    if (end == null) return '2d 12h 45m';
+    final remaining = end.toUtc().difference(DateTime.now().toUtc());
+    if (remaining.isNegative) return 'ENDED';
+    return '${remaining.inDays}d ${remaining.inHours.remainder(24)}h';
+  }
 
   Widget _reward() => GestureDetector(
     onTap: rewardBusy ? null : _openRewardCenter,

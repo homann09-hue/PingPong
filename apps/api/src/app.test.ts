@@ -3,6 +3,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { InMemorySocialStore } from "./social/in-memory-social-store.js";
+import { DemoAdminAuthenticator } from "./admin/admin-auth.js";
+import { InMemoryLiveOpsStore } from "./liveops/in-memory-liveops-store.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -152,6 +154,34 @@ describe("spin API", () => {
     expect(accepted.json().friend.displayName).toBe("LuckyLuna");
     expect(overview.json().friends).toHaveLength(1);
     await socialApp.close();
+  });
+  it("publishes targeted LiveOps campaigns through separate editor and publisher identities", async () => {
+    const liveOpsStore = new InMemoryLiveOpsStore(false);
+    const liveOpsApp = buildApp({
+      authenticator: { authenticate: async () => playerId }, spinStore: new InMemorySpinStore(1_000),
+      liveOpsStore, adminAuthenticator: new DemoAdminAuthenticator(),
+    });
+    const now = Date.now();
+    const created = await liveOpsApp.inject({
+      method: "POST", url: "/admin/v1/liveops/campaigns", headers: { authorization: "Bearer local-admin-editor" },
+      payload: { name: "Launch week", startsAt: new Date(now - 60_000).toISOString(), endsAt: new Date(now + 86_400_000).toISOString(),
+        audience: { minLevel: 1, minVipPoints: 0 }, creative: { title: "LAUNCH WEEK", subtitle: "Seven days of rewards", ctaLabel: "PLAY" } },
+    });
+    const forbidden = await liveOpsApp.inject({ method: "POST", url: `/admin/v1/liveops/campaigns/${created.json().id}/publish`,
+      headers: { authorization: "Bearer local-admin-editor" } });
+    const before = await liveOpsApp.inject({ method: "GET", url: "/v1/liveops", headers: { authorization: "Bearer valid" } });
+    const published = await liveOpsApp.inject({ method: "POST", url: `/admin/v1/liveops/campaigns/${created.json().id}/publish`,
+      headers: { authorization: "Bearer local-admin-publisher" } });
+    const after = await liveOpsApp.inject({ method: "GET", url: "/v1/liveops", headers: { authorization: "Bearer valid" } });
+    const audit = await liveOpsApp.inject({ method: "GET", url: "/admin/v1/audit", headers: { authorization: "Bearer local-admin-publisher" } });
+    expect(created.statusCode).toBe(201);
+    expect(forbidden.statusCode).toBe(403);
+    expect(before.json().campaigns).toHaveLength(0);
+    expect(published.statusCode).toBe(200);
+    expect(published.json()).toMatchObject({ status: "published", createdBy: "demo-editor", publishedBy: "demo-publisher" });
+    expect(after.json().campaigns[0].creative.title).toBe("LAUNCH WEEK");
+    expect(audit.json().entries.map((entry: { action: string }) => entry.action)).toEqual(["campaign.published", "campaign.created"]);
+    await liveOpsApp.close();
   });
   it("publishes tiered daily and weekly missions with cadence-specific periods", async () => {
     const response = await app.inject({ method: "GET", url: "/v1/missions", headers: { authorization: "Bearer valid" } });

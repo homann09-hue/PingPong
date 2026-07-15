@@ -351,6 +351,18 @@ class SocialOverviewView {
   final List<ClanView> discoverClans;
 }
 
+class LiveOpsCampaignView {
+  const LiveOpsCampaignView({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.ctaLabel,
+    required this.endsAt,
+  });
+  final String id, title, subtitle, ctaLabel;
+  final DateTime endsAt;
+}
+
 class CasinoApi {
   static const _configuredBase = String.fromEnvironment('API_URL');
   static final base = _configuredBase.isNotEmpty
@@ -588,6 +600,30 @@ class CasinoApi {
           : _clan(data['currentClan']),
       discoverClans: (data['discoverClans'] as List).map(_clan).toList(),
     );
+  }
+
+  Future<List<LiveOpsCampaignView>> liveOpsCampaigns() async {
+    final response = await http.get(
+      Uri.parse('$base/v1/liveops'),
+      headers: {'authorization': 'Bearer local-demo'},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('LiveOps-Kampagnen konnten nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['campaigns'] as List)
+        .map((value) {
+          final campaign = value as Map<String, dynamic>;
+          final creative = campaign['creative'] as Map<String, dynamic>;
+          return LiveOpsCampaignView(
+            id: campaign['id'] as String,
+            title: creative['title'] as String,
+            subtitle: creative['subtitle'] as String,
+            ctaLabel: creative['ctaLabel'] as String,
+            endsAt: DateTime.parse(campaign['endsAt'] as String),
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<void> sendFriendRequest(String playerId) async {

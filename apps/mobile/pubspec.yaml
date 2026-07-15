@@ -19,6 +19,11 @@ flutter:
     - family: AuroraSans
       fonts:
         - asset: assets/fonts/AuroraSans-Regular.ttf
+    # Flutter Web uses Roboto as its final Material fallback. Map that family
+    # to the bundled brand font so the client never depends on Google Fonts.
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/AuroraSans-Regular.ttf
   assets:
     - assets/world/
     - assets/slots/

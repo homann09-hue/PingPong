@@ -43,6 +43,14 @@ against the authoritative profile before any credit occurs. VIP points and
 tournament score are derived from settled gameplay rather than client events.
 See ADR 0003.
 
+LiveOps campaign publication is isolated from player authentication. Workforce
+JWTs require the `aurora-workforce` issuer, `aurora-admin` audience and a
+separate secret. Editors can create drafts, publishers can release them, and a
+database constraint rejects self-approval. Every mutation appends an audit row;
+PostgreSQL rejects updates and deletes on that audit table. Player reads expose
+only published campaigns whose UTC window and level/VIP audience match the
+authoritative profile.
+
 ## Runtime target
 
 - Flutter clients use feature modules and a render-only slot scene.

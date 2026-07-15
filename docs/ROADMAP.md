@@ -56,9 +56,12 @@ config publishing, targeting previews, audit export and live health dashboards.
 
 Implemented vertical slice: authenticated social overview, durable friend
 requests/friendships and persistent clan creation/discovery/membership with
-PostgreSQL constraints and a functional Flutter surface. Clan roles beyond owner
-and member, chat, invitations, moderation, inbox, push, segmentation and the
-admin application remain planned.
+PostgreSQL constraints and a functional Flutter surface. LiveOps campaigns now
+support UTC scheduling, level/VIP targeting, separate workforce JWTs, editor /
+publisher / auditor RBAC, mandatory second-actor publication, an append-only
+PostgreSQL audit trail and a server-driven Flutter lobby banner. Clan roles
+beyond owner and member, chat, invitations, moderation, inbox, push, targeting
+previews and the visual admin application remain planned.
 
 ## Phase 4 — scale and launch readiness
 

@@ -133,6 +133,14 @@ creation, clan discovery, membership and leave operations. PostgreSQL enforces
 one clan per player, canonical friendship pairs, unique pending requests and
 unique clan names/tags. Apply `infra/postgres/014_social.sql` for this slice.
 
+The lobby promotion is backed by the LiveOps campaign API. Workforce tokens use
+a dedicated issuer/audience and secret, with separate editor, publisher and
+auditor roles. Campaigns remain invisible to players until a different operator
+publishes them; creation and publication are written to an append-only audit
+log. Level/VIP targeting and active UTC windows are evaluated by the server.
+Apply `infra/postgres/015_liveops_admin.sql` and configure a separate
+`ADMIN_JWT_SECRET` before starting production mode.
+
 Authenticated wallet reads are available through `GET /v1/wallet` and
 `GET /v1/wallet/transactions?limit=50`. Ledger rows are immutable, use a
 transaction-specific idempotency key, include balances before and after, and
