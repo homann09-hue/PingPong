@@ -51,6 +51,17 @@ PostgreSQL rejects updates and deletes on that audit table. Player reads expose
 only published campaigns whose UTC window and level/VIP audience match the
 authoritative profile.
 
+Operational telemetry is kept outside authoritative settlement. Liveness only
+reports process state, while readiness checks PostgreSQL through an independent,
+timeout-bounded pool. The metrics endpoint uses a dedicated bearer secret and a
+fixed low-cardinality label set; player and request identifiers are prohibited.
+Client analytics accept only a versioned allow-list of structured events and use
+client-generated UUIDs for retry idempotency. They are persisted asynchronously
+from the player's perspective and can never change wallet, RNG or progression
+state. The storage remains pseudonymous and requires scheduled bounded retention
+plus a production erasure/anonymization workflow; soft account deletion alone
+does not remove telemetry rows.
+
 ## Runtime target
 
 - Flutter clients use feature modules and a render-only slot scene.

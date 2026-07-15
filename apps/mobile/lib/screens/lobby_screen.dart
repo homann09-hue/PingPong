@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/game_definition.dart';
@@ -58,6 +60,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadShopOffers();
     _loadSocial();
     _loadLiveOps();
+    unawaited(api.trackEvent('screen.viewed', screen: 'lobby'));
   }
 
   Future<void> _loadLiveOps() async {

@@ -5,6 +5,9 @@ import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { InMemorySocialStore } from "./social/in-memory-social-store.js";
 import { DemoAdminAuthenticator } from "./admin/admin-auth.js";
 import { InMemoryLiveOpsStore } from "./liveops/in-memory-liveops-store.js";
+import { InMemoryAnalyticsStore } from "./analytics/in-memory-analytics-store.js";
+import { PrometheusOperationalMetrics } from "./observability/operational-metrics.js";
+import { AlwaysReadyProbe } from "./observability/readiness.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -12,6 +15,37 @@ const app = buildApp({
   spinStore: new InMemorySpinStore(100),
 });
 afterAll(async () => app.close());
+
+describe("observability and analytics API", () => {
+  const metrics = new PrometheusOperationalMetrics(false);
+  const observableApp = buildApp({
+    authenticator: { authenticate: async (header) => header === "Bearer valid" ? playerId : null },
+    spinStore: new InMemorySpinStore(1_000), analyticsStore: new InMemoryAnalyticsStore(),
+    metrics, metricsToken: "test-metrics-token", readiness: new AlwaysReadyProbe(),
+  });
+  afterAll(async () => observableApp.close());
+
+  it("reports readiness and hides metrics without the scrape credential", async () => {
+    const ready = await observableApp.inject({ method: "GET", url: "/health/ready" });
+    const hidden = await observableApp.inject({ method: "GET", url: "/internal/metrics" });
+    const scrape = await observableApp.inject({ method: "GET", url: "/internal/metrics", headers: { authorization: "Bearer test-metrics-token" } });
+    expect(ready).toMatchObject({ statusCode: 200 });
+    expect(ready.json()).toEqual({ status: "ready", checks: { runtime: "up" } });
+    expect(hidden.statusCode).toBe(404);
+    expect(scrape.statusCode).toBe(200);
+    expect(scrape.body).toContain("aurora_http_requests_total");
+  });
+
+  it("accepts allow-listed, recent analytics idempotently and rejects arbitrary properties", async () => {
+    const event = { eventId: randomUUID(), name: "screen.viewed", occurredAt: new Date().toISOString(),
+      platform: "web", appVersion: "0.1.0", screen: "lobby" };
+    const request = { method: "POST" as const, url: "/v1/analytics/events", headers: { authorization: "Bearer valid" }, payload: { events: [event] } };
+    expect((await observableApp.inject(request)).json()).toEqual({ accepted: 1, duplicates: 0 });
+    expect((await observableApp.inject(request)).json()).toEqual({ accepted: 0, duplicates: 1 });
+    const invalid = await observableApp.inject({ ...request, payload: { events: [{ ...event, eventId: randomUUID(), email: "must-not-be-collected@example.test" }] } });
+    expect(invalid.statusCode).toBe(400);
+  });
+});
 
 describe("spin API", () => {
   it("requires an idempotency key", async () => {

@@ -53,6 +53,9 @@ class _SlotScreenState extends State<SlotScreen> {
     xp = widget.xp;
     vipPoints = widget.vipPoints;
     _loadJackpots();
+    unawaited(
+      api.trackEvent('screen.viewed', screen: 'slot', slotId: widget.game.id),
+    );
   }
 
   Future<void> _loadJackpots() async {
@@ -154,6 +157,13 @@ class _SlotScreenState extends State<SlotScreen> {
         totalFreeSpins = r.totalFreeSpins;
         vipPoints = r.vipPoints;
       });
+      unawaited(
+        api.trackEvent(
+          'slot.presentation_completed',
+          screen: 'slot',
+          slotId: widget.game.id,
+        ),
+      );
       return r;
     } catch (e) {
       if (mounted) {

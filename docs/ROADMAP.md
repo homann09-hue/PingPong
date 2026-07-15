@@ -13,6 +13,12 @@ Transactional PostgreSQL adapters, authentication/session rotation, device risk,
 outbox, 5x3 rendering at 60 FPS, asset bundles, audio/haptics hooks, telemetry,
 exact RTP tooling, load tests, and one production-quality slot.
 
+The telemetry foundation now includes dependency-aware readiness, authenticated
+low-cardinality Prometheus metrics, constrained pseudonymous client-event
+ingestion, PostgreSQL idempotency and a bounded-retention function. Deployment
+dashboards/alerts, OpenTelemetry tracing, crash reporting, consent enforcement
+and automated retention scheduling remain launch requirements.
+
 ## Phase 2 — engine breadth and economy (started)
 
 Feature state machines for wild variants, scatters, free spins, respins, cascades,

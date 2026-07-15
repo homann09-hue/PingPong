@@ -147,6 +147,16 @@ immutable audit view. In demo mode use the explicit editor/publisher buttons;
 production operators supply a short-lived workforce JWT. The console never
 persists that token and is served with a strict CSP and `no-store` caching.
 
+Operational probes are available at `GET /health` and `GET /health/ready`.
+Prometheus-format runtime metrics are exposed at `GET /internal/metrics` only
+with `Authorization: Bearer <METRICS_TOKEN>`; production requires a token of at
+least 32 bytes. Authenticated clients can submit the constrained, idempotent
+analytics taxonomy through `POST /v1/analytics/events`. Analytics delivery is
+best-effort and never participates in gameplay settlement. Apply
+`infra/postgres/016_observability_analytics.sql`, schedule its retention function,
+and see `docs/work-packages/phase7-observability-analytics.md` for the privacy and
+operations boundary.
+
 Authenticated wallet reads are available through `GET /v1/wallet` and
 `GET /v1/wallet/transactions?limit=50`. Ledger rows are immutable, use a
 transaction-specific idempotency key, include balances before and after, and

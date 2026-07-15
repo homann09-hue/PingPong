@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
@@ -18,6 +18,10 @@ import { ClanMembershipError, ClanNotFoundError, FriendRequestNotFoundError, Soc
 import type { AdminAuthenticator, AdminRole } from "./admin/admin-auth.js";
 import type { LiveOpsStore } from "./liveops/liveops-store.js";
 import { CampaignNotFoundError, CampaignStateError, FourEyesViolationError } from "./liveops/liveops-store.js";
+import type { AnalyticsStore, ClientAnalyticsEvent } from "./analytics/analytics-store.js";
+import { analyticsEventNames } from "./analytics/analytics-store.js";
+import type { OperationalMetrics } from "./observability/operational-metrics.js";
+import type { ReadinessProbe } from "./observability/readiness.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -47,6 +51,12 @@ const campaignBody = z.object({
   }),
 }).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { message: "endsAt must be after startsAt" });
 const adminAuditQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(100) });
+const analyticsBatchBody = z.object({ events: z.array(z.object({
+  eventId: z.string().uuid(), name: z.enum(analyticsEventNames), occurredAt: z.string().datetime(),
+  platform: z.enum(["ios", "android", "web"]), appVersion: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._+-]+$/),
+  screen: z.string().trim().min(1).max(64).regex(/^[a-z0-9._-]+$/).optional(),
+  slotId: z.string().trim().min(1).max(64).regex(/^[a-z0-9-]+$/).optional(), campaignId: z.string().uuid().optional(),
+}).strict()).min(1).max(50) }).strict();
 const rewardAmounts = new Map([
   ["daily", 250_000],
   ["spin-10", 100_000],
@@ -72,6 +82,10 @@ export interface AppDependencies {
   readonly socialStore?: SocialStore;
   readonly adminAuthenticator?: AdminAuthenticator;
   readonly liveOpsStore?: LiveOpsStore;
+  readonly analyticsStore?: AnalyticsStore;
+  readonly metrics?: OperationalMetrics;
+  readonly metricsToken?: string;
+  readonly readiness?: ReadinessProbe;
 }
 
 /** Builds the HTTP composition root with explicit, replaceable infrastructure ports. */
@@ -84,7 +98,9 @@ export function buildApp(dependencies: AppDependencies) {
     exposedHeaders: ["x-request-id"],
   });
   const authRateLimiter = new FixedWindowRateLimiter();
+  const requestStarted = new WeakMap<object, bigint>();
   app.addHook("onRequest", async (request, reply) => {
+    requestStarted.set(request, process.hrtime.bigint());
     reply.header("x-request-id", request.id);
     reply.header("x-content-type-options", "nosniff");
     reply.header("referrer-policy", "no-referrer");
@@ -109,9 +125,26 @@ export function buildApp(dependencies: AppDependencies) {
       if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
     }
   });
+  app.addHook("onResponse", async (request, reply) => {
+    if (!dependencies.metrics || request.url.startsWith("/internal/metrics")) return;
+    const started = requestStarted.get(request);
+    const seconds = started ? Number(process.hrtime.bigint() - started) / 1_000_000_000 : 0;
+    dependencies.metrics.observeHttp(request.method, request.routeOptions.url ?? "unmatched", reply.statusCode, seconds);
+  });
   const configs = new Map<string, SlotConfig>([classicConfig, auroraConfig, ...themedConfigs].map((config) => [config.id, config]));
 
   app.get("/health/live", async () => ({ status: "ok" }));
+  app.get("/health/ready", async (_request, reply) => {
+    if (!dependencies.readiness) return reply.code(503).send({ status: "not_ready", checks: { configuration: "down" } });
+    const result = await dependencies.readiness.check();
+    return reply.code(result.ready ? 200 : 503).send({ status: result.ready ? "ready" : "not_ready", checks: result.checks });
+  });
+  app.get("/internal/metrics", async (request, reply) => {
+    if (!dependencies.metrics || !dependencies.metricsToken || !secureBearerMatch(request.headers.authorization, dependencies.metricsToken)) {
+      return reply.code(404).send({ code: "NOT_FOUND" });
+    }
+    return reply.header("content-type", dependencies.metrics.contentType).send(await dependencies.metrics.render());
+  });
   app.post("/v1/auth/guest", async (request, reply) => {
     if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
     const body = guestAuthBody.safeParse(request.body);
@@ -212,6 +245,30 @@ export function buildApp(dependencies: AppDependencies) {
   });
   app.get("/v1/jackpots", async () => ({ jackpots: await dependencies.spinStore.getJackpots() }));
   app.get("/v1/shop/offers", async () => ({ offers: activeShopOffers(new Date()) }));
+  app.post("/v1/analytics/events", async (request, reply) => {
+    if (!dependencies.analyticsStore) return reply.code(503).send({ code: "ANALYTICS_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const rate = authRateLimiter.consume(`analytics:${playerId}`, 60, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    const body = analyticsBatchBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    const receivedAt = new Date();
+    const events: ClientAnalyticsEvent[] = body.data.events.map((event) => ({
+      eventId: event.eventId, name: event.name, occurredAt: new Date(event.occurredAt),
+      platform: event.platform, appVersion: event.appVersion,
+      ...(event.screen === undefined ? {} : { screen: event.screen }),
+      ...(event.slotId === undefined ? {} : { slotId: event.slotId }),
+      ...(event.campaignId === undefined ? {} : { campaignId: event.campaignId }),
+    }));
+    if (events.some((event) => event.occurredAt > new Date(receivedAt.getTime() + 5 * 60_000)
+      || event.occurredAt < new Date(receivedAt.getTime() - 24 * 60 * 60_000))) {
+      return reply.code(400).send({ code: "EVENT_TIME_OUT_OF_RANGE" });
+    }
+    const result = await dependencies.analyticsStore.ingest(playerId, events, receivedAt);
+    dependencies.metrics?.recordAnalytics(result.accepted, result.duplicates);
+    return reply.code(202).send(result);
+  });
   app.get("/v1/liveops", async (request, reply) => {
     if (!dependencies.liveOpsStore) return reply.code(503).send({ code: "LIVEOPS_UNAVAILABLE" });
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
@@ -501,9 +558,11 @@ export function buildApp(dependencies: AppDependencies) {
         playerId, idempotencyKey: keyResult.data, slotId, configVersion: config.version,
         bet: wager, seed,
       }, () => engine.spin({ bet: body.data.bet, seed, bonusBuy: body.data.bonusBuy }));
+      dependencies.metrics?.recordSpin(slotId, "returned");
       const { seed: _privateSeed, ...publicSpin } = settled.spin;
       return { ...settled, spin: publicSpin, jackpots: await dependencies.spinStore.getJackpots() };
     } catch (error) {
+      dependencies.metrics?.recordSpin(slotId, "rejected");
       if (error instanceof InsufficientFundsError) return reply.code(409).send({ code: "INSUFFICIENT_FUNDS" });
       throw error;
     }
@@ -513,11 +572,19 @@ export function buildApp(dependencies: AppDependencies) {
     await dependencies.identityService?.close();
     await dependencies.socialStore?.close();
     await dependencies.liveOpsStore?.close();
+    await dependencies.analyticsStore?.close();
+    await dependencies.readiness?.close();
   });
   return app;
 }
 
 function hasAdminRole(roles: readonly AdminRole[], required: AdminRole): boolean { return roles.includes(required); }
+
+function secureBearerMatch(authorization: string | undefined, expected: string): boolean {
+  if (!authorization?.startsWith("Bearer ")) return false;
+  const actual = Buffer.from(authorization.slice(7)); const target = Buffer.from(expected);
+  return actual.length === target.length && timingSafeEqual(actual, target);
+}
 
 function vipStatus(points: number) {
   const tiers = [

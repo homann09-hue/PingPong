@@ -365,6 +365,10 @@ class LiveOpsCampaignView {
 
 class CasinoApi {
   static const _configuredBase = String.fromEnvironment('API_URL');
+  static const _appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '0.1.0',
+  );
   static final base = _configuredBase.isNotEmpty
       ? _configuredBase
       : kIsWeb
@@ -935,6 +939,45 @@ class CasinoApi {
       coins: data['coins'] as int,
       balance: data['coinBalance'] as int,
     );
+  }
+
+  /// Sends only allow-listed presentation telemetry; failures never affect play.
+  Future<void> trackEvent(
+    String name, {
+    required String screen,
+    String? slotId,
+    String? campaignId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$base/v1/analytics/events'),
+        headers: {
+          'authorization': 'Bearer local-demo',
+          'content-type': 'application/json',
+        },
+        body: jsonEncode({
+          'events': [
+            {
+              'eventId': _uuid(),
+              'name': name,
+              'occurredAt': DateTime.now().toUtc().toIso8601String(),
+              'platform': kIsWeb
+                  ? 'web'
+                  : defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'ios'
+                  : 'android',
+              'appVersion': _appVersion,
+              'screen': screen,
+              'slotId': ?slotId,
+              'campaignId': ?campaignId,
+            },
+          ],
+        }),
+      );
+      if (response.statusCode != 202) return;
+    } catch (_) {
+      // Analytics is deliberately best-effort and cannot block gameplay.
+    }
   }
 
   static TimedRewardView _timedReward(Map<String, dynamic> data) =>
