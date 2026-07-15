@@ -1,6 +1,8 @@
 import type { SpinResult } from "@aurora/slot-engine";
 import type { JackpotPoolView } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
+import type { StoreProduct } from "../monetization/store-products.js";
+import type { VerifiedStoreTransaction } from "../monetization/receipt-verifier.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -35,6 +37,30 @@ export interface PlayerProfile {
 export interface ShopPurchase {
   readonly purchaseId: string; readonly offerId: string; readonly coins: number; readonly gemsSpent: number;
   readonly coinBalance: number; readonly gemBalance: number;
+}
+export interface GrantStorePurchaseCommand {
+  readonly playerId: string;
+  readonly product: StoreProduct;
+  readonly verified: VerifiedStoreTransaction;
+  readonly verificationHash: string;
+}
+export interface StorePurchaseSettlement {
+  readonly purchaseId: string;
+  readonly productKey: string;
+  readonly storeProductId: string;
+  readonly transactionId: string;
+  readonly coins: number;
+  readonly gems: number;
+  readonly coinBalance: number;
+  readonly gemBalance: number;
+  readonly replayed: boolean;
+}
+export interface StoreRefundCommand {
+  readonly eventId: string;
+  readonly platform: "ios" | "android";
+  readonly transactionId: string;
+  readonly occurredAt: Date;
+  readonly providerPayloadHash: string;
 }
 
 export interface RewardClaim {
@@ -127,6 +153,8 @@ export interface SpinStore {
   getActiveTournament(playerId: string, now: Date): Promise<TournamentView>;
   getJackpots(): Promise<readonly JackpotPoolView[]>;
   purchaseShopOffer(playerId: string, offer: ShopOffer, idempotencyKey: string): Promise<ShopPurchase>;
+  grantStorePurchase(command: GrantStorePurchaseCommand): Promise<StorePurchaseSettlement>;
+  refundStorePurchase(command: StoreRefundCommand): Promise<boolean>;
   close(): Promise<void>;
 }
 
@@ -140,3 +168,7 @@ export class MissionNotClaimableError extends Error {}
 export class EventMilestoneNotClaimableError extends Error {}
 export class InsufficientGemsError extends Error {}
 export class ShopOfferLimitReachedError extends Error {}
+export class StoreTransactionConflictError extends Error {}
+export class StoreProductLimitReachedError extends Error {}
+export class StorePurchaseRevokedError extends Error {}
+export class StorePurchaseDebtError extends Error {}

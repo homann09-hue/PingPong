@@ -25,6 +25,9 @@ import type { ReadinessProbe } from "./observability/readiness.js";
 import type { MessagingStore } from "./messaging/messaging-store.js";
 import { PushCampaignNotPublishableError } from "./messaging/messaging-store.js";
 import type { PushDeliveryWorker } from "./messaging/push-delivery-worker.js";
+import type { MonetizationService } from "./monetization/monetization-service.js";
+import { ReceiptGatewayUnavailableError, ReceiptInvalidError, ReceiptPendingError } from "./monetization/receipt-verifier.js";
+import { StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError } from "./spins/spin-store.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -75,6 +78,15 @@ const pushInstallationBody = z.object({
   provider: z.enum(["apns", "fcm", "web_push"]), token: z.string().min(16).max(4096),
 }).strict().refine((value) => value.provider === "fcm" || (value.provider === "apns" && value.platform === "ios")
   || (value.provider === "web_push" && value.platform === "web"), { message: "Provider is incompatible with platform" });
+const storePlatform = z.enum(["ios", "android"]);
+const storePurchaseBody = z.object({
+  platform: storePlatform, storeProductId: z.string().min(1).max(200), transactionId: z.string().min(1).max(256),
+  verificationToken: z.string().min(1).max(16_384),
+}).strict();
+const storeRefundBody = z.object({
+  eventId: z.string().uuid(), platform: storePlatform, transactionId: z.string().min(1).max(256),
+  occurredAt: z.string().datetime(), providerPayloadHash: z.string().regex(/^[0-9a-f]{64}$/),
+}).strict();
 const rewardAmounts = new Map([
   ["daily", 250_000],
   ["spin-10", 100_000],
@@ -106,6 +118,8 @@ export interface AppDependencies {
   readonly readiness?: ReadinessProbe;
   readonly messagingStore?: MessagingStore;
   readonly pushWorker?: PushDeliveryWorker;
+  readonly monetizationService?: MonetizationService;
+  readonly storeWebhookToken?: string;
 }
 
 /** Builds the HTTP composition root with explicit, replaceable infrastructure ports. */
@@ -164,6 +178,18 @@ export function buildApp(dependencies: AppDependencies) {
       return reply.code(404).send({ code: "NOT_FOUND" });
     }
     return reply.header("content-type", dependencies.metrics.contentType).send(await dependencies.metrics.render());
+  });
+  app.post("/internal/v1/store/refunds", async (request, reply) => {
+    if (!dependencies.monetizationService || !dependencies.storeWebhookToken
+      || !secureBearerMatch(request.headers.authorization, dependencies.storeWebhookToken)) {
+      return reply.code(404).send({ code: "NOT_FOUND" });
+    }
+    const body = storeRefundBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    const accepted = await dependencies.monetizationService.processRefund({
+      ...body.data, occurredAt: new Date(body.data.occurredAt),
+    });
+    return reply.code(202).send({ accepted });
   });
   app.post("/v1/auth/guest", async (request, reply) => {
     if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
@@ -265,6 +291,32 @@ export function buildApp(dependencies: AppDependencies) {
   });
   app.get("/v1/jackpots", async () => ({ jackpots: await dependencies.spinStore.getJackpots() }));
   app.get("/v1/shop/offers", async () => ({ offers: activeShopOffers(new Date()) }));
+  app.get("/v1/store/products", async (request, reply) => {
+    if (!dependencies.monetizationService) return reply.code(503).send({ code: "STORE_UNAVAILABLE" });
+    const platform = storePlatform.safeParse((request.query as { platform?: string }).platform);
+    if (!platform.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    return { products: dependencies.monetizationService.catalog(platform.data) };
+  });
+  app.post("/v1/store/purchases/verify", async (request, reply) => {
+    if (!dependencies.monetizationService) return reply.code(503).send({ code: "STORE_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const rate = authRateLimiter.consume(`store-purchase:${playerId}`, 20, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    const body = storePurchaseBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    try { return await dependencies.monetizationService.verifyAndGrant(playerId, body.data); }
+    catch (error) {
+      if (error instanceof ReceiptInvalidError) return reply.code(422).send({ code: "PURCHASE_INVALID" });
+      if (error instanceof ReceiptPendingError) return reply.code(409).send({ code: "PURCHASE_PENDING" });
+      if (error instanceof ReceiptGatewayUnavailableError) return reply.code(503).send({ code: "STORE_VERIFICATION_UNAVAILABLE" });
+      if (error instanceof StoreTransactionConflictError) return reply.code(409).send({ code: "TRANSACTION_CONFLICT" });
+      if (error instanceof StoreProductLimitReachedError) return reply.code(409).send({ code: "PRODUCT_LIMIT_REACHED" });
+      if (error instanceof StorePurchaseRevokedError) return reply.code(409).send({ code: "PURCHASE_REVOKED" });
+      if (error instanceof StorePurchaseDebtError) return reply.code(409).send({ code: "PURCHASE_REVIEW_REQUIRED" });
+      throw error;
+    }
+  });
   app.post("/v1/analytics/events", async (request, reply) => {
     if (!dependencies.analyticsStore) return reply.code(503).send({ code: "ANALYTICS_UNAVAILABLE" });
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
@@ -653,6 +705,7 @@ export function buildApp(dependencies: AppDependencies) {
     await dependencies.readiness?.close();
     await dependencies.pushWorker?.close();
     await dependencies.messagingStore?.close();
+    await dependencies.monetizationService?.close();
   });
   return app;
 }

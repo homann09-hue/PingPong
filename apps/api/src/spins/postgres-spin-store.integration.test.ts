@@ -6,6 +6,7 @@ import type { SpinResult } from "@aurora/slot-engine";
 import { activeShopOffers } from "../shop/shop-catalog.js";
 import { PostgresSpinStore } from "./postgres-spin-store.js";
 import { InsufficientGemsError, RewardNotAvailableError, ShopOfferLimitReachedError } from "./spin-store.js";
+import { storeProducts } from "../monetization/store-products.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseSuite = databaseUrl ? describe : describe.skip;
@@ -16,6 +17,7 @@ databaseSuite("PostgresSpinStore integration", () => {
   const playerId = randomUUID();
   const shopPlayerId = randomUUID();
   const concurrentShopPlayerId = randomUUID();
+  const storePlayerId = randomUUID();
   const slotId = `integration-${randomUUID()}`;
   const missionId = `integration-mission-${randomUUID()}`;
 
@@ -69,11 +71,16 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/013_shop_purchases.sql", import.meta.url), "utf8",
     );
     await pool.query(shopMigration);
-    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3)", [playerId, shopPlayerId, concurrentShopPlayerId]);
+    const storeMigration = await readFile(
+      new URL("../../../../infra/postgres/018_store_monetization.sql", import.meta.url), "utf8",
+    );
+    await pool.query(storeMigration);
+    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4)", [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId]);
     await pool.query(
       `INSERT INTO wallets (player_id, currency, balance) VALUES
-        ($1,'coin',100),($1,'gem',0),($2,'coin',1000),($2,'gem',320),($3,'coin',1000),($3,'gem',320)`,
-      [playerId, shopPlayerId, concurrentShopPlayerId],
+        ($1,'coin',100),($1,'gem',0),($2,'coin',1000),($2,'gem',320),($3,'coin',1000),($3,'gem',320),
+        ($4,'coin',1000),($4,'gem',320)`,
+      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId],
     );
     await pool.query(
       "INSERT INTO slot_config_versions (slot_id, version, config, config_sha256, published_at) VALUES ($1,1,'{}',$2,now())",
@@ -237,5 +244,31 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(concurrent.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     const rejected = concurrent.find((result) => result.status === "rejected");
     expect(rejected?.status === "rejected" ? rejected.reason : null).toBeInstanceOf(ShopOfferLimitReachedError);
+  });
+
+  it("grants and refunds a verified provider transaction idempotently without storing its token", async () => {
+    const product = storeProducts.find((item) => item.key === "fortune-chest")!;
+    const transactionId = `pg-${randomUUID()}`;
+    const command = { playerId: storePlayerId, product, verificationHash: "b".repeat(64), verified: {
+      platform: "ios" as const, storeProductId: product.storeProductIds.ios, transactionId,
+      originalTransactionId: transactionId, accountId: storePlayerId, environment: "sandbox" as const,
+      purchasedAt: new Date(), quantity: 1 as const, providerFinalized: true, revokedAt: null,
+    } };
+    const first = await store.grantStorePurchase(command);
+    const replay = await store.grantStorePurchase(command);
+    expect(first).toMatchObject({ coins: 5_000_000, gems: 150, coinBalance: 5_001_000, gemBalance: 470, replayed: false });
+    expect(replay).toMatchObject({ coinBalance: 5_001_000, replayed: true });
+    const persisted = await pool.query<{ verification_hash: string }>(
+      "SELECT verification_hash FROM verified_store_purchases WHERE platform='ios' AND transaction_id=$1", [transactionId],
+    );
+    expect(persisted.rows).toEqual([{ verification_hash: "b".repeat(64) }]);
+    const eventId = randomUUID();
+    expect(await store.refundStorePurchase({ eventId, platform: "ios", transactionId, occurredAt: new Date(), providerPayloadHash: "c".repeat(64) })).toBe(true);
+    expect(await store.refundStorePurchase({ eventId, platform: "ios", transactionId, occurredAt: new Date(), providerPayloadHash: "c".repeat(64) })).toBe(false);
+    expect(await store.getProfile(storePlayerId)).toMatchObject({ coinBalance: 1000, gemBalance: 320 });
+    const ledger = await pool.query<{ count: string }>(
+      "SELECT count(*) FROM wallet_ledger WHERE player_id=$1 AND source IN ('store_purchase','store_refund')", [storePlayerId],
+    );
+    expect(ledger.rows[0]?.count).toBe("4");
   });
 });

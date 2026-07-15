@@ -178,6 +178,35 @@ class ShopPurchaseException implements Exception {
   final String code;
 }
 
+class StoreProductView {
+  const StoreProductView({
+    required this.key,
+    required this.title,
+    required this.description,
+    required this.badge,
+    required this.featured,
+    required this.grantCoins,
+    required this.grantGems,
+    required this.purchaseLimit,
+    required this.storeProductId,
+  });
+  final String key, title, description, badge, purchaseLimit, storeProductId;
+  final bool featured;
+  final int grantCoins, grantGems;
+}
+
+class VerifiedStorePurchaseView {
+  const VerifiedStorePurchaseView({
+    required this.coins,
+    required this.gems,
+    required this.coinBalance,
+    required this.gemBalance,
+    required this.replayed,
+  });
+  final int coins, gems, coinBalance, gemBalance;
+  final bool replayed;
+}
+
 class PushPreferencesView {
   const PushPreferencesView({
     required this.enabled,
@@ -594,6 +623,67 @@ class CasinoApi {
           );
         })
         .toList(growable: false);
+  }
+
+  Future<List<StoreProductView>> storeProducts(String platform) async {
+    final response = await http.get(
+      Uri.parse('$base/v1/store/products?platform=$platform'),
+    );
+    if (response.statusCode != 200)
+      throw StateError('Store-Katalog konnte nicht geladen werden');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['products'] as List)
+        .map((value) {
+          final item = value as Map<String, dynamic>;
+          return StoreProductView(
+            key: item['key'] as String,
+            title: item['title'] as String,
+            description: item['description'] as String,
+            badge: item['badge'] as String,
+            featured: item['featured'] as bool,
+            grantCoins: item['grantCoins'] as int,
+            grantGems: item['grantGems'] as int,
+            purchaseLimit: item['purchaseLimit'] as String,
+            storeProductId: item['storeProductId'] as String,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<VerifiedStorePurchaseView> verifyStorePurchase({
+    required String platform,
+    required String productId,
+    required String transactionId,
+    required String verificationToken,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$base/v1/store/purchases/verify'),
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer local-demo',
+      },
+      body: jsonEncode({
+        'platform': platform,
+        'storeProductId': productId,
+        'transactionId': transactionId,
+        'verificationToken': verificationToken,
+      }),
+    );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 409 || response.statusCode == 422) {
+      throw ShopPurchaseException(
+        data['code'] as String? ?? 'PURCHASE_REJECTED',
+      );
+    }
+    if (response.statusCode != 200)
+      throw StateError('Store-Kauf konnte nicht verifiziert werden');
+    return VerifiedStorePurchaseView(
+      coins: data['coins'] as int,
+      gems: data['gems'] as int,
+      coinBalance: data['coinBalance'] as int,
+      gemBalance: data['gemBalance'] as int,
+      replayed: data['replayed'] as bool,
+    );
   }
 
   Future<SocialOverviewView> socialOverview() async {

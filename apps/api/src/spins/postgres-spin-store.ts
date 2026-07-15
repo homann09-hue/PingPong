@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { SpinResult } from "@aurora/slot-engine";
-import type { EventMilestoneClaim, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spin-store.js";
+import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
+import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -25,6 +25,10 @@ interface WalletTransactionRow {
   created_at: Date;
 }
 interface TimedRewardRow { level: number; last_claimed_at: Date | null; streak: number; cycle_position: number; claims_toward_wheel: number }
+interface StorePurchaseRow {
+  id: string; player_id: string; product_key: string; store_product_id: string; transaction_id: string;
+  coins_granted: string; gems_granted: string; coin_balance_after: string; gem_balance_after: string;
+}
 
 /** Atomically settles wagers, wins, ledger entries, spin audit and outbox event. */
 export class PostgresSpinStore implements SpinStore {
@@ -277,6 +281,140 @@ export class PostgresSpinStore implements SpinStore {
       await client.query("ROLLBACK");
       throw error;
     } finally { client.release(); }
+  }
+
+  public async grantStorePurchase(command: GrantStorePurchaseCommand): Promise<StorePurchaseSettlement> {
+    const client = await this.pool.connect();
+    const transactionKey = `${command.verified.platform}:${command.verified.transactionId}`;
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [transactionKey]);
+      const existing = await client.query<StorePurchaseRow>(
+        `SELECT id,player_id,product_key,store_product_id,transaction_id,coins_granted,gems_granted,
+                coin_balance_after,gem_balance_after FROM verified_store_purchases
+          WHERE platform=$1 AND transaction_id=$2`, [command.verified.platform, command.verified.transactionId],
+      );
+      if (existing.rows[0]) {
+        const row = existing.rows[0];
+        if (row.player_id !== command.playerId || row.product_key !== command.product.key) throw new StoreTransactionConflictError();
+        await client.query("COMMIT");
+        return this.storeSettlement(row, true);
+      }
+      const revoked = await client.query(
+        "SELECT 1 FROM store_purchase_events WHERE platform=$1 AND transaction_id=$2 AND event_type='refund' LIMIT 1",
+        [command.verified.platform, command.verified.transactionId],
+      );
+      if (revoked.rowCount) throw new StorePurchaseRevokedError();
+      const debt = await client.query(
+        "SELECT 1 FROM verified_store_purchases WHERE player_id=$1 AND status='refunded' AND (unrecovered_coins>0 OR unrecovered_gems>0) LIMIT 1",
+        [command.playerId],
+      );
+      if (debt.rowCount) throw new StorePurchaseDebtError();
+      const purchaseLimitKey = command.product.purchaseLimit === "once" ? command.product.key : null;
+      if (purchaseLimitKey) {
+        const limited = await client.query(
+          "SELECT 1 FROM verified_store_purchases WHERE player_id=$1 AND purchase_limit_key=$2 LIMIT 1",
+          [command.playerId, purchaseLimitKey],
+        );
+        if (limited.rowCount) throw new StoreProductLimitReachedError();
+      }
+      const wallets = await client.query<{ currency: "coin" | "gem"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','gem') ORDER BY currency FOR UPDATE",
+        [command.playerId],
+      );
+      const coinRow = wallets.rows.find((row) => row.currency === "coin");
+      const gemRow = wallets.rows.find((row) => row.currency === "gem");
+      if (!coinRow || !gemRow) throw new Error("Player store wallets do not exist");
+      const coinBefore = this.safeInteger(coinRow.balance, "Store coin balance");
+      const gemBefore = this.safeInteger(gemRow.balance, "Store gem balance");
+      const purchaseId = randomUUID();
+      const settlement: StorePurchaseSettlement = {
+        purchaseId, productKey: command.product.key, storeProductId: command.verified.storeProductId,
+        transactionId: command.verified.transactionId, coins: command.product.grantCoins, gems: command.product.grantGems,
+        coinBalance: coinBefore + command.product.grantCoins, gemBalance: gemBefore + command.product.grantGems, replayed: false,
+      };
+      await client.query(
+        `INSERT INTO verified_store_purchases
+          (id,player_id,platform,product_key,store_product_id,transaction_id,original_transaction_id,environment,
+           purchased_at,verification_hash,provider_finalized,purchase_limit_key,coins_granted,gems_granted,
+           coin_balance_after,gem_balance_after)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        [purchaseId, command.playerId, command.verified.platform, command.product.key, command.verified.storeProductId,
+          command.verified.transactionId, command.verified.originalTransactionId, command.verified.environment,
+          command.verified.purchasedAt, command.verificationHash, command.verified.providerFinalized, purchaseLimitKey,
+          settlement.coins, settlement.gems, settlement.coinBalance, settlement.gemBalance],
+      );
+      await client.query(
+        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint ELSE $2::bigint END, version=version+1
+          WHERE player_id=$3 AND currency IN ('coin','gem')`,
+        [settlement.coinBalance, settlement.gemBalance, command.playerId],
+      );
+      await this.ledger(client, { playerId: command.playerId, amount: settlement.coins, reason: "verified_store_purchase",
+        source: "store_purchase", referenceId: purchaseId, idempotencyKey: `store:${transactionKey}:coins`,
+        balanceBefore: coinBefore, balanceAfter: settlement.coinBalance,
+        metadata: { productKey: command.product.key, platform: command.verified.platform, environment: command.verified.environment } });
+      if (settlement.gems > 0) await this.ledger(client, { playerId: command.playerId, currency: "gem", amount: settlement.gems,
+        reason: "verified_store_purchase", source: "store_purchase", referenceId: purchaseId,
+        idempotencyKey: `store:${transactionKey}:gems`, balanceBefore: gemBefore, balanceAfter: settlement.gemBalance,
+        metadata: { productKey: command.product.key, platform: command.verified.platform, environment: command.verified.environment } });
+      await client.query("COMMIT");
+      return settlement;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if ((error as { code?: string }).code === "23505" && command.product.purchaseLimit === "once") throw new StoreProductLimitReachedError();
+      throw error;
+    } finally { client.release(); }
+  }
+
+  public async refundStorePurchase(command: StoreRefundCommand): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`${command.platform}:${command.transactionId}`]);
+      const event = await client.query(
+        `INSERT INTO store_purchase_events(event_id,platform,transaction_id,event_type,occurred_at,provider_payload_hash)
+         VALUES ($1,$2,$3,'refund',$4,$5) ON CONFLICT (event_id) DO NOTHING`,
+        [command.eventId, command.platform, command.transactionId, command.occurredAt, command.providerPayloadHash],
+      );
+      if (event.rowCount !== 1) { await client.query("COMMIT"); return false; }
+      const purchases = await client.query<StorePurchaseRow & { status: "granted" | "refunded" }>(
+        `SELECT id,player_id,product_key,store_product_id,transaction_id,coins_granted,gems_granted,
+                coin_balance_after,gem_balance_after,status FROM verified_store_purchases
+          WHERE platform=$1 AND transaction_id=$2 FOR UPDATE`, [command.platform, command.transactionId],
+      );
+      const purchase = purchases.rows[0];
+      if (!purchase || purchase.status === "refunded") { await client.query("COMMIT"); return true; }
+      const wallets = await client.query<{ currency: "coin" | "gem"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','gem') ORDER BY currency FOR UPDATE",
+        [purchase.player_id],
+      );
+      const coinBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "coin")!.balance, "Refund coin balance");
+      const gemBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "gem")!.balance, "Refund gem balance");
+      const grantedCoins = this.safeInteger(purchase.coins_granted, "Granted coins");
+      const grantedGems = this.safeInteger(purchase.gems_granted, "Granted gems");
+      const recoveredCoins = Math.min(coinBefore, grantedCoins);
+      const recoveredGems = Math.min(gemBefore, grantedGems);
+      await client.query(
+        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint ELSE $2::bigint END, version=version+1
+          WHERE player_id=$3 AND currency IN ('coin','gem')`,
+        [coinBefore - recoveredCoins, gemBefore - recoveredGems, purchase.player_id],
+      );
+      if (recoveredCoins > 0) await this.ledger(client, { playerId: purchase.player_id, amount: -recoveredCoins,
+        reason: "store_refund", source: "store_refund", referenceId: purchase.id,
+        idempotencyKey: `store-refund:${command.eventId}:coins`, balanceBefore: coinBefore,
+        balanceAfter: coinBefore - recoveredCoins, metadata: { platform: command.platform, transactionId: command.transactionId } });
+      if (recoveredGems > 0) await this.ledger(client, { playerId: purchase.player_id, currency: "gem", amount: -recoveredGems,
+        reason: "store_refund", source: "store_refund", referenceId: purchase.id,
+        idempotencyKey: `store-refund:${command.eventId}:gems`, balanceBefore: gemBefore,
+        balanceAfter: gemBefore - recoveredGems, metadata: { platform: command.platform, transactionId: command.transactionId } });
+      await client.query(
+        `UPDATE verified_store_purchases SET status='refunded',refunded_at=$1,coins_recovered=$2,gems_recovered=$3,
+          unrecovered_coins=coins_granted-$2,unrecovered_gems=gems_granted-$3 WHERE id=$4`,
+        [command.occurredAt, recoveredCoins, recoveredGems, purchase.id],
+      );
+      await client.query("COMMIT");
+      return true;
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 
   public async claimReward(playerId: string, rewardId: string, coins: number): Promise<RewardClaim> {
@@ -664,6 +802,13 @@ export class PostgresSpinStore implements SpinStore {
         vipPoints: result.rows[0].progression_after.vipPoints ?? 0,
       },
     } : null;
+  }
+
+  private storeSettlement(row: StorePurchaseRow, replayed: boolean): StorePurchaseSettlement {
+    return { purchaseId: row.id, productKey: row.product_key, storeProductId: row.store_product_id,
+      transactionId: row.transaction_id, coins: this.safeInteger(row.coins_granted, "Store coins"),
+      gems: this.safeInteger(row.gems_granted, "Store gems"), coinBalance: this.safeInteger(row.coin_balance_after, "Store coin balance"),
+      gemBalance: this.safeInteger(row.gem_balance_after, "Store gem balance"), replayed };
   }
 
   private async ledger(client: PoolClient, entry: {

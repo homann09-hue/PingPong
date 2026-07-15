@@ -9,6 +9,8 @@ import { InMemoryAnalyticsStore } from "./analytics/in-memory-analytics-store.js
 import { PrometheusOperationalMetrics } from "./observability/operational-metrics.js";
 import { AlwaysReadyProbe } from "./observability/readiness.js";
 import { InMemoryMessagingStore } from "./messaging/in-memory-messaging-store.js";
+import { MonetizationService } from "./monetization/monetization-service.js";
+import { DemoReceiptVerifier } from "./monetization/receipt-verifier.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -16,6 +18,62 @@ const app = buildApp({
   spinStore: new InMemorySpinStore(100),
 });
 afterAll(async () => app.close());
+
+describe("verified store monetization API", () => {
+  const spinStore = new InMemorySpinStore(1_000);
+  const storeApp = buildApp({
+    authenticator: { authenticate: async (header) => header === "Bearer valid" ? playerId : null },
+    spinStore, monetizationService: new MonetizationService(new DemoReceiptVerifier(), spinStore),
+    storeWebhookToken: "test-store-webhook",
+  });
+  afterAll(async () => storeApp.close());
+
+  it("publishes grants without inventing platform prices", async () => {
+    const response = await storeApp.inject({ method: "GET", url: "/v1/store/products?platform=ios" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().products).toHaveLength(4);
+    expect(response.json().products[0]).toMatchObject({ storeProductId: "com.aurora.socialcasino.starter_vault", grantCoins: 2_000_000 });
+    expect(response.body).not.toContain("price");
+  });
+
+  it("grants a verified purchase exactly once and rejects an invalid proof", async () => {
+    const transactionId = `tx-${randomUUID()}`;
+    const request = { method: "POST" as const, url: "/v1/store/purchases/verify", headers: { authorization: "Bearer valid" }, payload: {
+      platform: "ios", storeProductId: "com.aurora.socialcasino.coin_stack", transactionId,
+      verificationToken: `demo-approved:${transactionId}`,
+    } };
+    const first = await storeApp.inject(request); const replay = await storeApp.inject(request);
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({ coins: 1_000_000, coinBalance: 1_001_000, replayed: false });
+    expect(replay.json()).toMatchObject({ coinBalance: 1_001_000, replayed: true });
+    const invalid = await storeApp.inject({ ...request, payload: { ...request.payload, transactionId: `tx-${randomUUID()}`, verificationToken: "forged" } });
+    expect(invalid.statusCode).toBe(422);
+    expect(invalid.json()).toEqual({ code: "PURCHASE_INVALID" });
+  });
+
+  it("reverses a refunded grant once and blocks a pre-refunded transaction", async () => {
+    const transactionId = `tx-${randomUUID()}`;
+    const purchase = { platform: "android", storeProductId: "aurora_fortune_chest", transactionId,
+      verificationToken: `demo-approved:${transactionId}` };
+    expect((await storeApp.inject({ method: "POST", url: "/v1/store/purchases/verify", headers: { authorization: "Bearer valid" }, payload: purchase })).statusCode).toBe(200);
+    const eventId = randomUUID();
+    const refund = { method: "POST" as const, url: "/internal/v1/store/refunds", headers: { authorization: "Bearer test-store-webhook" },
+      payload: { eventId, platform: "android", transactionId, occurredAt: new Date().toISOString(), providerPayloadHash: "a".repeat(64) } };
+    expect((await storeApp.inject(refund)).json()).toEqual({ accepted: true });
+    expect((await storeApp.inject(refund)).json()).toEqual({ accepted: false });
+    const futureId = `tx-${randomUUID()}`;
+    await storeApp.inject({ ...refund, payload: { ...refund.payload, eventId: randomUUID(), transactionId: futureId } });
+    const revoked = await storeApp.inject({ method: "POST", url: "/v1/store/purchases/verify", headers: { authorization: "Bearer valid" }, payload: {
+      platform: "android", storeProductId: "aurora_coin_stack", transactionId: futureId, verificationToken: `demo-approved:${futureId}`,
+    } });
+    expect(revoked.statusCode).toBe(409);
+    expect(revoked.json()).toEqual({ code: "PURCHASE_REVOKED" });
+  });
+
+  it("hides the refund webhook from unauthorized callers", async () => {
+    expect((await storeApp.inject({ method: "POST", url: "/internal/v1/store/refunds", payload: {} })).statusCode).toBe(404);
+  });
+});
 
 describe("observability and analytics API", () => {
   const metrics = new PrometheusOperationalMetrics(false);

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { EventMilestoneClaim, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spin-store.js";
+import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
+import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -28,6 +28,11 @@ export class InMemorySpinStore implements SpinStore {
   );
   private readonly shopReplays = new Map<string, ShopPurchase>();
   private readonly limitedShopPurchases = new Set<string>();
+  private readonly storePurchases = new Map<string, StorePurchaseSettlement & { readonly playerId: string }>();
+  private readonly limitedStorePurchases = new Set<string>();
+  private readonly revokedStoreTransactions = new Set<string>();
+  private readonly storeRefundEvents = new Set<string>();
+  private readonly storePurchaseDebt = new Set<string>();
 
   public constructor(initialBalance = 100_000) { this.defaultBalance = initialBalance; }
   private readonly defaultBalance: number;
@@ -256,6 +261,58 @@ export class InMemorySpinStore implements SpinStore {
     if (limitKey) this.limitedShopPurchases.add(limitKey);
     this.shopReplays.set(replayKey, purchase);
     return purchase;
+  }
+
+  public async grantStorePurchase(command: GrantStorePurchaseCommand): Promise<StorePurchaseSettlement> {
+    const transactionKey = `${command.verified.platform}:${command.verified.transactionId}`;
+    if (this.revokedStoreTransactions.has(transactionKey)) throw new StorePurchaseRevokedError();
+    const replay = this.storePurchases.get(transactionKey);
+    if (replay) {
+      if (replay.playerId !== command.playerId || replay.productKey !== command.product.key) {
+        throw new StoreTransactionConflictError();
+      }
+      return { ...replay, replayed: true };
+    }
+    if (this.storePurchaseDebt.has(command.playerId)) throw new StorePurchaseDebtError();
+    const limitKey = `${command.playerId}:${command.product.key}`;
+    if (command.product.purchaseLimit === "once" && this.limitedStorePurchases.has(limitKey)) {
+      throw new StoreProductLimitReachedError();
+    }
+    const coinBefore = this.balances.get(command.playerId) ?? this.defaultBalance;
+    const gemBefore = this.gemBalances.get(command.playerId) ?? 320;
+    const purchase: StorePurchaseSettlement & { readonly playerId: string } = {
+      purchaseId: randomUUID(), playerId: command.playerId, productKey: command.product.key,
+      storeProductId: command.verified.storeProductId, transactionId: command.verified.transactionId,
+      coins: command.product.grantCoins, gems: command.product.grantGems,
+      coinBalance: coinBefore + command.product.grantCoins, gemBalance: gemBefore + command.product.grantGems,
+      replayed: false,
+    };
+    this.balances.set(command.playerId, purchase.coinBalance);
+    this.gemBalances.set(command.playerId, purchase.gemBalance);
+    this.record(command.playerId, purchase.coins, "verified_store_purchase", "store_purchase", purchase.purchaseId, coinBefore, purchase.coinBalance);
+    if (purchase.gems > 0) this.record(command.playerId, purchase.gems, "verified_store_purchase", "store_purchase", `${purchase.purchaseId}:gems`, gemBefore, purchase.gemBalance, "gem");
+    this.storePurchases.set(transactionKey, purchase);
+    if (command.product.purchaseLimit === "once") this.limitedStorePurchases.add(limitKey);
+    return purchase;
+  }
+
+  public async refundStorePurchase(command: StoreRefundCommand): Promise<boolean> {
+    if (this.storeRefundEvents.has(command.eventId)) return false;
+    this.storeRefundEvents.add(command.eventId);
+    const transactionKey = `${command.platform}:${command.transactionId}`;
+    this.revokedStoreTransactions.add(transactionKey);
+    const purchase = this.storePurchases.get(transactionKey);
+    if (!purchase) return true;
+    const coinBefore = this.balances.get(purchase.playerId) ?? this.defaultBalance;
+    const gemBefore = this.gemBalances.get(purchase.playerId) ?? 320;
+    const recoveredCoins = Math.min(coinBefore, purchase.coins);
+    const recoveredGems = Math.min(gemBefore, purchase.gems);
+    this.balances.set(purchase.playerId, coinBefore - recoveredCoins);
+    this.gemBalances.set(purchase.playerId, gemBefore - recoveredGems);
+    if (recoveredCoins > 0) this.record(purchase.playerId, -recoveredCoins, "store_refund", "store_refund", `${command.eventId}:coins`, coinBefore, coinBefore - recoveredCoins);
+    if (recoveredGems > 0) this.record(purchase.playerId, -recoveredGems, "store_refund", "store_refund", `${command.eventId}:gems`, gemBefore, gemBefore - recoveredGems, "gem");
+    if (recoveredCoins < purchase.coins || recoveredGems < purchase.gems) this.storePurchaseDebt.add(purchase.playerId);
+    return true;
   }
 
   public async getProfile(playerId: string): Promise<PlayerProfile> {

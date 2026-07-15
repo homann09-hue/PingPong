@@ -17,6 +17,8 @@ import { InMemoryMessagingStore } from "./messaging/in-memory-messaging-store.js
 import { PostgresMessagingStore } from "./messaging/postgres-messaging-store.js";
 import { AesGcmPushTokenCipher } from "./messaging/push-token-cipher.js";
 import { DemoPushGateway, HttpPushGateway, PushDeliveryWorker } from "./messaging/push-delivery-worker.js";
+import { DemoReceiptVerifier, HttpReceiptVerifier } from "./monetization/receipt-verifier.js";
+import { MonetizationService } from "./monetization/monetization-service.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -28,12 +30,16 @@ const metricsToken = process.env.METRICS_TOKEN;
 const pushTokenEncryptionKey = process.env.PUSH_TOKEN_ENCRYPTION_KEY;
 const pushGatewayUrl = process.env.PUSH_GATEWAY_URL;
 const pushGatewayToken = process.env.PUSH_GATEWAY_TOKEN;
+const storeVerificationUrl = process.env.STORE_VERIFICATION_URL;
+const storeGatewayToken = process.env.STORE_GATEWAY_TOKEN;
+const storeWebhookToken = process.env.STORE_WEBHOOK_TOKEN;
 const demoMode = process.env.DEMO_MODE === "true";
 if (!demoMode && (!databaseUrl || !jwtSecret || !adminJwtSecret || !metricsToken
-  || !pushTokenEncryptionKey || !pushGatewayUrl || !pushGatewayToken)) {
-  throw new Error("DATABASE_URL, JWT_SECRET, ADMIN_JWT_SECRET, METRICS_TOKEN and push gateway credentials are required outside DEMO_MODE");
+  || !pushTokenEncryptionKey || !pushGatewayUrl || !pushGatewayToken || !storeVerificationUrl || !storeGatewayToken || !storeWebhookToken)) {
+  throw new Error("Database, auth, metrics, push and store verification credentials are required outside DEMO_MODE");
 }
 if (!demoMode && Buffer.byteLength(metricsToken!) < 32) throw new Error("METRICS_TOKEN must contain at least 32 bytes");
+if (!demoMode && Buffer.byteLength(storeWebhookToken!) < 32) throw new Error("STORE_WEBHOOK_TOKEN must contain at least 32 bytes");
 const demoPlayerId = "00000000-0000-4000-8000-000000000001";
 const identityService = demoMode
   ? new IdentityService(new InMemoryIdentityStore(), "local-demo-jwt-secret-at-least-32-bytes")
@@ -42,6 +48,10 @@ const messagingStore = demoMode
   ? new InMemoryMessagingStore()
   : PostgresMessagingStore.connect(databaseUrl!, new AesGcmPushTokenCipher(pushTokenEncryptionKey!));
 const metrics = new PrometheusOperationalMetrics();
+const spinStore = demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStore.connect(databaseUrl!);
+const monetizationService = new MonetizationService(
+  demoMode ? new DemoReceiptVerifier() : new HttpReceiptVerifier(storeVerificationUrl!, storeGatewayToken!), spinStore,
+);
 const pushWorker = new PushDeliveryWorker(
   messagingStore,
   demoMode ? new DemoPushGateway() : new HttpPushGateway(pushGatewayUrl!, pushGatewayToken!),
@@ -57,7 +67,7 @@ const app = buildApp({
           : identityService.authenticate(authorization),
       }
     : identityService,
-  spinStore: demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStore.connect(databaseUrl!),
+  spinStore,
   socialStore: demoMode ? new InMemorySocialStore(demoPlayerId) : PostgresSocialStore.connect(databaseUrl!),
   liveOpsStore: demoMode ? new InMemoryLiveOpsStore() : PostgresLiveOpsStore.connect(databaseUrl!),
   adminAuthenticator: demoMode ? new DemoAdminAuthenticator() : new AdminJwtAuthenticator(adminJwtSecret!),
@@ -68,6 +78,8 @@ const app = buildApp({
   messagingStore,
   pushWorker,
   identityService,
+  monetizationService,
+  storeWebhookToken: demoMode ? "local-store-webhook" : storeWebhookToken!,
 });
 try {
   await app.listen({ port, host });

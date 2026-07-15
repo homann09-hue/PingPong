@@ -167,6 +167,15 @@ configure `PUSH_TOKEN_ENCRYPTION_KEY`, `PUSH_GATEWAY_URL` and
 `PUSH_GATEWAY_TOKEN`. See
 `docs/work-packages/phase8-push-messaging.md` for the native provisioning boundary.
 
+Virtual coin bundles use the separate `/v1/store` purchase boundary. The server
+verifies account-bound provider transactions before an atomic wallet grant,
+deduplicates transaction IDs globally, stores only proof hashes, and idempotently
+reconciles refunds without allowing negative balances. Apply
+`infra/postgres/018_store_monetization.sql` and configure
+`STORE_VERIFICATION_URL`, `STORE_GATEWAY_TOKEN`, and `STORE_WEBHOOK_TOKEN`.
+Localized prices always come from StoreKit or Google Play. See
+`docs/work-packages/phase9-store-monetization.md`.
+
 Authenticated wallet reads are available through `GET /v1/wallet` and
 `GET /v1/wallet/transactions?limit=50`. Ledger rows are immutable, use a
 transaction-specific idempotency key, include balances before and after, and
