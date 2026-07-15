@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class SpinRoundView {
@@ -304,10 +305,12 @@ class SlotPaytable {
 }
 
 class CasinoApi {
-  static const base = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://localhost:8080',
-  );
+  static const _configuredBase = String.fromEnvironment('API_URL');
+  static final base = _configuredBase.isNotEmpty
+      ? _configuredBase
+      : kIsWeb
+      ? Uri.base.origin
+      : 'http://localhost:8080';
   final Random _random = Random.secure();
 
   Future<SlotPaytable> paytable(String gameId) async {
