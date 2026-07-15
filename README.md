@@ -154,6 +154,14 @@ remove ordinary members but cannot change roles or act on other officers. Apply
 `infra/postgres/022_clan_member_management.sql`; every role, removal and
 ownership mutation creates an immutable action record.
 
+Player support now has a searchable player/economy view and a four-eyes grant
+workflow. Support operators can request bounded positive coin or gem grants, but
+only a different approver can book them. Approval atomically updates the wallet,
+adds an `admin_grant` ledger entry and appends the workforce audit record; there
+is no direct balance setter. Apply `infra/postgres/023_economy_admin.sql` after
+the core and LiveOps admin migrations. Demo mode provides separate support and
+approver buttons in `/admin/`.
+
 The lobby promotion is backed by the LiveOps campaign API. Workforce tokens use
 a dedicated issuer/audience and secret, with separate editor, publisher and
 auditor roles. Campaigns remain invisible to players until a different operator

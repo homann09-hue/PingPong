@@ -12,6 +12,7 @@ import { AlwaysReadyProbe } from "./observability/readiness.js";
 import { InMemoryMessagingStore } from "./messaging/in-memory-messaging-store.js";
 import { MonetizationService } from "./monetization/monetization-service.js";
 import { DemoReceiptVerifier } from "./monetization/receipt-verifier.js";
+import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -19,6 +20,52 @@ const app = buildApp({
   spinStore: new InMemorySpinStore(100),
 });
 afterAll(async () => app.close());
+
+describe("four-eyes economy administration API", () => {
+  const spinStore = new InMemorySpinStore(1_000);
+  const economyAdminStore = new InMemoryEconomyAdminStore(spinStore, playerId);
+  const economyApp = buildApp({
+    authenticator: { authenticate: async () => null }, spinStore, economyAdminStore,
+    adminAuthenticator: new DemoAdminAuthenticator(),
+  });
+  afterAll(async () => economyApp.close());
+
+  it("searches players and books an independently approved grant exactly once", async () => {
+    const support = { authorization: "Bearer local-admin-support" };
+    const approver = { authorization: "Bearer local-admin-economy-approver" };
+    const players = await economyApp.inject({ method: "GET", url: "/admin/v1/players?query=Aurora", headers: support });
+    expect(players.statusCode).toBe(200);
+    expect(players.json().players[0]).toMatchObject({ id: playerId, coinBalance: 1_000, gemBalance: 320 });
+
+    const created = await economyApp.inject({ method: "POST", url: "/admin/v1/economy/grants", headers: support,
+      payload: { playerId, currency: "coin", amount: 750, reason: "Verified customer support correction" } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ status: "pending", requestedBy: "demo-support", amount: 750 });
+    const grantId = created.json().id;
+    expect((await economyApp.inject({ method: "POST", url: `/admin/v1/economy/grants/${grantId}/approve`, headers: support })).statusCode).toBe(403);
+
+    const approved = await economyApp.inject({ method: "POST", url: `/admin/v1/economy/grants/${grantId}/approve`, headers: approver });
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json()).toMatchObject({ status: "approved", resolvedBy: "demo-economy-approver", balanceBefore: 1_000, balanceAfter: 1_750 });
+    expect((await spinStore.getProfile(playerId)).coinBalance).toBe(1_750);
+    expect((await economyApp.inject({ method: "POST", url: `/admin/v1/economy/grants/${grantId}/approve`, headers: approver })).statusCode).toBe(409);
+    expect((await spinStore.getProfile(playerId)).coinBalance).toBe(1_750);
+    const audit = await economyApp.inject({ method: "GET", url: "/admin/v1/economy/audit", headers: approver });
+    expect(audit.json().entries.map((entry: { action: string }) => entry.action)).toEqual(["economy_grant.approved", "economy_grant.created"]);
+  });
+
+  it("rejects invalid grants and keeps rejection separate from wallet mutation", async () => {
+    const invalid = await economyApp.inject({ method: "POST", url: "/admin/v1/economy/grants",
+      headers: { authorization: "Bearer local-admin-support" }, payload: { playerId, currency: "gem", amount: -1, reason: "invalid" } });
+    expect(invalid.statusCode).toBe(400);
+    const created = await economyApp.inject({ method: "POST", url: "/admin/v1/economy/grants",
+      headers: { authorization: "Bearer local-admin-support" }, payload: { playerId, currency: "gem", amount: 25, reason: "Courtesy correction" } });
+    const rejected = await economyApp.inject({ method: "POST", url: `/admin/v1/economy/grants/${created.json().id}/reject`,
+      headers: { authorization: "Bearer local-admin-economy-approver" } });
+    expect(rejected.json()).toMatchObject({ status: "rejected", balanceBefore: null, balanceAfter: null });
+    expect((await spinStore.getProfile(playerId)).gemBalance).toBe(320);
+  });
+});
 
 describe("verified store monetization API", () => {
   const spinStore = new InMemorySpinStore(1_000);

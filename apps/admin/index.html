@@ -32,6 +32,8 @@
           <button id="demo-editor" type="button">Demo editor</button>
           <button id="demo-publisher" type="button">Demo publisher</button>
           <button id="demo-moderator" type="button">Demo moderator</button>
+          <button id="demo-support" type="button">Demo support</button>
+          <button id="demo-approver" type="button">Demo approver</button>
         </div>
         <p id="session-status" class="status" role="status">Not connected</p>
       </section>
@@ -41,6 +43,7 @@
         <button class="tab" data-view="create" type="button">New draft</button>
         <button class="tab" data-view="audit" type="button">Audit log</button>
         <button class="tab" data-view="moderation" type="button">Moderation</button>
+        <button class="tab" data-view="economy" type="button">Players &amp; economy</button>
       </nav>
 
       <section id="campaigns-view" class="view" aria-labelledby="campaigns-title">
@@ -80,6 +83,27 @@
           <button id="refresh-moderation" type="button">Refresh</button>
         </div>
         <div id="moderation-cases" class="campaign-grid"><p class="empty">Connect a moderator session to load reports.</p></div>
+      </section>
+
+      <section id="economy-view" class="view hidden" aria-labelledby="economy-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">PLAYER SUPPORT</p><h2 id="economy-title">Wallet grant approvals</h2></div>
+          <button id="refresh-grants" type="button">Refresh queue</button>
+        </div>
+        <form id="player-search" class="search-form">
+          <label>Player ID or display name<input name="query" maxlength="64" placeholder="Aurora Player"></label>
+          <button class="primary" type="submit">Search</button>
+        </form>
+        <form id="grant-form" class="campaign-form grant-form hidden" aria-label="Create wallet grant">
+          <input name="playerId" type="hidden">
+          <label>Currency<select name="currency" required><option value="coin">Coins</option><option value="gem">Gems</option></select></label>
+          <label>Amount<input name="amount" type="number" required min="1" max="100000000" step="1"></label>
+          <label class="wide">Audited reason<textarea name="reason" required minlength="3" maxlength="500" rows="3"></textarea></label>
+          <div class="wide form-actions"><button class="primary" type="submit">Submit for approval</button><button id="cancel-grant" type="button">Cancel</button></div>
+        </form>
+        <div id="players" class="campaign-grid"><p class="empty">Search for a player to request a controlled grant.</p></div>
+        <h3 class="subheading">Approval queue</h3>
+        <div id="economy-grants" class="campaign-grid"><p class="empty">No grants loaded.</p></div>
       </section>
     </main>
   </body>

@@ -1,4 +1,4 @@
-const state = { token: "", campaigns: [], moderationCases: [] };
+const state = { token: "", campaigns: [], moderationCases: [], players: [], economyGrants: [] };
 const byId = (id) => document.getElementById(id);
 
 function setStatus(element, message, type = "") {
@@ -13,15 +13,19 @@ function operatorError(error) {
     FOUR_EYES_REQUIRED: "A different publisher must approve this draft.",
     CAMPAIGN_NOT_PUBLISHED: "Only published campaigns can be dispatched.",
     MODERATION_CASE_ALREADY_RESOLVED: "This report was already resolved.",
+    ECONOMY_GRANT_ALREADY_RESOLVED: "This grant was already resolved.",
+    PLAYER_NOT_ACTIVE: "The player is no longer active.",
   };
   return messages[error.message] ?? error.message;
 }
 
 async function api(path, options = {}) {
   if (!state.token) throw new Error("Connect an operator session first.");
+  const headers = { authorization: `Bearer ${state.token}`, ...options.headers };
+  if (options.body !== undefined) headers["content-type"] = "application/json";
   const response = await fetch(path, {
     ...options,
-    headers: { "content-type": "application/json", authorization: `Bearer ${state.token}`, ...options.headers },
+    headers,
   });
   const body = response.status === 204 ? null : await response.json();
   if (!response.ok) throw new Error(body?.code ?? `HTTP ${response.status}`);
@@ -129,11 +133,62 @@ async function resolveModeration(caseId, decision) {
   } catch (error) { setStatus(byId("session-status"), operatorError(error), "error"); }
 }
 
+async function searchPlayers(query = "") {
+  const container = byId("players");
+  container.innerHTML = '<p class="empty">Searching…</p>';
+  try {
+    const body = await api(`/admin/v1/players?query=${encodeURIComponent(query)}&limit=25`);
+    state.players = body.players;
+    container.innerHTML = body.players.length ? body.players.map((player) => `
+      <article class="campaign"><header><div><p class="eyebrow">${escapeHtml(player.id)}</p><h3>${escapeHtml(player.displayName)}</h3></div><span class="badge published">${escapeHtml(player.status)}</span></header>
+      <div class="meta"><span>Level ${player.level} · XP ${player.xp} · VIP ${player.vipPoints}</span><span>${player.coinBalance.toLocaleString("de-DE")} coins · ${player.gemBalance.toLocaleString("de-DE")} gems</span></div>
+      <footer><button class="primary" data-grant-player="${player.id}" type="button">Request grant</button></footer></article>`).join("") : '<p class="empty">No matching players.</p>';
+    container.querySelectorAll("[data-grant-player]").forEach((button) => button.addEventListener("click", () => requestGrant(button.dataset.grantPlayer)));
+  } catch (error) { container.innerHTML = `<p class="empty">${escapeHtml(operatorError(error))}</p>`; }
+}
+
+function requestGrant(playerId) {
+  const form = byId("grant-form");
+  form.reset(); form.elements.playerId.value = playerId; form.classList.remove("hidden");
+  form.elements.amount.focus();
+}
+
+async function submitGrant(event) {
+  event.preventDefault(); const form = event.currentTarget; const values = new FormData(form);
+  try {
+    await api("/admin/v1/economy/grants", { method: "POST", body: JSON.stringify({
+      playerId: values.get("playerId"), currency: values.get("currency"), amount: Number(values.get("amount")), reason: values.get("reason"),
+    }) });
+    form.classList.add("hidden"); form.reset();
+    setStatus(byId("session-status"), "Grant requested. A different approver must resolve it.", "success");
+    await loadEconomyGrants();
+  } catch (error) { setStatus(byId("session-status"), operatorError(error), "error"); }
+}
+
+async function loadEconomyGrants() {
+  const container = byId("economy-grants");
+  container.innerHTML = '<p class="empty">Loading queue…</p>';
+  try {
+    const body = await api("/admin/v1/economy/grants?limit=50"); state.economyGrants = body.grants;
+    container.innerHTML = body.grants.length ? body.grants.map((grant) => `
+      <article class="campaign"><header><div><p class="eyebrow">${escapeHtml(grant.currency)} GRANT</p><h3>${grant.amount.toLocaleString("de-DE")}</h3></div><span class="badge ${grant.status === 'approved' ? 'published' : 'draft'}">${escapeHtml(grant.status)}</span></header>
+      <p class="subtitle">${escapeHtml(grant.reason)}</p><div class="meta"><span>Player ${escapeHtml(grant.playerId)}</span><span>Requested by ${escapeHtml(grant.requestedBy)} · ${formatDate(grant.requestedAt)}</span></div>
+      <footer>${grant.status === 'pending' ? `<button data-grant-action="reject" data-grant-id="${grant.id}" type="button">Reject</button><button class="primary" data-grant-action="approve" data-grant-id="${grant.id}" type="button">Approve</button>` : `<span>Resolved by ${escapeHtml(grant.resolvedBy ?? '—')}</span>`}</footer></article>`).join("") : '<p class="empty">The grant queue is empty.</p>';
+    container.querySelectorAll("[data-grant-action]").forEach((button) => button.addEventListener("click", () => resolveGrant(button.dataset.grantId, button.dataset.grantAction)));
+  } catch (error) { container.innerHTML = `<p class="empty">${escapeHtml(operatorError(error))}</p>`; }
+}
+
+async function resolveGrant(grantId, action) {
+  try { await api(`/admin/v1/economy/grants/${encodeURIComponent(grantId)}/${action}`, { method: "POST" }); await loadEconomyGrants(); }
+  catch (error) { setStatus(byId("session-status"), operatorError(error), "error"); }
+}
+
 function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("hidden", view.id !== `${name}-view`));
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === name));
   if (name === "audit" && state.token) loadAudit();
   if (name === "moderation" && state.token) loadModeration();
+  if (name === "economy" && state.token) loadEconomyGrants();
 }
 
 function connect(token) {
@@ -151,9 +206,15 @@ byId("demo-moderator").addEventListener("click", () => {
   setStatus(byId("session-status"), "Connected · social moderator", "success");
   showView("moderation");
 });
+byId("demo-support").addEventListener("click", () => { state.token = "local-admin-support"; setStatus(byId("session-status"), "Connected · economy support", "success"); showView("economy"); searchPlayers(); });
+byId("demo-approver").addEventListener("click", () => { state.token = "local-admin-economy-approver"; setStatus(byId("session-status"), "Connected · economy approver", "success"); showView("economy"); });
 byId("refresh-campaigns").addEventListener("click", loadCampaigns);
 byId("refresh-audit").addEventListener("click", loadAudit);
 byId("refresh-moderation").addEventListener("click", loadModeration);
+byId("refresh-grants").addEventListener("click", loadEconomyGrants);
+byId("player-search").addEventListener("submit", (event) => { event.preventDefault(); searchPlayers(new FormData(event.currentTarget).get("query")); });
+byId("grant-form").addEventListener("submit", submitGrant);
+byId("cancel-grant").addEventListener("click", () => byId("grant-form").classList.add("hidden"));
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
 
 const form = byId("campaign-form");

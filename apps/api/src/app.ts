@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import Fastify from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import staticFiles from "@fastify/static";
 import { z } from "zod";
@@ -28,6 +28,8 @@ import type { PushDeliveryWorker } from "./messaging/push-delivery-worker.js";
 import type { MonetizationService } from "./monetization/monetization-service.js";
 import { ReceiptGatewayUnavailableError, ReceiptInvalidError, ReceiptPendingError } from "./monetization/receipt-verifier.js";
 import { StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError } from "./spins/spin-store.js";
+import type { EconomyAdminStore } from "./admin/economy-admin-store.js";
+import { EconomyFourEyesViolationError, EconomyGrantNotFoundError, EconomyGrantStateError, EconomyPlayerNotFoundError } from "./admin/economy-admin-store.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -71,6 +73,10 @@ const campaignBody = z.object({
   }),
 }).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { message: "endsAt must be after startsAt" });
 const adminAuditQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(100) });
+const adminPlayerQuery = z.object({ query: z.string().trim().max(64).default(""), limit: z.coerce.number().int().min(1).max(50).default(25) });
+const economyGrantQuery = z.object({ status: z.enum(["pending", "approved", "rejected"]).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) });
+const economyGrantBody = z.object({ playerId: z.string().uuid(), currency: z.enum(["coin", "gem"]),
+  amount: z.number().int().positive().max(100_000_000), reason: z.string().trim().min(3).max(500) }).strict();
 const moderationCasesQuery = z.object({
   status: z.enum(["open", "actioned", "dismissed"]).default("open"),
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -134,6 +140,7 @@ export interface AppDependencies {
   readonly socialStore?: SocialStore;
   readonly adminAuthenticator?: AdminAuthenticator;
   readonly liveOpsStore?: LiveOpsStore;
+  readonly economyAdminStore?: EconomyAdminStore;
   readonly analyticsStore?: AnalyticsStore;
   readonly metrics?: OperationalMetrics;
   readonly metricsToken?: string;
@@ -502,6 +509,63 @@ export function buildApp(dependencies: AppDependencies) {
     if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
     return { entries: await dependencies.socialStore.listModerationAudit(query.data.limit) };
   });
+  app.get("/admin/v1/players", async (request, reply) => {
+    if (!dependencies.economyAdminStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAnyAdminRole(principal.roles, ["economy_support", "economy_approver", "economy_auditor"])) return reply.code(403).send({ code: "FORBIDDEN" });
+    const query = adminPlayerQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: query.error.issues });
+    return { players: await dependencies.economyAdminStore.searchPlayers(query.data.query, query.data.limit) };
+  });
+  app.get("/admin/v1/economy/grants", async (request, reply) => {
+    if (!dependencies.economyAdminStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAnyAdminRole(principal.roles, ["economy_support", "economy_approver", "economy_auditor"])) return reply.code(403).send({ code: "FORBIDDEN" });
+    const query = economyGrantQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: query.error.issues });
+    return { grants: await dependencies.economyAdminStore.listGrants(query.data.status, query.data.limit) };
+  });
+  app.post("/admin/v1/economy/grants", async (request, reply) => {
+    if (!dependencies.economyAdminStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "economy_support")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const body = economyGrantBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    try { return reply.code(201).send(await dependencies.economyAdminStore.createGrant({ ...body.data, actor: principal.subject, now: new Date() })); }
+    catch (error) { if (error instanceof EconomyPlayerNotFoundError) return reply.code(404).send({ code: "PLAYER_NOT_FOUND" }); throw error; }
+  });
+  app.post("/admin/v1/economy/grants/:grantId/approve", async (request, reply) => resolveEconomyGrant(request, reply, "approve"));
+  app.post("/admin/v1/economy/grants/:grantId/reject", async (request, reply) => resolveEconomyGrant(request, reply, "reject"));
+  app.get("/admin/v1/economy/audit", async (request, reply) => {
+    if (!dependencies.economyAdminStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "economy_auditor")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const query = adminAuditQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    return { entries: await dependencies.economyAdminStore.listAudit(query.data.limit) };
+  });
+
+  async function resolveEconomyGrant(request: FastifyRequest, reply: FastifyReply, action: "approve" | "reject") {
+    if (!dependencies.economyAdminStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "economy_approver")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const grantId = z.string().uuid().safeParse((request.params as { grantId: string }).grantId);
+    if (!grantId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return await (action === "approve" ? dependencies.economyAdminStore.approveGrant(grantId.data, principal.subject, new Date())
+      : dependencies.economyAdminStore.rejectGrant(grantId.data, principal.subject, new Date())); }
+    catch (error) {
+      if (error instanceof EconomyGrantNotFoundError) return reply.code(404).send({ code: "ECONOMY_GRANT_NOT_FOUND" });
+      if (error instanceof EconomyGrantStateError) return reply.code(409).send({ code: "ECONOMY_GRANT_ALREADY_RESOLVED" });
+      if (error instanceof EconomyFourEyesViolationError) return reply.code(409).send({ code: "FOUR_EYES_REQUIRED" });
+      if (error instanceof EconomyPlayerNotFoundError) return reply.code(409).send({ code: "PLAYER_NOT_ACTIVE" });
+      throw error;
+    }
+  }
   app.post("/v1/shop/offers/:offerId/purchase", async (request, reply) => {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
@@ -893,6 +957,7 @@ export function buildApp(dependencies: AppDependencies) {
     await dependencies.identityService?.close();
     await dependencies.socialStore?.close();
     await dependencies.liveOpsStore?.close();
+    await dependencies.economyAdminStore?.close();
     await dependencies.analyticsStore?.close();
     await dependencies.readiness?.close();
     await dependencies.pushWorker?.close();
@@ -903,6 +968,7 @@ export function buildApp(dependencies: AppDependencies) {
 }
 
 function hasAdminRole(roles: readonly AdminRole[], required: AdminRole): boolean { return roles.includes(required); }
+function hasAnyAdminRole(roles: readonly AdminRole[], required: readonly AdminRole[]): boolean { return required.some((role) => roles.includes(role)); }
 
 function secureBearerMatch(authorization: string | undefined, expected: string): boolean {
   if (!authorization?.startsWith("Bearer ")) return false;

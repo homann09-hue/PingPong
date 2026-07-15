@@ -45,8 +45,9 @@ No parallel wallet table was introduced. `wallet_ledger` gained `source`,
 
 - Only coin transactions are used by current gameplay; the schema already
   permits gems, but gem grant/spend use cases are not exposed yet.
-- Admin corrections require the future four-eyes approval workflow before an
-  endpoint may be added.
+- Admin corrections are exposed only as bounded positive grants through the
+  implemented four-eyes support/approver workflow; direct balance setters and
+  unaudited debits remain prohibited.
 - Transaction history is limit-bounded but needs cursor pagination before
   accounts accumulate production-scale histories.
 

@@ -19,6 +19,8 @@ import { AesGcmPushTokenCipher } from "./messaging/push-token-cipher.js";
 import { DemoPushGateway, HttpPushGateway, PushDeliveryWorker } from "./messaging/push-delivery-worker.js";
 import { DemoReceiptVerifier, HttpReceiptVerifier } from "./monetization/receipt-verifier.js";
 import { MonetizationService } from "./monetization/monetization-service.js";
+import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store.js";
+import { PostgresEconomyAdminStore } from "./admin/postgres-economy-admin-store.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -49,6 +51,9 @@ const messagingStore = demoMode
   : PostgresMessagingStore.connect(databaseUrl!, new AesGcmPushTokenCipher(pushTokenEncryptionKey!));
 const metrics = new PrometheusOperationalMetrics();
 const spinStore = demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStore.connect(databaseUrl!);
+const economyAdminStore = demoMode
+  ? new InMemoryEconomyAdminStore(spinStore as InMemorySpinStore, demoPlayerId)
+  : PostgresEconomyAdminStore.connect(databaseUrl!);
 const monetizationService = new MonetizationService(
   demoMode ? new DemoReceiptVerifier() : new HttpReceiptVerifier(storeVerificationUrl!, storeGatewayToken!), spinStore,
 );
@@ -64,6 +69,7 @@ const app = buildApp({
   spinStore,
   socialStore: demoMode ? new InMemorySocialStore(demoPlayerId) : PostgresSocialStore.connect(databaseUrl!),
   liveOpsStore: demoMode ? new InMemoryLiveOpsStore() : PostgresLiveOpsStore.connect(databaseUrl!),
+  economyAdminStore,
   adminAuthenticator: demoMode ? new DemoAdminAuthenticator() : new AdminJwtAuthenticator(adminJwtSecret!),
   analyticsStore: demoMode ? new InMemoryAnalyticsStore() : PostgresAnalyticsStore.connect(databaseUrl!),
   metrics,

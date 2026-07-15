@@ -328,6 +328,17 @@ export class InMemorySpinStore implements SpinStore {
     };
   }
 
+  /** Applies an already approved local workforce grant and records the same ledger shape as production. */
+  public async applyAdminGrant(playerId: string, currency: "coin" | "gem", amount: number, referenceId: string, reason: string): Promise<{ balanceBefore: number; balanceAfter: number }> {
+    const balances = currency === "coin" ? this.balances : this.gemBalances;
+    const balanceBefore = balances.get(playerId) ?? (currency === "coin" ? this.defaultBalance : 320);
+    const balanceAfter = balanceBefore + amount;
+    balances.set(playerId, balanceAfter);
+    this.record(playerId, amount, "admin_grant", "admin", `admin-grant:${referenceId}`, balanceBefore, balanceAfter, currency);
+    void reason;
+    return { balanceBefore, balanceAfter };
+  }
+
   public async close(): Promise<void> {}
 
   private record(
