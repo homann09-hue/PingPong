@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { InMemorySocialStore } from "./social/in-memory-social-store.js";
+import { ClanOfficerLimitError } from "./social/social-store.js";
 import { DemoAdminAuthenticator } from "./admin/admin-auth.js";
 import { InMemoryLiveOpsStore } from "./liveops/in-memory-liveops-store.js";
 import { InMemoryAnalyticsStore } from "./analytics/in-memory-analytics-store.js";
@@ -204,6 +205,55 @@ describe("clan message trust and safety API", () => {
     expect(feed.json().messages.find((item: { id: string }) => item.id === message.id)).toMatchObject({ status: "removed", body: null });
     const audit = await socialApp.inject({ method: "GET", url: "/admin/v1/moderation/audit", headers: { authorization: "Bearer local-admin-moderator" } });
     expect(audit.json().entries[0]).toMatchObject({ caseId, actor: "demo-moderator", decision: "remove_message" });
+  });
+});
+
+describe("clan member management API", () => {
+  const ownerId = "00000000-0000-4000-8000-000000000001";
+  const officerId = "00000000-0000-4000-8000-000000000102";
+  const memberId = "00000000-0000-4000-8000-000000000103";
+  const socialStore = new InMemorySocialStore(ownerId);
+  const identities = new Map([["Bearer owner", ownerId], ["Bearer officer", officerId], ["Bearer member", memberId]]);
+  const clanApp = buildApp({
+    authenticator: { authenticate: async (header) => identities.get(header ?? "") ?? null },
+    spinStore: new InMemorySpinStore(1_000), socialStore,
+  });
+  afterAll(async () => clanApp.close());
+
+  it("lists members and enforces promotion, kick, and ownership-transfer capabilities", async () => {
+    const clan = await socialStore.createClan(ownerId, "Managed Clan", "MGR");
+    await socialStore.joinClan(officerId, clan.id);
+    await socialStore.joinClan(memberId, clan.id);
+    const roster = await clanApp.inject({ method: "GET", url: "/v1/clans/members", headers: { authorization: "Bearer member" } });
+    expect(roster.statusCode).toBe(200);
+    expect(roster.json().members.map((item: { role: string }) => item.role)).toEqual(["owner", "member", "member"]);
+
+    const promote = await clanApp.inject({ method: "PUT", url: `/v1/clans/members/${officerId}/role`,
+      headers: { authorization: "Bearer owner" }, payload: { role: "officer" } });
+    expect(promote.json().member).toMatchObject({ role: "officer", player: { id: officerId } });
+    expect((await clanApp.inject({ method: "PUT", url: `/v1/clans/members/${memberId}/role`,
+      headers: { authorization: "Bearer officer" }, payload: { role: "officer" } })).statusCode).toBe(403);
+
+    expect((await clanApp.inject({ method: "DELETE", url: `/v1/clans/members/${memberId}`,
+      headers: { authorization: "Bearer officer" } })).statusCode).toBe(204);
+    await socialStore.joinClan(memberId, clan.id);
+    const transfer = await clanApp.inject({ method: "POST", url: "/v1/clans/ownership-transfer",
+      headers: { authorization: "Bearer owner" }, payload: { playerId: memberId } });
+    expect(transfer.statusCode).toBe(200);
+    expect(transfer.json().members.find((item: { player: { id: string } }) => item.player.id === memberId).role).toBe("owner");
+    expect(transfer.json().members.find((item: { player: { id: string } }) => item.player.id === ownerId).role).toBe("officer");
+    expect((await clanApp.inject({ method: "PUT", url: `/v1/clans/members/${officerId}/role`,
+      headers: { authorization: "Bearer owner" }, payload: { role: "member" } })).statusCode).toBe(403);
+  });
+
+  it("caps officer assignment at five", async () => {
+    const isolatedOwner = randomUUID();
+    const isolated = new InMemorySocialStore(isolatedOwner);
+    const clan = await isolated.createClan(isolatedOwner, "Officer Limits", "LIMIT");
+    const candidates = Array.from({ length: 6 }, () => randomUUID());
+    for (const candidate of candidates) await isolated.joinClan(candidate, clan.id);
+    for (const candidate of candidates.slice(0, 5)) await isolated.updateClanMemberRole(isolatedOwner, candidate, "officer");
+    await expect(isolated.updateClanMemberRole(isolatedOwner, candidates[5]!, "officer")).rejects.toBeInstanceOf(ClanOfficerLimitError);
   });
 });
 

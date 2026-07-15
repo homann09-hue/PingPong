@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ClanFeedPage, ClanInvitationView, ClanMessageReportReason, ClanMessageReportView, ClanMessageView, ClanView, FriendRequestView, ModerationAuditEntry, ModerationCaseStatus, ModerationCaseView, ModerationDecision, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
-import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError, decodeClanFeedCursor, encodeClanFeedCursor } from "./social-store.js";
+import type { ClanFeedPage, ClanInvitationView, ClanMemberView, ClanMessageReportReason, ClanMessageReportView, ClanMessageView, ClanRole, ClanView, FriendRequestView, ModerationAuditEntry, ModerationCaseStatus, ModerationCaseView, ModerationDecision, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
+import { ClanInvitationNotFoundError, ClanMemberNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanOfficerLimitError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError, decodeClanFeedCursor, encodeClanFeedCursor } from "./social-store.js";
 
 interface MutableClan { id: string; name: string; tag: string; memberLimit: number; weeklyScore: number }
 interface PendingRequest { id: string; senderId: string; recipientId: string; createdAt: string }
@@ -15,7 +15,7 @@ export class InMemorySocialStore implements SocialStore {
   private readonly requests = new Map<string, PendingRequest>();
   private readonly friendships = new Set<string>();
   private readonly clans = new Map<string, MutableClan>();
-  private readonly memberships = new Map<string, { clanId: string; role: "owner" | "officer" | "member" }>();
+  private readonly memberships = new Map<string, { clanId: string; role: ClanRole; joinedAt: string }>();
   private readonly invitations = new Map<string, MutableInvitation>();
   private readonly messages = new Map<string, MutableMessage>();
   private readonly reports = new Map<string, MutableReport>();
@@ -35,7 +35,7 @@ export class InMemorySocialStore implements SocialStore {
       { id: "10000000-0000-4000-8000-000000000002", name: "Lucky Dragons", tag: "LUCKY", memberLimit: 50, weeklyScore: 7_900_000 },
       { id: "10000000-0000-4000-8000-000000000003", name: "Aurora Legends", tag: "AURORA", memberLimit: 50, weeklyScore: 7_200_000 },
     ]) this.clans.set(clan.id, clan);
-    this.memberships.set(players[1]!.id, { clanId: "10000000-0000-4000-8000-000000000003", role: "member" });
+    this.memberships.set(players[1]!.id, { clanId: "10000000-0000-4000-8000-000000000003", role: "member", joinedAt: new Date().toISOString() });
   }
 
   public async getOverview(playerId: string): Promise<SocialOverview> {
@@ -85,7 +85,7 @@ export class InMemorySocialStore implements SocialStore {
     if (this.memberships.has(playerId) || [...this.clans.values()].some((clan) =>
       clan.name.toLowerCase() === name.toLowerCase() || clan.tag.toLowerCase() === tag.toLowerCase())) throw new ClanMembershipError();
     const clan = { id: randomUUID(), name, tag: tag.toUpperCase(), memberLimit: 50, weeklyScore: 0 };
-    this.clans.set(clan.id, clan); this.memberships.set(playerId, { clanId: clan.id, role: "owner" });
+    this.clans.set(clan.id, clan); this.memberships.set(playerId, { clanId: clan.id, role: "owner", joinedAt: new Date().toISOString() });
     this.cancelInvitationsFor(playerId);
     return this.clanView(clan, "owner");
   }
@@ -94,7 +94,7 @@ export class InMemorySocialStore implements SocialStore {
     this.ensureAuthenticatedPlayer(playerId); const clan = this.clans.get(clanId);
     if (!clan) throw new ClanNotFoundError();
     if (this.memberships.has(playerId) || this.memberCount(clanId) >= clan.memberLimit) throw new ClanMembershipError();
-    this.memberships.set(playerId, { clanId, role: "member" }); this.cancelInvitationsFor(playerId); return this.clanView(clan, "member");
+    this.memberships.set(playerId, { clanId, role: "member", joinedAt: new Date().toISOString() }); this.cancelInvitationsFor(playerId); return this.clanView(clan, "member");
   }
 
   public async leaveClan(playerId: string): Promise<void> {
@@ -132,9 +132,47 @@ export class InMemorySocialStore implements SocialStore {
     if (!clan) throw new ClanNotFoundError();
     if (this.memberCount(clan.id) >= clan.memberLimit) throw new ClanMembershipError();
     invitation.status = "accepted";
-    this.memberships.set(playerId, { clanId: clan.id, role: "member" });
+    this.memberships.set(playerId, { clanId: clan.id, role: "member", joinedAt: new Date().toISOString() });
     this.cancelInvitationsFor(playerId, invitation.id);
     return this.clanView(clan, "member");
+  }
+
+  public async listClanMembers(playerId: string): Promise<readonly ClanMemberView[]> {
+    const membership = this.requireClanMembership(playerId);
+    return this.membersForClan(membership.clanId);
+  }
+
+  public async updateClanMemberRole(playerId: string, targetPlayerId: string, role: "officer" | "member"): Promise<ClanMemberView> {
+    const actor = this.requireClanMembership(playerId);
+    const target = this.memberships.get(targetPlayerId);
+    if (!target || target.clanId !== actor.clanId) throw new ClanMemberNotFoundError();
+    if (actor.role !== "owner" || playerId === targetPlayerId || target.role === "owner") throw new ClanPermissionError();
+    if (role === "officer" && target.role !== "officer"
+      && [...this.memberships.values()].filter((item) => item.clanId === actor.clanId && item.role === "officer").length >= 5) {
+      throw new ClanOfficerLimitError();
+    }
+    if (target.role === role) return this.memberView(targetPlayerId, target);
+    target.role = role;
+    return this.memberView(targetPlayerId, target);
+  }
+
+  public async removeClanMember(playerId: string, targetPlayerId: string): Promise<void> {
+    const actor = this.requireClanMembership(playerId);
+    const target = this.memberships.get(targetPlayerId);
+    if (!target || target.clanId !== actor.clanId) throw new ClanMemberNotFoundError();
+    if (playerId === targetPlayerId || target.role === "owner" || actor.role === "member"
+      || (actor.role === "officer" && target.role !== "member")) throw new ClanPermissionError();
+    this.memberships.delete(targetPlayerId);
+  }
+
+  public async transferClanOwnership(playerId: string, targetPlayerId: string): Promise<readonly ClanMemberView[]> {
+    const actor = this.requireClanMembership(playerId);
+    const target = this.memberships.get(targetPlayerId);
+    if (!target || target.clanId !== actor.clanId) throw new ClanMemberNotFoundError();
+    if (actor.role !== "owner" || playerId === targetPlayerId) throw new ClanPermissionError();
+    actor.role = "officer";
+    target.role = "owner";
+    return this.membersForClan(actor.clanId);
   }
 
   public async listClanFeed(playerId: string, cursor: string | undefined, limit: number): Promise<ClanFeedPage> {
@@ -242,7 +280,7 @@ export class InMemorySocialStore implements SocialStore {
       }
     }
   }
-  private requireClanMembership(playerId: string): { clanId: string; role: "owner" | "officer" | "member" } {
+  private requireClanMembership(playerId: string): { clanId: string; role: ClanRole; joinedAt: string } {
     this.ensureAuthenticatedPlayer(playerId);
     const membership = this.memberships.get(playerId);
     if (!membership) throw new ClanMembershipError();
@@ -273,5 +311,15 @@ export class InMemorySocialStore implements SocialStore {
     const reasons = { spam: 0, harassment: 0, hate: 0, sexual: 0, personal_data: 0, other: 0 };
     for (const report of reports) reasons[report.reason] += 1;
     return { ...value, author: this.requirePlayer(value.authorId), reportCount: reports.length, reasons };
+  }
+  private memberView(playerId: string, membership: { clanId: string; role: ClanRole; joinedAt: string }): ClanMemberView {
+    return { player: this.requirePlayer(playerId), role: membership.role, joinedAt: membership.joinedAt };
+  }
+  private membersForClan(clanId: string): readonly ClanMemberView[] {
+    const roleOrder: Record<ClanRole, number> = { owner: 0, officer: 1, member: 2 };
+    return [...this.memberships.entries()].filter(([, item]) => item.clanId === clanId)
+      .map(([id, item]) => this.memberView(id, item))
+      .sort((left, right) => roleOrder[left.role] - roleOrder[right.role]
+        || right.player.level - left.player.level || left.player.displayName.localeCompare(right.player.displayName));
   }
 }

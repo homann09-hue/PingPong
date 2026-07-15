@@ -45,6 +45,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<PurchasableStoreProductView> storeProducts = const [];
   SocialOverviewView? socialOverview;
   List<ClanMessageView> clanMessages = const [];
+  List<ClanMemberView> clanMembers = const [];
   String? clanFeedCursor;
   LiveOpsCampaignView? activeCampaign;
   PushPreferencesView? pushPreferences;
@@ -228,13 +229,23 @@ class _LobbyScreenState extends State<LobbyScreen> {
       if (loaded.currentClan == null) {
         setState(() {
           clanMessages = const [];
+          clanMembers = const [];
           clanFeedCursor = null;
         });
       } else {
-        await _loadClanFeed();
+        await Future.wait([_loadClanFeed(), _loadClanMembers()]);
       }
     } on StateError {
       // The social surface communicates unavailable state without fake data.
+    }
+  }
+
+  Future<void> _loadClanMembers() async {
+    try {
+      final loaded = await api.clanMembers();
+      if (mounted) setState(() => clanMembers = loaded);
+    } on StateError {
+      // The previous roster remains visible during a transient failure.
     }
   }
 
@@ -684,6 +695,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     2 => ClubScreen(
       overview: socialOverview,
       messages: clanMessages,
+      members: clanMembers,
       hasOlderMessages: clanFeedCursor != null,
       busy: socialBusy,
       onAddFriend: (playerId) =>
@@ -705,6 +717,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
       onReportClanMessage: (messageId, reason, details) => _socialAction(
         () => api.reportClanMessage(messageId, reason, details),
       ),
+      onUpdateClanMemberRole: (memberId, role) =>
+          _socialAction(() => api.updateClanMemberRole(memberId, role)),
+      onRemoveClanMember: (memberId) =>
+          _socialAction(() => api.removeClanMember(memberId)),
+      onTransferClanOwnership: (memberId) =>
+          _socialAction(() => api.transferClanOwnership(memberId)),
       onLoadOlderMessages: _loadOlderClanMessages,
     ),
     3 => EventsScreen(

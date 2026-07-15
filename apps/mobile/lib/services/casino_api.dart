@@ -434,6 +434,17 @@ class ClanInvitationView {
   final DateTime expiresAt;
 }
 
+class ClanMemberView {
+  const ClanMemberView({
+    required this.player,
+    required this.role,
+    required this.joinedAt,
+  });
+  final SocialPlayerView player;
+  final String role;
+  final DateTime joinedAt;
+}
+
 class ClanMessageView {
   const ClanMessageView({
     required this.id,
@@ -972,6 +983,55 @@ class CasinoApi {
     );
     if (response.statusCode != 200) {
       throw StateError('Clan-Einladung konnte nicht angenommen werden');
+    }
+  }
+
+  Future<List<ClanMemberView>> clanMembers() async {
+    final response = await _client.get(Uri.parse('$base/v1/clans/members'));
+    if (response.statusCode != 200) {
+      throw StateError('Clan-Mitglieder konnten nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['members'] as List)
+        .map((value) {
+          final member = value as Map<String, dynamic>;
+          return ClanMemberView(
+            player: _socialPlayer(member['player']),
+            role: member['role'] as String,
+            joinedAt: DateTime.parse(member['joinedAt'] as String),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<void> updateClanMemberRole(String playerId, String role) async {
+    final response = await _client.put(
+      Uri.parse('$base/v1/clans/members/$playerId/role'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'role': role}),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Clan-Rolle konnte nicht geändert werden');
+    }
+  }
+
+  Future<void> removeClanMember(String playerId) async {
+    final response = await _client.delete(
+      Uri.parse('$base/v1/clans/members/$playerId'),
+    );
+    if (response.statusCode != 204) {
+      throw StateError('Clan-Mitglied konnte nicht entfernt werden');
+    }
+  }
+
+  Future<void> transferClanOwnership(String playerId) async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/clans/ownership-transfer'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'playerId': playerId}),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Clan-Führung konnte nicht übertragen werden');
     }
   }
 

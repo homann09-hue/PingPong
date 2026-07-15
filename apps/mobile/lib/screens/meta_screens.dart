@@ -785,6 +785,7 @@ class _RewardTile extends StatelessWidget {
 
 typedef SocialIdCallback = Future<void> Function(String id);
 typedef ClanCreateCallback = Future<void> Function(String name, String tag);
+typedef ClanRoleCallback = Future<void> Function(String playerId, String role);
 typedef ClanReportCallback =
     Future<void> Function(String messageId, String reason, String? details);
 
@@ -793,6 +794,7 @@ class ClubScreen extends StatelessWidget {
     super.key,
     required this.overview,
     required this.messages,
+    required this.members,
     required this.hasOlderMessages,
     required this.busy,
     required this.onAddFriend,
@@ -805,17 +807,23 @@ class ClubScreen extends StatelessWidget {
     required this.onPostClanMessage,
     required this.onRemoveClanMessage,
     required this.onReportClanMessage,
+    required this.onUpdateClanMemberRole,
+    required this.onRemoveClanMember,
+    required this.onTransferClanOwnership,
     required this.onLoadOlderMessages,
   });
 
   final SocialOverviewView? overview;
   final List<ClanMessageView> messages;
+  final List<ClanMemberView> members;
   final bool hasOlderMessages;
   final bool busy;
   final SocialIdCallback onAddFriend, onAcceptFriend, onJoinClan;
   final SocialIdCallback onInviteToClan, onAcceptClanInvitation;
   final SocialIdCallback onPostClanMessage, onRemoveClanMessage;
   final ClanReportCallback onReportClanMessage;
+  final ClanRoleCallback onUpdateClanMemberRole;
+  final SocialIdCallback onRemoveClanMember, onTransferClanOwnership;
   final ClanCreateCallback onCreateClan;
   final Future<void> Function() onLeaveClan;
   final Future<void> Function() onLoadOlderMessages;
@@ -856,6 +864,8 @@ class ClubScreen extends StatelessWidget {
             actionLabel: current.role == 'owner' ? 'ANFÜHRER' : 'VERLASSEN',
             onAction: current.role == 'owner' || busy ? null : onLeaveClan,
           ),
+          const SizedBox(height: 12),
+          _clanRoster(context, current),
           const SizedBox(height: 12),
           _clanFeed(context, current),
         ] else ...[
@@ -908,6 +918,135 @@ class ClubScreen extends StatelessWidget {
       ],
     );
   }
+
+  Widget _clanRoster(BuildContext context, ClanView clan) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: MetaStyle.card(const Color(0xffa75bff)),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'MITGLIEDER ${members.length}/${clan.memberLimit}',
+          style: MetaStyle.title,
+        ),
+        const SizedBox(height: 6),
+        for (final member in members)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              radius: 17,
+              child: Text('${member.player.level}'),
+            ),
+            title: Text(member.player.displayName),
+            subtitle: Text(_clanRoleLabel(member.role)),
+            trailing: _memberMenu(context, clan, member),
+          ),
+      ],
+    ),
+  );
+
+  Widget? _memberMenu(
+    BuildContext context,
+    ClanView clan,
+    ClanMemberView member,
+  ) {
+    final isSelf = member.player.id == overview!.player.id;
+    final ownerActions = clan.role == 'owner' && !isSelf;
+    final officerKick =
+        clan.role == 'officer' && member.role == 'member' && !isSelf;
+    if (!ownerActions && !officerKick) return null;
+    return PopupMenuButton<String>(
+      enabled: !busy,
+      tooltip: 'Mitglied verwalten',
+      onSelected: (action) async {
+        if (action == 'promote') {
+          await onUpdateClanMemberRole(member.player.id, 'officer');
+        } else if (action == 'demote') {
+          await onUpdateClanMemberRole(member.player.id, 'member');
+        } else if (action == 'transfer') {
+          await _confirmOwnershipTransfer(context, member);
+        } else {
+          await _confirmMemberRemoval(context, member);
+        }
+      },
+      itemBuilder: (_) => [
+        if (ownerActions && member.role == 'member')
+          const PopupMenuItem(
+            value: 'promote',
+            child: Text('Zum Offizier ernennen'),
+          ),
+        if (ownerActions && member.role == 'officer')
+          const PopupMenuItem(
+            value: 'demote',
+            child: Text('Zum Mitglied zurückstufen'),
+          ),
+        if (ownerActions)
+          const PopupMenuItem(
+            value: 'transfer',
+            child: Text('Clan-Führung übertragen'),
+          ),
+        const PopupMenuItem(value: 'remove', child: Text('Aus Clan entfernen')),
+      ],
+    );
+  }
+
+  Future<void> _confirmOwnershipTransfer(
+    BuildContext context,
+    ClanMemberView member,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('CLAN-FÜHRUNG ÜBERTRAGEN?'),
+        content: Text(
+          '${member.player.displayName} wird neuer Anführer. Du wirst zum Offizier.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ABBRECHEN'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ÜBERTRAGEN'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await onTransferClanOwnership(member.player.id);
+  }
+
+  Future<void> _confirmMemberRemoval(
+    BuildContext context,
+    ClanMemberView member,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('MITGLIED ENTFERNEN?'),
+        content: Text('${member.player.displayName} aus dem Clan entfernen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ABBRECHEN'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ENTFERNEN'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await onRemoveClanMember(member.player.id);
+  }
+
+  static String _clanRoleLabel(String role) => switch (role) {
+    'owner' => 'ANFÜHRER',
+    'officer' => 'OFFIZIER',
+    _ => 'MITGLIED',
+  };
 
   Widget _friendsSection() => Column(
     children: [

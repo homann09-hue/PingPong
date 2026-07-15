@@ -14,7 +14,7 @@ import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js"
 import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
 import type { SocialStore } from "./social/social-store.js";
-import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError } from "./social/social-store.js";
+import { ClanInvitationNotFoundError, ClanMemberNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanOfficerLimitError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError } from "./social/social-store.js";
 import type { AdminAuthenticator, AdminRole } from "./admin/admin-auth.js";
 import type { LiveOpsStore } from "./liveops/liveops-store.js";
 import { CampaignNotFoundError, CampaignStateError, FourEyesViolationError } from "./liveops/liveops-store.js";
@@ -48,6 +48,8 @@ const clanBody = z.object({
   tag: z.string().trim().min(3).max(8).regex(/^[A-Za-z0-9]+$/),
 });
 const clanInvitationBody = z.object({ playerId: z.string().uuid() }).strict();
+const clanMemberRoleBody = z.object({ role: z.enum(["officer", "member"]) }).strict();
+const clanOwnershipTransferBody = z.object({ playerId: z.string().uuid() }).strict();
 const clanMessageBody = z.object({
   body: z.string().trim().min(1).max(280).refine((value) => !/[\u0000-\u001F\u007F]/u.test(value), "Control characters are not allowed"),
 }).strict();
@@ -606,6 +608,60 @@ export function buildApp(dependencies: AppDependencies) {
     catch (error) {
       if (error instanceof ClanInvitationNotFoundError) return reply.code(404).send({ code: "CLAN_INVITATION_NOT_FOUND" });
       if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_CONFLICT" });
+      throw error;
+    }
+  });
+  app.get("/v1/clans/members", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    try { return { members: await dependencies.socialStore.listClanMembers(playerId) }; }
+    catch (error) {
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_REQUIRED" });
+      throw error;
+    }
+  });
+  app.put("/v1/clans/members/:playerId/role", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const actorId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!actorId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const targetId = z.string().uuid().safeParse((request.params as { playerId: string }).playerId);
+    const body = clanMemberRoleBody.safeParse(request.body);
+    if (!targetId.success || !body.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return { member: await dependencies.socialStore.updateClanMemberRole(actorId, targetId.data, body.data.role) }; }
+    catch (error) {
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_REQUIRED" });
+      if (error instanceof ClanMemberNotFoundError) return reply.code(404).send({ code: "CLAN_MEMBER_NOT_FOUND" });
+      if (error instanceof ClanPermissionError) return reply.code(403).send({ code: "CLAN_PERMISSION_DENIED" });
+      if (error instanceof ClanOfficerLimitError) return reply.code(409).send({ code: "CLAN_OFFICER_LIMIT_REACHED" });
+      throw error;
+    }
+  });
+  app.delete("/v1/clans/members/:playerId", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const actorId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!actorId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const targetId = z.string().uuid().safeParse((request.params as { playerId: string }).playerId);
+    if (!targetId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { await dependencies.socialStore.removeClanMember(actorId, targetId.data); return reply.code(204).send(); }
+    catch (error) {
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_REQUIRED" });
+      if (error instanceof ClanMemberNotFoundError) return reply.code(404).send({ code: "CLAN_MEMBER_NOT_FOUND" });
+      if (error instanceof ClanPermissionError) return reply.code(403).send({ code: "CLAN_PERMISSION_DENIED" });
+      throw error;
+    }
+  });
+  app.post("/v1/clans/ownership-transfer", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const actorId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!actorId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const body = clanOwnershipTransferBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return { members: await dependencies.socialStore.transferClanOwnership(actorId, body.data.playerId) }; }
+    catch (error) {
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_REQUIRED" });
+      if (error instanceof ClanMemberNotFoundError) return reply.code(404).send({ code: "CLAN_MEMBER_NOT_FOUND" });
+      if (error instanceof ClanPermissionError) return reply.code(403).send({ code: "CLAN_PERMISSION_DENIED" });
       throw error;
     }
   });

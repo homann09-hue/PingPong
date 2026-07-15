@@ -9,6 +9,8 @@ that placeholder with an authenticated, server-authoritative social graph.
 - Directed friend requests and symmetric friendships.
 - Clan creation, discovery, joining and leaving.
 - Exactly one clan membership per player, bounded clan capacity and owner role.
+- Member roster, bounded officer assignment, role-aware removal and atomic
+  ownership transfer with append-only action evidence.
 - Demo and PostgreSQL adapters behind the same `SocialStore` contract.
 - Flutter rendering and actions sourced only from `/v1/social/overview`.
 - API, widget and PostgreSQL integration coverage.
@@ -23,5 +25,5 @@ memberships.
 
 ## Next
 
-Add invitations, officer permissions, moderation/audit events, clan missions,
-seasonal score settlement, chat/inbox delivery and abuse controls.
+Add clan missions, seasonal score settlement, chat/inbox delivery, automated
+sanctions and broader abuse controls.

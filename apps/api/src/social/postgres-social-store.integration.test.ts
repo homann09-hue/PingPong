@@ -36,6 +36,11 @@ databaseSuite("Postgres social graph", () => {
       const moderation = await readFile(new URL("../../../../infra/postgres/021_clan_moderation.sql", import.meta.url), "utf8");
       await pool.query(moderation);
     }
+    const managementExists = await pool.query<{ table_name: string | null }>("SELECT to_regclass('public.clan_member_actions') AS table_name");
+    if (!managementExists.rows[0]?.table_name) {
+      const management = await readFile(new URL("../../../../infra/postgres/022_clan_member_management.sql", import.meta.url), "utf8");
+      await pool.query(management);
+    }
     await pool.query("INSERT INTO players (id,level) VALUES ($1,12),($2,27),($3,19)", [firstPlayer, secondPlayer, thirdPlayer]);
     await store.getOverview(firstPlayer);
     await store.getOverview(secondPlayer);
@@ -98,5 +103,20 @@ databaseSuite("Postgres social graph", () => {
     await expect(store.resolveModerationCase(moderationCase.id, "other", "dismiss", "Already done")).rejects.toBeInstanceOf(ModerationCaseStateError);
     expect((await store.listClanFeed(firstPlayer, undefined, 20)).messages.find((item) => item.id === message.id)).toMatchObject({ status: "removed", body: null });
     expect((await store.listModerationAudit(10)).find((item) => item.caseId === moderationCase.id)).toMatchObject({ actor: "integration-moderator" });
+  });
+
+  it("atomically manages roles, kicks, ownership, and immutable member actions", async () => {
+    const clanId = (await store.getOverview(firstPlayer)).currentClan!.id;
+    await store.joinClan(secondPlayer, clanId);
+    expect((await store.listClanMembers(thirdPlayer)).map((item) => item.role)).toEqual(["owner", "member", "member"]);
+    expect(await store.updateClanMemberRole(firstPlayer, thirdPlayer, "officer")).toMatchObject({ role: "officer" });
+    await store.removeClanMember(thirdPlayer, secondPlayer);
+    await store.joinClan(secondPlayer, clanId);
+    const members = await store.transferClanOwnership(firstPlayer, secondPlayer);
+    expect(members.find((item) => item.player.id === secondPlayer)?.role).toBe("owner");
+    expect(members.find((item) => item.player.id === firstPlayer)?.role).toBe("officer");
+    const actions = await pool.query<{ action: string }>("SELECT action FROM clan_member_actions WHERE clan_id=$1 ORDER BY created_at", [clanId]);
+    expect(actions.rows.map((item) => item.action)).toEqual(["role_changed", "removed", "ownership_transferred"]);
+    await expect(pool.query("DELETE FROM clan_member_actions")).rejects.toThrow(/immutable/);
   });
 });

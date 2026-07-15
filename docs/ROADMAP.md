@@ -65,10 +65,12 @@ requests/friendships and persistent clan creation/discovery/membership with
 PostgreSQL constraints and a functional Flutter surface. LiveOps campaigns now
 support UTC scheduling, level/VIP targeting, separate workforce JWTs, editor /
 publisher / auditor RBAC, mandatory second-actor publication, an append-only
-PostgreSQL audit trail and a server-driven Flutter lobby banner. Clan roles
-capabilities now include role-checked invitations and a moderated, paginated
-clan feed. Player reports, automated trust-and-safety review, clan
-sanctions, social inbox push, targeting previews, enterprise SSO and the broader
+PostgreSQL audit trail and a server-driven Flutter lobby banner. Clan role
+capabilities now include role-checked invitations, a moderated paginated feed,
+player reports with audited staff decisions, member rosters, bounded officer
+promotion, capability-checked removal and atomic ownership transfer. Automated
+trust-and-safety review, clan sanctions, social inbox push, targeting previews,
+enterprise SSO and the broader
 player/economy/health admin modules remain planned. A responsive LiveOps console
 for campaign drafts, publication and audit review is implemented at `/admin/`.
 

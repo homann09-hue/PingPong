@@ -148,6 +148,11 @@ exposing reporter identities to other players. Apply
 `infra/postgres/021_clan_moderation.sql` after the community migration. The
 staff workflow is available from the Moderation tab at `/admin/`; demo mode
 uses the isolated `local-admin-moderator` identity.
+Clan owners can promote up to five officers, demote them, remove members and
+transfer ownership without creating an ownerless committed state. Officers may
+remove ordinary members but cannot change roles or act on other officers. Apply
+`infra/postgres/022_clan_member_management.sql`; every role, removal and
+ownership mutation creates an immutable action record.
 
 The lobby promotion is backed by the LiveOps campaign API. Workforce tokens use
 a dedicated issuer/audience and secret, with separate editor, publisher and

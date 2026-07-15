@@ -28,6 +28,14 @@ export interface ClanInvitationView {
   readonly expiresAt: string;
 }
 
+export type ClanRole = "owner" | "officer" | "member";
+
+export interface ClanMemberView {
+  readonly player: SocialPlayer;
+  readonly role: ClanRole;
+  readonly joinedAt: string;
+}
+
 export interface ClanMessageView {
   readonly id: string;
   readonly author: SocialPlayer;
@@ -98,6 +106,10 @@ export interface SocialStore {
   leaveClan(playerId: string): Promise<void>;
   inviteToClan(playerId: string, targetPlayerId: string): Promise<ClanInvitationView>;
   acceptClanInvitation(playerId: string, invitationId: string): Promise<ClanView>;
+  listClanMembers(playerId: string): Promise<readonly ClanMemberView[]>;
+  updateClanMemberRole(playerId: string, targetPlayerId: string, role: "officer" | "member"): Promise<ClanMemberView>;
+  removeClanMember(playerId: string, targetPlayerId: string): Promise<void>;
+  transferClanOwnership(playerId: string, targetPlayerId: string): Promise<readonly ClanMemberView[]>;
   listClanFeed(playerId: string, cursor: string | undefined, limit: number): Promise<ClanFeedPage>;
   postClanMessage(playerId: string, body: string): Promise<ClanMessageView>;
   removeClanMessage(playerId: string, messageId: string): Promise<void>;
@@ -114,6 +126,8 @@ export class FriendRequestNotFoundError extends Error {}
 export class ClanNotFoundError extends Error {}
 export class ClanMembershipError extends Error {}
 export class ClanPermissionError extends Error {}
+export class ClanMemberNotFoundError extends Error {}
+export class ClanOfficerLimitError extends Error {}
 export class ClanInvitationNotFoundError extends Error {}
 export class ClanMessageNotFoundError extends Error {}
 export class ClanMessageRateLimitError extends Error {}
