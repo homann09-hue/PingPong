@@ -178,6 +178,22 @@ class ShopPurchaseException implements Exception {
   final String code;
 }
 
+class PushPreferencesView {
+  const PushPreferencesView({
+    required this.enabled,
+    required this.marketing,
+    required this.rewards,
+    required this.social,
+    required this.quietHoursStartMinutes,
+    required this.quietHoursEndMinutes,
+    required this.timeZone,
+  });
+
+  final bool enabled, marketing, rewards, social;
+  final int? quietHoursStartMinutes, quietHoursEndMinutes;
+  final String timeZone;
+}
+
 class RewardClaimResponse {
   const RewardClaimResponse({required this.coins, required this.balance});
 
@@ -630,6 +646,72 @@ class CasinoApi {
         .toList(growable: false);
   }
 
+  Future<PushPreferencesView> pushPreferences() async {
+    final response = await http.get(
+      Uri.parse('$base/v1/messaging/preferences'),
+      headers: {'authorization': 'Bearer local-demo'},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Benachrichtigungseinstellungen nicht verfügbar');
+    }
+    return _pushPreferences(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<PushPreferencesView> updatePushPreferences(
+    PushPreferencesView preferences,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$base/v1/messaging/preferences'),
+      headers: {
+        'authorization': 'Bearer local-demo',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        'enabled': preferences.enabled,
+        'marketing': preferences.marketing,
+        'rewards': preferences.rewards,
+        'social': preferences.social,
+        'quietHoursStartMinutes': preferences.quietHoursStartMinutes,
+        'quietHoursEndMinutes': preferences.quietHoursEndMinutes,
+        'timeZone': preferences.timeZone,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Benachrichtigungseinstellungen nicht gespeichert');
+    }
+    return _pushPreferences(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Called by the native/web permission bootstrap after it obtains a real
+  /// provider token. The demo never fabricates one.
+  Future<void> registerPushInstallation({
+    required String installationId,
+    required String provider,
+    required String token,
+  }) async {
+    final platform = kIsWeb
+        ? 'web'
+        : defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : 'android';
+    final response = await http.put(
+      Uri.parse('$base/v1/messaging/installations/current'),
+      headers: {
+        'authorization': 'Bearer local-demo',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        'installationId': installationId,
+        'platform': platform,
+        'provider': provider,
+        'token': token,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Push-Gerät konnte nicht registriert werden');
+    }
+  }
+
   Future<void> sendFriendRequest(String playerId) async {
     final response = await http.post(
       Uri.parse('$base/v1/social/friend-requests'),
@@ -989,6 +1071,17 @@ class CasinoApi {
         streak: data['streak'] as int,
         cyclePosition: data['cyclePosition'] as int,
         claimsTowardWheel: data['claimsTowardWheel'] as int,
+      );
+
+  static PushPreferencesView _pushPreferences(Map<String, dynamic> data) =>
+      PushPreferencesView(
+        enabled: data['enabled'] as bool,
+        marketing: data['marketing'] as bool,
+        rewards: data['rewards'] as bool,
+        social: data['social'] as bool,
+        quietHoursStartMinutes: data['quietHoursStartMinutes'] as int?,
+        quietHoursEndMinutes: data['quietHoursEndMinutes'] as int?,
+        timeZone: data['timeZone'] as String,
       );
 
   static List<JackpotPoolView> _jackpotPools(List<dynamic> values) => values

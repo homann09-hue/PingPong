@@ -146,6 +146,57 @@ void main() {
     expect(find.text('Bessere tägliche Belohnungen'), findsOneWidget);
   });
 
+  testWidgets('notification settings require explicit marketing opt-in', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    PushPreferencesView? saved;
+    const initial = PushPreferencesView(
+      enabled: true,
+      marketing: false,
+      rewards: true,
+      social: true,
+      quietHoursStartMinutes: null,
+      quietHoursEndMinutes: null,
+      timeZone: 'UTC',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () async {
+              saved = await showModalBottomSheet<PushPreferencesView>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) =>
+                    const NotificationSettingsSheet(initial: initial),
+              );
+            },
+            child: const Text('OPEN'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('OPEN'));
+    await tester.pumpAndSettle();
+    expect(find.text('BENACHRICHTIGUNGEN'), findsOneWidget);
+    expect(
+      find.textContaining('Marketing ist standardmäßig aus'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Angebote & Events'));
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('SPEICHERN'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('SPEICHERN'));
+    await tester.pumpAndSettle();
+    expect(saved?.marketing, isTrue);
+    expect(saved?.quietHoursStartMinutes, isNull);
+  });
+
   testWidgets('reward center exposes authoritative timed rewards and wheel', (
     tester,
   ) async {

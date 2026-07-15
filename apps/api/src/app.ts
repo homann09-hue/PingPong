@@ -22,6 +22,9 @@ import type { AnalyticsStore, ClientAnalyticsEvent } from "./analytics/analytics
 import { analyticsEventNames } from "./analytics/analytics-store.js";
 import type { OperationalMetrics } from "./observability/operational-metrics.js";
 import type { ReadinessProbe } from "./observability/readiness.js";
+import type { MessagingStore } from "./messaging/messaging-store.js";
+import { PushCampaignNotPublishableError } from "./messaging/messaging-store.js";
+import type { PushDeliveryWorker } from "./messaging/push-delivery-worker.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -57,6 +60,21 @@ const analyticsBatchBody = z.object({ events: z.array(z.object({
   screen: z.string().trim().min(1).max(64).regex(/^[a-z0-9._-]+$/).optional(),
   slotId: z.string().trim().min(1).max(64).regex(/^[a-z0-9-]+$/).optional(), campaignId: z.string().uuid().optional(),
 }).strict()).min(1).max(50) }).strict();
+const pushPreferencesBody = z.object({
+  enabled: z.boolean(), marketing: z.boolean(), rewards: z.boolean(), social: z.boolean(),
+  quietHoursStartMinutes: z.number().int().min(0).max(1439).nullable(),
+  quietHoursEndMinutes: z.number().int().min(0).max(1439).nullable(),
+  timeZone: z.string().min(1).max(64).regex(/^[A-Za-z0-9_+/-]+$/).refine(isValidTimeZone, "Invalid IANA time zone"),
+}).strict().refine((value) => (value.quietHoursStartMinutes === null) === (value.quietHoursEndMinutes === null), {
+  message: "Quiet-hour boundaries must both be set or both be null",
+}).refine((value) => value.quietHoursStartMinutes === null || value.quietHoursStartMinutes !== value.quietHoursEndMinutes, {
+  message: "Quiet-hour boundaries must differ",
+});
+const pushInstallationBody = z.object({
+  installationId: z.string().uuid(), platform: z.enum(["ios", "android", "web"]),
+  provider: z.enum(["apns", "fcm", "web_push"]), token: z.string().min(16).max(4096),
+}).strict().refine((value) => value.provider === "fcm" || (value.provider === "apns" && value.platform === "ios")
+  || (value.provider === "web_push" && value.platform === "web"), { message: "Provider is incompatible with platform" });
 const rewardAmounts = new Map([
   ["daily", 250_000],
   ["spin-10", 100_000],
@@ -86,6 +104,8 @@ export interface AppDependencies {
   readonly metrics?: OperationalMetrics;
   readonly metricsToken?: string;
   readonly readiness?: ReadinessProbe;
+  readonly messagingStore?: MessagingStore;
+  readonly pushWorker?: PushDeliveryWorker;
 }
 
 /** Builds the HTTP composition root with explicit, replaceable infrastructure ports. */
@@ -269,6 +289,45 @@ export function buildApp(dependencies: AppDependencies) {
     dependencies.metrics?.recordAnalytics(result.accepted, result.duplicates);
     return reply.code(202).send(result);
   });
+  app.get("/v1/messaging/preferences", async (request, reply) => {
+    if (!dependencies.messagingStore) return reply.code(503).send({ code: "MESSAGING_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return dependencies.messagingStore.getPreferences(playerId);
+  });
+  app.put("/v1/messaging/preferences", async (request, reply) => {
+    if (!dependencies.messagingStore) return reply.code(503).send({ code: "MESSAGING_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const body = pushPreferencesBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    return dependencies.messagingStore.updatePreferences(playerId, body.data, new Date());
+  });
+  app.get("/v1/messaging/installations", async (request, reply) => {
+    if (!dependencies.messagingStore) return reply.code(503).send({ code: "MESSAGING_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return { installations: await dependencies.messagingStore.listInstallations(playerId) };
+  });
+  app.put("/v1/messaging/installations/current", async (request, reply) => {
+    if (!dependencies.messagingStore) return reply.code(503).send({ code: "MESSAGING_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const rate = authRateLimiter.consume(`push-installation:${playerId}`, 20, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    const body = pushInstallationBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    return dependencies.messagingStore.registerInstallation(playerId, body.data, new Date());
+  });
+  app.delete("/v1/messaging/installations/:installationId", async (request, reply) => {
+    if (!dependencies.messagingStore) return reply.code(503).send({ code: "MESSAGING_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const installationId = z.string().uuid().safeParse((request.params as { installationId: string }).installationId);
+    if (!installationId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    const removed = await dependencies.messagingStore.removeInstallation(playerId, installationId.data);
+    return removed ? reply.code(204).send() : reply.code(404).send({ code: "INSTALLATION_NOT_FOUND" });
+  });
   app.get("/v1/liveops", async (request, reply) => {
     if (!dependencies.liveOpsStore) return reply.code(503).send({ code: "LIVEOPS_UNAVAILABLE" });
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
@@ -306,6 +365,23 @@ export function buildApp(dependencies: AppDependencies) {
       if (error instanceof CampaignNotFoundError) return reply.code(404).send({ code: "CAMPAIGN_NOT_FOUND" });
       if (error instanceof CampaignStateError) return reply.code(409).send({ code: "CAMPAIGN_STATE_CONFLICT" });
       if (error instanceof FourEyesViolationError) return reply.code(409).send({ code: "FOUR_EYES_REQUIRED" });
+      throw error;
+    }
+  });
+  app.post("/admin/v1/liveops/campaigns/:campaignId/push-dispatch", async (request, reply) => {
+    if (!dependencies.liveOpsStore || !dependencies.messagingStore || !dependencies.adminAuthenticator) {
+      return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    }
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "liveops_publisher")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const campaignId = z.string().uuid().safeParse((request.params as { campaignId: string }).campaignId);
+    if (!campaignId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    const campaign = (await dependencies.liveOpsStore.listCampaigns()).find((item) => item.id === campaignId.data);
+    if (!campaign) return reply.code(404).send({ code: "CAMPAIGN_NOT_FOUND" });
+    try { return reply.code(202).send(await dependencies.messagingStore.queueLiveOpsCampaign(campaign, principal.subject, new Date())); }
+    catch (error) {
+      if (error instanceof PushCampaignNotPublishableError) return reply.code(409).send({ code: "CAMPAIGN_NOT_PUBLISHED" });
       throw error;
     }
   });
@@ -405,6 +481,7 @@ export function buildApp(dependencies: AppDependencies) {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     const deleted = await dependencies.identityService.deleteAccount(playerId);
+    if (deleted) await dependencies.messagingStore?.disablePlayer(playerId, new Date());
     return deleted ? reply.code(204).send() : reply.code(404).send({ code: "ACCOUNT_NOT_FOUND" });
   });
   app.get("/v1/wallet", async (request, reply) => {
@@ -574,6 +651,8 @@ export function buildApp(dependencies: AppDependencies) {
     await dependencies.liveOpsStore?.close();
     await dependencies.analyticsStore?.close();
     await dependencies.readiness?.close();
+    await dependencies.pushWorker?.close();
+    await dependencies.messagingStore?.close();
   });
   return app;
 }
@@ -584,6 +663,11 @@ function secureBearerMatch(authorization: string | undefined, expected: string):
   if (!authorization?.startsWith("Bearer ")) return false;
   const actual = Buffer.from(authorization.slice(7)); const target = Buffer.from(expected);
   return actual.length === target.length && timingSafeEqual(actual, target);
+}
+
+function isValidTimeZone(value: string): boolean {
+  try { new Intl.DateTimeFormat("en", { timeZone: value }).format(); return true; }
+  catch { return false; }
 }
 
 function vipStatus(points: number) {

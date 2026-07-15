@@ -9,10 +9,12 @@ class TopHud extends StatelessWidget {
     this.gems = 320,
     this.vipTier = 'GOLD',
     this.onVipTap,
+    this.onNotificationsTap,
   });
   final int balance, level, xp, gems;
   final String vipTier;
   final VoidCallback? onVipTap;
+  final VoidCallback? onNotificationsTap;
   @override
   Widget build(BuildContext context) => Container(
     height: 76,
@@ -73,6 +75,9 @@ class TopHud extends StatelessWidget {
                 children: [
                   Text(
                     'LEVEL $level',
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
@@ -100,6 +105,16 @@ class TopHud extends StatelessWidget {
             const SizedBox(width: 5),
             _currency(Icons.diamond, _fmt(gems), const Color(0xff42e3ff)),
             const SizedBox(width: 5),
+            IconButton(
+              onPressed: onNotificationsTap,
+              tooltip: 'Benachrichtigungen',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(
+                Icons.notifications_outlined,
+                color: Color(0xffffd75d),
+              ),
+            ),
+            const SizedBox(width: 2),
             GestureDetector(
               onTap: onVipTap,
               child: Container(

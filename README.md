@@ -143,7 +143,8 @@ Apply `infra/postgres/015_liveops_admin.sql` and configure a separate
 
 The staff console is served at `http://localhost:8080/admin/`. It provides a
 responsive campaign registry, draft form, role-separated publication action and
-immutable audit view. In demo mode use the explicit editor/publisher buttons;
+immutable audit view. Published campaigns can be queued as idempotent push
+dispatches for eligible, opted-in installations. In demo mode use the explicit editor/publisher buttons;
 production operators supply a short-lived workforce JWT. The console never
 persists that token and is served with a strict CSP and `no-store` caching.
 
@@ -156,6 +157,15 @@ best-effort and never participates in gameplay settlement. Apply
 `infra/postgres/016_observability_analytics.sql`, schedule its retention function,
 and see `docs/work-packages/phase7-observability-analytics.md` for the privacy and
 operations boundary.
+
+Notification preferences and provider installation registrations are available
+under `/v1/messaging`. Marketing starts disabled, quiet hours use the player's
+IANA time zone, and provider tokens are encrypted at rest. The durable worker
+supports APNs, FCM and Web Push through a normalized HTTPS gateway, bounded retries
+and invalid-token retirement. Apply `infra/postgres/017_push_messaging.sql` and
+configure `PUSH_TOKEN_ENCRYPTION_KEY`, `PUSH_GATEWAY_URL` and
+`PUSH_GATEWAY_TOKEN`. See
+`docs/work-packages/phase8-push-messaging.md` for the native provisioning boundary.
 
 Authenticated wallet reads are available through `GET /v1/wallet` and
 `GET /v1/wallet/transactions?limit=50`. Ledger rows are immutable, use a

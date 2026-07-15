@@ -11,6 +11,7 @@ function operatorError(error) {
     UNAUTHORIZED: "The workforce token is invalid or expired.",
     FORBIDDEN: "This action requires a different operator role.",
     FOUR_EYES_REQUIRED: "A different publisher must approve this draft.",
+    CAMPAIGN_NOT_PUBLISHED: "Only published campaigns can be dispatched.",
   };
   return messages[error.message] ?? error.message;
 }
@@ -59,9 +60,20 @@ function renderCampaigns() {
       <header><div><p class="eyebrow">${escapeHtml(campaign.name)}</p><h3>${escapeHtml(campaign.creative.title)}</h3></div><span class="badge ${campaign.status}">${escapeHtml(campaign.status)}</span></header>
       <p class="subtitle">${escapeHtml(campaign.creative.subtitle)}</p>
       <div class="meta"><span>${formatDate(campaign.startsAt)} — ${formatDate(campaign.endsAt)}</span><span>Audience: level ${campaign.audience.minLevel}+ · VIP ${campaign.audience.minVipPoints}+</span><span>Created by ${escapeHtml(campaign.createdBy)}</span></div>
-      <footer><strong>${escapeHtml(campaign.creative.ctaLabel)}</strong>${campaign.status === "draft" ? `<button data-publish="${campaign.id}" type="button">Publish</button>` : `<span>Approved by ${escapeHtml(campaign.publishedBy ?? "—")}</span>`}</footer>
+      <footer><strong>${escapeHtml(campaign.creative.ctaLabel)}</strong>${campaign.status === "draft" ? `<button data-publish="${campaign.id}" type="button">Publish</button>` : `<span>Approved by ${escapeHtml(campaign.publishedBy ?? "—")}</span><button data-push="${campaign.id}" type="button">Queue push</button>`}</footer>
     </article>`).join("");
   container.querySelectorAll("[data-publish]").forEach((button) => button.addEventListener("click", () => publishCampaign(button.dataset.publish)));
+  container.querySelectorAll("[data-push]").forEach((button) => button.addEventListener("click", () => dispatchPush(button.dataset.push)));
+}
+
+async function dispatchPush(id) {
+  if (!window.confirm("Queue this campaign for every eligible, opted-in installation? This action is audited and idempotent.")) return;
+  try {
+    const result = await api(`/admin/v1/liveops/campaigns/${encodeURIComponent(id)}/push-dispatch`, { method: "POST" });
+    setStatus(byId("session-status"), result.duplicate ? "Push was already queued for this campaign version." : `${result.queued} push delivery job(s) queued.`, "success");
+  } catch (error) {
+    setStatus(byId("session-status"), operatorError(error), "error");
+  }
 }
 
 async function publishCampaign(id) {

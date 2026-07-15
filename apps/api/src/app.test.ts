@@ -8,6 +8,7 @@ import { InMemoryLiveOpsStore } from "./liveops/in-memory-liveops-store.js";
 import { InMemoryAnalyticsStore } from "./analytics/in-memory-analytics-store.js";
 import { PrometheusOperationalMetrics } from "./observability/operational-metrics.js";
 import { AlwaysReadyProbe } from "./observability/readiness.js";
+import { InMemoryMessagingStore } from "./messaging/in-memory-messaging-store.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -26,6 +27,7 @@ describe("observability and analytics API", () => {
   afterAll(async () => observableApp.close());
 
   it("reports readiness and hides metrics without the scrape credential", async () => {
+    metrics.recordPush("delivered");
     const ready = await observableApp.inject({ method: "GET", url: "/health/ready" });
     const hidden = await observableApp.inject({ method: "GET", url: "/internal/metrics" });
     const scrape = await observableApp.inject({ method: "GET", url: "/internal/metrics", headers: { authorization: "Bearer test-metrics-token" } });
@@ -34,6 +36,7 @@ describe("observability and analytics API", () => {
     expect(hidden.statusCode).toBe(404);
     expect(scrape.statusCode).toBe(200);
     expect(scrape.body).toContain("aurora_http_requests_total");
+    expect(scrape.body).toContain('aurora_push_deliveries_total{result="delivered"} 1');
   });
 
   it("accepts allow-listed, recent analytics idempotently and rejects arbitrary properties", async () => {
@@ -44,6 +47,66 @@ describe("observability and analytics API", () => {
     expect((await observableApp.inject(request)).json()).toEqual({ accepted: 0, duplicates: 1 });
     const invalid = await observableApp.inject({ ...request, payload: { events: [{ ...event, eventId: randomUUID(), email: "must-not-be-collected@example.test" }] } });
     expect(invalid.statusCode).toBe(400);
+  });
+});
+
+describe("push messaging API", () => {
+  const messagingStore = new InMemoryMessagingStore();
+  const liveOpsStore = new InMemoryLiveOpsStore();
+  const messagingApp = buildApp({
+    authenticator: { authenticate: async (header) => header === "Bearer valid" ? playerId : null },
+    spinStore: new InMemorySpinStore(1_000), messagingStore, liveOpsStore,
+    adminAuthenticator: new DemoAdminAuthenticator(),
+  });
+  afterAll(async () => messagingApp.close());
+
+  it("persists strict preferences and never returns the provider token", async () => {
+    const before = await messagingApp.inject({ method: "GET", url: "/v1/messaging/preferences", headers: { authorization: "Bearer valid" } });
+    expect(before.json()).toMatchObject({ enabled: true, marketing: false, rewards: true, social: true, timeZone: "UTC" });
+    const preferences = { enabled: true, marketing: true, rewards: true, social: false,
+      quietHoursStartMinutes: 1320, quietHoursEndMinutes: 420, timeZone: "Europe/Berlin" };
+    const updated = await messagingApp.inject({ method: "PUT", url: "/v1/messaging/preferences",
+      headers: { authorization: "Bearer valid" }, payload: preferences });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject(preferences);
+    const invalid = await messagingApp.inject({ method: "PUT", url: "/v1/messaging/preferences",
+      headers: { authorization: "Bearer valid" }, payload: { ...preferences, timeZone: "Not/A_Real_Zone" } });
+    expect(invalid.statusCode).toBe(400);
+
+    const installationId = randomUUID();
+    const registered = await messagingApp.inject({ method: "PUT", url: "/v1/messaging/installations/current",
+      headers: { authorization: "Bearer valid" }, payload: {
+        installationId, platform: "ios", provider: "apns", token: "provider-token-is-secret-and-long-enough",
+      } });
+    expect(registered.statusCode).toBe(200);
+    expect(registered.body).not.toContain("provider-token");
+    const listed = await messagingApp.inject({ method: "GET", url: "/v1/messaging/installations",
+      headers: { authorization: "Bearer valid" } });
+    expect(listed.json().installations).toHaveLength(1);
+    expect(listed.body).not.toContain("provider-token");
+    const incompatible = await messagingApp.inject({ method: "PUT", url: "/v1/messaging/installations/current",
+      headers: { authorization: "Bearer valid" }, payload: {
+        installationId: randomUUID(), platform: "android", provider: "apns", token: "another-provider-token-that-is-long",
+      } });
+    expect(incompatible.statusCode).toBe(400);
+  });
+
+  it("permits only a publisher to dispatch a published campaign idempotently", async () => {
+    const draft = await liveOpsStore.createDraft({
+      name: "Push campaign", startsAt: new Date(Date.now() - 60_000), endsAt: new Date(Date.now() + 3_600_000),
+      audience: { minLevel: 1, minVipPoints: 0 }, creative: { title: "Bonus", subtitle: "Event live", ctaLabel: "EVENTS" }, actor: "demo-editor",
+    });
+    const draftDispatch = await messagingApp.inject({ method: "POST", url: `/admin/v1/liveops/campaigns/${draft.id}/push-dispatch`,
+      headers: { authorization: "Bearer local-admin-publisher" } });
+    expect(draftDispatch.statusCode).toBe(409);
+    await liveOpsStore.publish(draft.id, "demo-publisher", new Date());
+    const forbidden = await messagingApp.inject({ method: "POST", url: `/admin/v1/liveops/campaigns/${draft.id}/push-dispatch`,
+      headers: { authorization: "Bearer local-admin-editor" } });
+    expect(forbidden.statusCode).toBe(403);
+    const request = { method: "POST" as const, url: `/admin/v1/liveops/campaigns/${draft.id}/push-dispatch`,
+      headers: { authorization: "Bearer local-admin-publisher" } };
+    expect((await messagingApp.inject(request)).json()).toEqual({ queued: 1, duplicate: false });
+    expect((await messagingApp.inject(request)).json()).toEqual({ queued: 0, duplicate: true });
   });
 });
 

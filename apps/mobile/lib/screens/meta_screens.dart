@@ -7,6 +7,161 @@ import '../services/casino_api.dart';
 typedef RewardClaimCallback = Future<void> Function(String rewardId);
 typedef ShopPurchaseCallback = Future<void> Function(ShopOfferView offer);
 
+class NotificationSettingsSheet extends StatefulWidget {
+  const NotificationSettingsSheet({super.key, required this.initial});
+  final PushPreferencesView initial;
+
+  @override
+  State<NotificationSettingsSheet> createState() =>
+      _NotificationSettingsSheetState();
+}
+
+class _NotificationSettingsSheetState extends State<NotificationSettingsSheet> {
+  late bool enabled, marketing, rewards, social, quietHours;
+  late String timeZone;
+
+  @override
+  void initState() {
+    super.initState();
+    enabled = widget.initial.enabled;
+    marketing = widget.initial.marketing;
+    rewards = widget.initial.rewards;
+    social = widget.initial.social;
+    quietHours = widget.initial.quietHoursStartMinutes != null;
+    timeZone = widget.initial.timeZone;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final zones = {
+      timeZone,
+      'UTC',
+      'Europe/Berlin',
+      'America/New_York',
+      'Asia/Tokyo',
+    }.toList();
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: const BoxDecoration(
+          color: Color(0xff180a35),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          border: Border(top: BorderSide(color: Color(0xffffc52f), width: 2)),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(
+                  child: SizedBox(
+                    width: 44,
+                    child: Divider(thickness: 4, color: Colors.white38),
+                  ),
+                ),
+                const Text('BENACHRICHTIGUNGEN', style: MetaStyle.hero),
+                const SizedBox(height: 4),
+                const Text(
+                  'Du entscheidest, welche Nachrichten Aurora senden darf. Marketing ist standardmäßig aus.',
+                  style: MetaStyle.caption,
+                ),
+                const SizedBox(height: 12),
+                _switch(
+                  'Push-Nachrichten',
+                  'Master-Schalter für dieses Konto',
+                  enabled,
+                  (value) => setState(() => enabled = value),
+                ),
+                _switch(
+                  'Angebote & Events',
+                  'Personalisierte LiveOps-Kampagnen',
+                  marketing,
+                  enabled ? (value) => setState(() => marketing = value) : null,
+                ),
+                _switch(
+                  'Belohnungen',
+                  'Daily Rewards und zeitlich begrenzte Boni',
+                  rewards,
+                  enabled ? (value) => setState(() => rewards = value) : null,
+                ),
+                _switch(
+                  'Social',
+                  'Freundschafts- und Clan-Aktivität',
+                  social,
+                  enabled ? (value) => setState(() => social = value) : null,
+                ),
+                _switch(
+                  'Ruhezeit 22:00–07:00',
+                  'Keine nichtkritischen Nachrichten während der Nacht',
+                  quietHours,
+                  enabled
+                      ? (value) => setState(() => quietHours = value)
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: timeZone,
+                  decoration: const InputDecoration(
+                    labelText: 'Zeitzone',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: zones
+                      .map(
+                        (zone) =>
+                            DropdownMenuItem(value: zone, child: Text(zone)),
+                      )
+                      .toList(),
+                  onChanged: enabled
+                      ? (value) => setState(() => timeZone = value ?? timeZone)
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(
+                    PushPreferencesView(
+                      enabled: enabled,
+                      marketing: marketing,
+                      rewards: rewards,
+                      social: social,
+                      quietHoursStartMinutes: quietHours ? 22 * 60 : null,
+                      quietHoursEndMinutes: quietHours ? 7 * 60 : null,
+                      timeZone: timeZone,
+                    ),
+                  ),
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('SPEICHERN'),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Die Systemfreigabe und das Push-Token werden separat durch iOS, Android oder den Browser verwaltet.',
+                  textAlign: TextAlign.center,
+                  style: MetaStyle.caption,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _switch(
+    String title,
+    String subtitle,
+    bool value,
+    ValueChanged<bool>? onChanged,
+  ) => SwitchListTile.adaptive(
+    contentPadding: EdgeInsets.zero,
+    title: Text(title, style: MetaStyle.title),
+    subtitle: Text(subtitle, style: MetaStyle.caption),
+    value: value,
+    onChanged: onChanged,
+    activeTrackColor: const Color(0xff8b3df0),
+  );
+}
+
 class QuestsScreen extends StatelessWidget {
   const QuestsScreen({
     super.key,

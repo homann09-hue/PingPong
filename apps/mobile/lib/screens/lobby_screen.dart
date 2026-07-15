@@ -41,6 +41,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<ShopOfferView> shopOffers = const [];
   SocialOverviewView? socialOverview;
   LiveOpsCampaignView? activeCampaign;
+  PushPreferencesView? pushPreferences;
   TimedRewardView? hourlyReward;
   TimedRewardView? dailyReward;
   WheelView? rewardWheel;
@@ -60,7 +61,51 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadShopOffers();
     _loadSocial();
     _loadLiveOps();
+    _loadMessaging();
     unawaited(api.trackEvent('screen.viewed', screen: 'lobby'));
+  }
+
+  Future<void> _loadMessaging() async {
+    try {
+      final loaded = await api.pushPreferences();
+      if (mounted) setState(() => pushPreferences = loaded);
+    } on StateError {
+      // Messaging settings stay unavailable until the authoritative API responds.
+    }
+  }
+
+  Future<void> _openNotificationSettings() async {
+    final current = pushPreferences;
+    if (current == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Benachrichtigungseinstellungen sind gerade offline.'),
+        ),
+      );
+      return;
+    }
+    final changed = await showModalBottomSheet<PushPreferencesView>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => NotificationSettingsSheet(initial: current),
+    );
+    if (changed == null) return;
+    try {
+      final saved = await api.updatePushPreferences(changed);
+      if (!mounted) return;
+      setState(() => pushPreferences = saved);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Benachrichtigungen gespeichert.')),
+      );
+    } on StateError {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Einstellungen konnten nicht gespeichert werden.'),
+        ),
+      );
+    }
   }
 
   Future<void> _loadLiveOps() async {
@@ -350,6 +395,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               gems: gems,
               vipTier: vipTier,
               onVipTap: _showVip,
+              onNotificationsTap: _openNotificationSettings,
             ),
             Expanded(child: _content()),
             _nav(),

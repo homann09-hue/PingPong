@@ -3,6 +3,7 @@ export interface OperationalMetrics {
   observeHttp(method: string, route: string, statusCode: number, durationSeconds: number): void;
   recordSpin(slotId: string, outcome: "returned" | "rejected"): void;
   recordAnalytics(accepted: number, duplicates: number): void;
+  recordPush(result: "delivered" | "retry" | "failed" | "suppressed" | "invalid_token"): void;
   render(): Promise<string>;
   readonly contentType: string;
 }
@@ -14,6 +15,7 @@ export class PrometheusOperationalMetrics implements OperationalMetrics {
   private readonly requests = new Map<string, RequestMetric>();
   private readonly spins = new Map<string, number>();
   private readonly analytics = new Map<string, number>();
+  private readonly push = new Map<string, number>();
   public constructor(private readonly includeRuntimeMetrics = true) {}
   public readonly contentType = "text/plain; version=0.0.4; charset=utf-8";
 
@@ -28,6 +30,9 @@ export class PrometheusOperationalMetrics implements OperationalMetrics {
   public recordAnalytics(accepted: number, duplicates: number): void {
     if (accepted > 0) this.analytics.set("accepted", (this.analytics.get("accepted") ?? 0) + accepted);
     if (duplicates > 0) this.analytics.set("duplicate", (this.analytics.get("duplicate") ?? 0) + duplicates);
+  }
+  public recordPush(result: "delivered" | "retry" | "failed" | "suppressed" | "invalid_token"): void {
+    this.push.set(result, (this.push.get(result) ?? 0) + 1);
   }
   public async render(): Promise<string> {
     const lines = [
@@ -49,6 +54,8 @@ export class PrometheusOperationalMetrics implements OperationalMetrics {
     }
     lines.push("# HELP aurora_client_analytics_events_total Client analytics ingestion results", "# TYPE aurora_client_analytics_events_total counter");
     for (const [result, count] of this.analytics) lines.push(`aurora_client_analytics_events_total${labelSet({ result })} ${count}`);
+    lines.push("# HELP aurora_push_deliveries_total Push delivery outcomes", "# TYPE aurora_push_deliveries_total counter");
+    for (const [result, count] of this.push) lines.push(`aurora_push_deliveries_total${labelSet({ result })} ${count}`);
     if (this.includeRuntimeMetrics) {
       const memory = process.memoryUsage();
       lines.push("# TYPE aurora_process_resident_memory_bytes gauge", `aurora_process_resident_memory_bytes ${memory.rss}`,

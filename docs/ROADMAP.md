@@ -71,6 +71,13 @@ previews, enterprise SSO and the broader player/economy/health admin modules
 remain planned. A responsive LiveOps console for campaign drafts, publication
 and audit review is implemented at `/admin/`.
 
+Push messaging now includes explicit per-category preferences, quiet hours,
+encrypted APNs/FCM/Web Push token registration, idempotent audience fan-out from
+published campaigns, an audited publisher action, durable multi-worker leasing,
+bounded retries, invalid-token retirement and delivery metrics. Native provider
+permission/token bootstraps, production gateway provisioning, deep-link routing,
+receipt reconciliation and push capacity tests remain launch work.
+
 ## Phase 4 — scale and launch readiness
 
 Multi-region read strategy, capacity tests, disaster recovery exercises, abuse

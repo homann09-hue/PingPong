@@ -62,6 +62,15 @@ state. The storage remains pseudonymous and requires scheduled bounded retention
 plus a production erasure/anonymization workflow; soft account deletion alone
 does not remove telemetry rows.
 
+Push messaging is an eventual-consistency boundary. Player preferences and
+encrypted installation credentials are strongly persisted, while approved
+LiveOps campaigns fan out into idempotent delivery rows. Workers lease those rows
+with `SKIP LOCKED`, re-evaluate preferences and account/install state, honor local
+quiet hours and submit a normalized envelope to an internal HTTPS gateway. The
+gateway owns APNs/FCM/Web Push credentials; product services never embed provider
+SDK secrets. Dispatch is restricted to published campaigns and produces an
+append-only workforce audit entry.
+
 ## Runtime target
 
 - Flutter clients use feature modules and a render-only slot scene.
