@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SpinResult } from "@aurora/slot-engine";
+import { activeShopOffers } from "../shop/shop-catalog.js";
 import { PostgresSpinStore } from "./postgres-spin-store.js";
-import { RewardNotAvailableError } from "./spin-store.js";
+import { InsufficientGemsError, RewardNotAvailableError, ShopOfferLimitReachedError } from "./spin-store.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseSuite = databaseUrl ? describe : describe.skip;
@@ -13,6 +14,8 @@ databaseSuite("PostgresSpinStore integration", () => {
   const pool = new Pool({ connectionString: databaseUrl });
   const store = new PostgresSpinStore(pool);
   const playerId = randomUUID();
+  const shopPlayerId = randomUUID();
+  const concurrentShopPlayerId = randomUUID();
   const slotId = `integration-${randomUUID()}`;
   const missionId = `integration-mission-${randomUUID()}`;
 
@@ -66,8 +69,12 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/013_shop_purchases.sql", import.meta.url), "utf8",
     );
     await pool.query(shopMigration);
-    await pool.query("INSERT INTO players (id) VALUES ($1)", [playerId]);
-    await pool.query("INSERT INTO wallets (player_id, currency, balance) VALUES ($1,'coin',100),($1,'gem',0)", [playerId]);
+    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3)", [playerId, shopPlayerId, concurrentShopPlayerId]);
+    await pool.query(
+      `INSERT INTO wallets (player_id, currency, balance) VALUES
+        ($1,'coin',100),($1,'gem',0),($2,'coin',1000),($2,'gem',320),($3,'coin',1000),($3,'gem',320)`,
+      [playerId, shopPlayerId, concurrentShopPlayerId],
+    );
     await pool.query(
       "INSERT INTO slot_config_versions (slot_id, version, config, config_sha256, published_at) VALUES ($1,1,'{}',$2,now())",
       [slotId, Buffer.alloc(32)],
@@ -181,5 +188,54 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(wheel).toMatchObject({ rewardCurrency: "gem", rewardAmount: 25, availableSpins: 0 });
     const gems = await pool.query<{ balance: string }>("SELECT balance FROM wallets WHERE player_id=$1 AND currency='gem'", [playerId]);
     expect(gems.rows[0]?.balance).toBe("25");
+  });
+
+  it("purchases shop offers atomically with replay, limits, and wallet ledger entries", async () => {
+    const offer = activeShopOffers(new Date("2026-07-15T12:00:00.000Z"))[0]!;
+    const idempotencyKey = randomUUID();
+    const first = await store.purchaseShopOffer(shopPlayerId, offer, idempotencyKey);
+    const replay = await store.purchaseShopOffer(shopPlayerId, offer, idempotencyKey);
+    expect(first).toMatchObject({
+      offerId: "daily-fortune",
+      coins: 200_000,
+      gemsSpent: 20,
+      coinBalance: 201_000,
+      gemBalance: 300,
+    });
+    expect(replay).toEqual(first);
+    await expect(
+      store.purchaseShopOffer(shopPlayerId, offer, randomUUID()),
+    ).rejects.toBeInstanceOf(ShopOfferLimitReachedError);
+    await expect(
+      store.purchaseShopOffer(
+        shopPlayerId,
+        { ...offer, id: "too-expensive", periodKey: null, costGems: 301 },
+        randomUUID(),
+      ),
+    ).rejects.toBeInstanceOf(InsufficientGemsError);
+
+    const ledger = await pool.query<{
+      currency: string;
+      amount: string;
+      balance_before: string;
+      balance_after: string;
+    }>(
+      `SELECT currency, amount, balance_before, balance_after
+         FROM wallet_ledger WHERE player_id=$1 AND source='shop' ORDER BY currency`,
+      [shopPlayerId],
+    );
+    expect(ledger.rows).toEqual([
+      { currency: "coin", amount: "200000", balance_before: "1000", balance_after: "201000" },
+      { currency: "gem", amount: "-20", balance_before: "320", balance_after: "300" },
+    ]);
+
+    const concurrentOffer = { ...offer, id: "concurrent-daily" };
+    const concurrent = await Promise.allSettled([
+      store.purchaseShopOffer(concurrentShopPlayerId, concurrentOffer, randomUUID()),
+      store.purchaseShopOffer(concurrentShopPlayerId, concurrentOffer, randomUUID()),
+    ]);
+    expect(concurrent.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = concurrent.find((result) => result.status === "rejected");
+    expect(rejected?.status === "rejected" ? rejected.reason : null).toBeInstanceOf(ShopOfferLimitReachedError);
   });
 });

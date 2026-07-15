@@ -30,8 +30,8 @@ Stand: 14. Juli 2026
 ## Verifikation
 
 - 22 Engine- und Mathematiktests bestanden.
-- 21 API-/Identity-/Reward-Tests und drei PostgreSQL-Integrationstests
-  bestanden (24 API-Tests insgesamt).
+- 28 API-/Identity-/Reward-Tests und vier PostgreSQL-Integrationstests
+  bestanden (32 API-Tests insgesamt).
 - Die Release-Guardrails simulieren 100.000 Spins je veröffentlichtem Thema.
 - Zusätzlicher vollständiger Simulatorlauf: 800.000 Spins über acht Themen.
 - Stichproben-RTP der acht Themen: 92,62 % bis 96,01 % bei 94 % Ziel-RTP; alle 95-%-Konfidenzintervalle enthalten das Ziel.

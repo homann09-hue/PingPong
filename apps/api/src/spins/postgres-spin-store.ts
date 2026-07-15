@@ -221,6 +221,13 @@ export class PostgresSpinStore implements SpinStore {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const wallets = await client.query<{ currency: "coin" | "gem"; balance: string }>(
+        `SELECT currency, balance FROM wallets
+          WHERE player_id=$1 AND currency IN ('coin','gem') ORDER BY currency FOR UPDATE`, [playerId],
+      );
+      const coinRow = wallets.rows.find((row) => row.currency === "coin");
+      const gemRow = wallets.rows.find((row) => row.currency === "gem");
+      if (!coinRow || !gemRow) throw new Error("Player shop wallets do not exist");
       const replay = await client.query<{ id: string; offer_id: string; coins: string; gems_spent: string; coin_balance_after: string; gem_balance_after: string }>(
         `SELECT id, offer_id, coins, gems_spent, coin_balance_after, gem_balance_after
            FROM shop_purchases WHERE player_id=$1 AND idempotency_key=$2`,
@@ -234,13 +241,6 @@ export class PostgresSpinStore implements SpinStore {
           coinBalance: this.safeInteger(row.coin_balance_after, "Shop coin balance"),
           gemBalance: this.safeInteger(row.gem_balance_after, "Shop gem balance") };
       }
-      const wallets = await client.query<{ currency: "coin" | "gem"; balance: string }>(
-        `SELECT currency, balance FROM wallets
-          WHERE player_id=$1 AND currency IN ('coin','gem') ORDER BY currency FOR UPDATE`, [playerId],
-      );
-      const coinRow = wallets.rows.find((row) => row.currency === "coin");
-      const gemRow = wallets.rows.find((row) => row.currency === "gem");
-      if (!coinRow || !gemRow) throw new Error("Player shop wallets do not exist");
       if (offer.periodKey) {
         const claimed = await client.query(
           "SELECT 1 FROM shop_purchases WHERE player_id=$1 AND offer_id=$2 AND period_key=$3",
@@ -261,7 +261,7 @@ export class PostgresSpinStore implements SpinStore {
           purchase.coinBalance, purchase.gemBalance],
       );
       await client.query(
-        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1 ELSE $2 END, version=version+1
+        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint ELSE $2::bigint END, version=version+1
           WHERE player_id=$3 AND currency IN ('coin','gem')`,
         [purchase.coinBalance, purchase.gemBalance, playerId],
       );

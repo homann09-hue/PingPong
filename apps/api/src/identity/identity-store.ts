@@ -19,6 +19,7 @@ export interface CreateGuestSession {
   readonly refreshTokenHash: Buffer;
   readonly expiresAt: Date;
   readonly initialCoinBalance: number;
+  readonly initialGemBalance: number;
 }
 
 export interface RotateSession {

@@ -30,6 +30,14 @@ databaseSuite("Postgres identity sessions", () => {
   it("persists a guest device and atomically rotates its session", async () => {
     const installationId = randomUUID();
     const first = await identity.createGuest(installationId, "ios");
+    const wallets = await pool.query<{ currency: string; balance: string }>(
+      "SELECT currency, balance FROM wallets WHERE player_id=$1 ORDER BY currency",
+      [first.playerId],
+    );
+    expect(wallets.rows).toEqual([
+      { currency: "coin", balance: "100000" },
+      { currency: "gem", balance: "320" },
+    ]);
     const rotated = await identity.refresh(first.refreshToken);
     expect(rotated?.playerId).toBe(first.playerId);
     expect(await identity.authenticate(`Bearer ${first.accessToken}`)).toBeNull();

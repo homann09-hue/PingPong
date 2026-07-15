@@ -25,8 +25,8 @@ export class PostgresIdentityStore implements IdentityStore {
       if (!existing.rows[0]) {
         await client.query("INSERT INTO players (id) VALUES ($1)", [playerId]);
         await client.query(
-          "INSERT INTO wallets (player_id, currency, balance) VALUES ($1,'coin',$2),($1,'gem',0)",
-          [playerId, command.initialCoinBalance],
+          "INSERT INTO wallets (player_id, currency, balance) VALUES ($1,'coin',$2),($1,'gem',$3)",
+          [playerId, command.initialCoinBalance, command.initialGemBalance],
         );
         await client.query(
           "INSERT INTO auth_identities (id, player_id, provider, provider_subject) VALUES ($1,$2,'guest',$3)",

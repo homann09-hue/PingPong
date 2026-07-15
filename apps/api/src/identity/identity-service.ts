@@ -33,6 +33,7 @@ export class IdentityService implements Authenticator {
       refreshTokenHash: this.hash(refreshToken),
       expiresAt: refreshTokenExpiresAt,
       initialCoinBalance: 100_000,
+      initialGemBalance: 320,
     });
     return this.tokens(session, refreshToken, refreshTokenExpiresAt);
   }
