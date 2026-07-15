@@ -13,6 +13,7 @@ import { InMemoryMessagingStore } from "./messaging/in-memory-messaging-store.js
 import { MonetizationService } from "./monetization/monetization-service.js";
 import { DemoReceiptVerifier } from "./monetization/receipt-verifier.js";
 import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store.js";
+import type { OperationsStore } from "./operations/operations-store.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -154,6 +155,36 @@ describe("observability and analytics API", () => {
     expect((await observableApp.inject(request)).json()).toEqual({ accepted: 0, duplicates: 1 });
     const invalid = await observableApp.inject({ ...request, payload: { events: [{ ...event, eventId: randomUUID(), email: "must-not-be-collected@example.test" }] } });
     expect(invalid.statusCode).toBe(400);
+  });
+});
+
+describe("workforce operations health API", () => {
+  const metrics = new PrometheusOperationalMetrics(false);
+  metrics.observeHttp("GET", "/synthetic", 503, 0.025);
+  metrics.recordSpin("classic-3x3", "returned"); metrics.recordSpin("classic-3x3", "rejected");
+  metrics.recordAnalytics(4, 1); metrics.recordPush("failed");
+  const operationsStore: OperationsStore = {
+    snapshot: async () => ({ activePlayers: 42, suspendedPlayers: 2, spinsLast15Minutes: 19,
+      analyticsEventsLast24Hours: 120, pendingEconomyGrants: 3, openModerationCases: 4,
+      pushPending: 8, pushProcessing: 2, pushStale: 1, pushFailedLast24Hours: 5, adminActionsLast24Hours: 9 }),
+    close: async () => {},
+  };
+  const operationsApp = buildApp({ authenticator: { authenticate: async () => null }, spinStore: new InMemorySpinStore(),
+    adminAuthenticator: new DemoAdminAuthenticator(), operationsStore, metrics, readiness: new AlwaysReadyProbe() });
+  afterAll(async () => operationsApp.close());
+
+  it("returns aggregate health only to the dedicated operations role", async () => {
+    const forbidden = await operationsApp.inject({ method: "GET", url: "/admin/v1/operations/health",
+      headers: { authorization: "Bearer local-admin-publisher" } });
+    expect(forbidden.statusCode).toBe(403);
+    const response = await operationsApp.inject({ method: "GET", url: "/admin/v1/operations/health",
+      headers: { authorization: "Bearer local-admin-operations" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: "warning", issues: ["stale_push_leases"],
+      readiness: { ready: true }, runtime: { requests: { serverErrors: 1 }, spins: { returned: 1, rejected: 1 },
+        analytics: { accepted: 4, duplicates: 1 }, push: { failed: 1 } },
+      durable: { activePlayers: 42, pushStale: 1, pendingEconomyGrants: 3 } });
+    expect(response.body).not.toContain("playerId");
   });
 });
 

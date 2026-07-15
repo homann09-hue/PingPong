@@ -21,6 +21,8 @@ import { DemoReceiptVerifier, HttpReceiptVerifier } from "./monetization/receipt
 import { MonetizationService } from "./monetization/monetization-service.js";
 import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store.js";
 import { PostgresEconomyAdminStore } from "./admin/postgres-economy-admin-store.js";
+import { InMemoryOperationsStore } from "./operations/in-memory-operations-store.js";
+import { PostgresOperationsStore } from "./operations/postgres-operations-store.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -54,6 +56,10 @@ const spinStore = demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStor
 const economyAdminStore = demoMode
   ? new InMemoryEconomyAdminStore(spinStore as InMemorySpinStore, demoPlayerId)
   : PostgresEconomyAdminStore.connect(databaseUrl!);
+const socialStore = demoMode ? new InMemorySocialStore(demoPlayerId) : PostgresSocialStore.connect(databaseUrl!);
+const operationsStore = demoMode
+  ? new InMemoryOperationsStore(economyAdminStore, socialStore)
+  : PostgresOperationsStore.connect(databaseUrl!);
 const monetizationService = new MonetizationService(
   demoMode ? new DemoReceiptVerifier() : new HttpReceiptVerifier(storeVerificationUrl!, storeGatewayToken!), spinStore,
 );
@@ -67,9 +73,10 @@ const pushWorker = new PushDeliveryWorker(
 const app = buildApp({
   authenticator: identityService,
   spinStore,
-  socialStore: demoMode ? new InMemorySocialStore(demoPlayerId) : PostgresSocialStore.connect(databaseUrl!),
+  socialStore,
   liveOpsStore: demoMode ? new InMemoryLiveOpsStore() : PostgresLiveOpsStore.connect(databaseUrl!),
   economyAdminStore,
+  operationsStore,
   adminAuthenticator: demoMode ? new DemoAdminAuthenticator() : new AdminJwtAuthenticator(adminJwtSecret!),
   analyticsStore: demoMode ? new InMemoryAnalyticsStore() : PostgresAnalyticsStore.connect(databaseUrl!),
   metrics,

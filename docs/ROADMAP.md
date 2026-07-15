@@ -70,7 +70,9 @@ capabilities now include role-checked invitations, a moderated paginated feed,
 player reports with audited staff decisions, member rosters, bounded officer
 promotion, capability-checked removal and atomic ownership transfer. Automated
 trust-and-safety review, clan sanctions, social inbox push, targeting previews,
-enterprise SSO and the broader health admin module remain planned. Player search
+enterprise SSO remains planned. The health admin module now combines readiness,
+process metrics and durable queue aggregates behind a dedicated read-only role.
+Player search
 and bounded coin/gem support grants now use separate support/approver roles,
 mandatory second-actor approval, atomic wallet/ledger settlement and immutable
 audit records. A responsive LiveOps console

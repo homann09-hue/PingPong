@@ -30,6 +30,7 @@ import { ReceiptGatewayUnavailableError, ReceiptInvalidError, ReceiptPendingErro
 import { StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError } from "./spins/spin-store.js";
 import type { EconomyAdminStore } from "./admin/economy-admin-store.js";
 import { EconomyFourEyesViolationError, EconomyGrantNotFoundError, EconomyGrantStateError, EconomyPlayerNotFoundError } from "./admin/economy-admin-store.js";
+import type { OperationsStore } from "./operations/operations-store.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -141,6 +142,7 @@ export interface AppDependencies {
   readonly adminAuthenticator?: AdminAuthenticator;
   readonly liveOpsStore?: LiveOpsStore;
   readonly economyAdminStore?: EconomyAdminStore;
+  readonly operationsStore?: OperationsStore;
   readonly analyticsStore?: AnalyticsStore;
   readonly metrics?: OperationalMetrics;
   readonly metricsToken?: string;
@@ -547,6 +549,25 @@ export function buildApp(dependencies: AppDependencies) {
     const query = adminAuditQuery.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
     return { entries: await dependencies.economyAdminStore.listAudit(query.data.limit) };
+  });
+  app.get("/admin/v1/operations/health", async (request, reply) => {
+    if (!dependencies.operationsStore || !dependencies.adminAuthenticator || !dependencies.metrics || !dependencies.readiness) {
+      return reply.code(503).send({ code: "OPERATIONS_UNAVAILABLE" });
+    }
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "operations_viewer")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const now = new Date();
+    const [readiness, durable] = await Promise.all([dependencies.readiness.check(), dependencies.operationsStore.snapshot(now)]);
+    const runtime = dependencies.metrics.snapshot();
+    const issues: string[] = [];
+    if (!readiness.ready) issues.push("readiness_failed");
+    if (durable.pushStale > 0) issues.push("stale_push_leases");
+    if (durable.pushFailedLast24Hours >= 100) issues.push("push_failures_elevated");
+    if (durable.pendingEconomyGrants >= 100) issues.push("economy_approval_backlog");
+    if (durable.openModerationCases >= 500) issues.push("moderation_backlog");
+    const status = !readiness.ready ? "critical" : issues.length > 0 ? "warning" : "healthy";
+    return { generatedAt: now.toISOString(), status, issues, readiness, runtime, durable };
   });
 
   async function resolveEconomyGrant(request: FastifyRequest, reply: FastifyReply, action: "approve" | "reject") {
@@ -958,6 +979,7 @@ export function buildApp(dependencies: AppDependencies) {
     await dependencies.socialStore?.close();
     await dependencies.liveOpsStore?.close();
     await dependencies.economyAdminStore?.close();
+    await dependencies.operationsStore?.close();
     await dependencies.analyticsStore?.close();
     await dependencies.readiness?.close();
     await dependencies.pushWorker?.close();

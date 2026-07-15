@@ -1,4 +1,4 @@
-const state = { token: "", campaigns: [], moderationCases: [], players: [], economyGrants: [] };
+const state = { token: "", campaigns: [], moderationCases: [], players: [], economyGrants: [], operations: null };
 const byId = (id) => document.getElementById(id);
 
 function setStatus(element, message, type = "") {
@@ -15,6 +15,7 @@ function operatorError(error) {
     MODERATION_CASE_ALREADY_RESOLVED: "This report was already resolved.",
     ECONOMY_GRANT_ALREADY_RESOLVED: "This grant was already resolved.",
     PLAYER_NOT_ACTIVE: "The player is no longer active.",
+    OPERATIONS_UNAVAILABLE: "Operational health data is not available on this environment.",
   };
   return messages[error.message] ?? error.message;
 }
@@ -183,12 +184,40 @@ async function resolveGrant(grantId, action) {
   catch (error) { setStatus(byId("session-status"), operatorError(error), "error"); }
 }
 
+async function loadOperations() {
+  const summary = byId("operations-summary"); const metrics = byId("operations-metrics");
+  summary.innerHTML = '<p class="empty">Loading operational snapshot…</p>'; metrics.innerHTML = "";
+  try {
+    const health = await api("/admin/v1/operations/health"); state.operations = health;
+    const issueText = health.issues.length ? health.issues.map((issue) => issue.replaceAll("_", " ")).join(" · ") : "No active operational warnings";
+    summary.innerHTML = `<div class="health-state ${escapeHtml(health.status)}"><div><p class="eyebrow">${escapeHtml(health.status)}</p><strong>${escapeHtml(issueText)}</strong></div><p>${formatDate(health.generatedAt)}</p></div>`;
+    const cards = [
+      ["Readiness", Object.entries(health.readiness.checks).map(([name, value]) => [name, value])],
+      ["HTTP since start", [["requests", health.runtime.requests.total], ["server errors", health.runtime.requests.serverErrors], ["average latency", `${health.runtime.requests.averageDurationMilliseconds.toFixed(1)} ms`]]],
+      ["Authoritative spins", [["returned", health.runtime.spins.returned], ["rejected", health.runtime.spins.rejected], ["last 15 minutes", health.durable.spinsLast15Minutes]]],
+      ["Players", [["active", health.durable.activePlayers], ["suspended", health.durable.suspendedPlayers]]],
+      ["Work queues", [["economy approvals", health.durable.pendingEconomyGrants], ["moderation cases", health.durable.openModerationCases], ["admin actions / 24h", health.durable.adminActionsLast24Hours]]],
+      ["Push delivery", [["pending", health.durable.pushPending], ["processing", health.durable.pushProcessing], ["stale leases", health.durable.pushStale], ["failed / 24h", health.durable.pushFailedLast24Hours]]],
+      ["Client ingestion", [["analytics / 24h", health.durable.analyticsEventsLast24Hours], ["accepted since start", health.runtime.analytics.accepted], ["duplicates since start", health.runtime.analytics.duplicates]]],
+      ["Runtime", [["uptime", formatDuration(health.runtime.runtime.uptimeSeconds)], ["resident memory", formatBytes(health.runtime.runtime.residentMemoryBytes)], ["heap used", formatBytes(health.runtime.runtime.heapUsedBytes)]]],
+    ];
+    metrics.innerHTML = cards.map(([title, entries]) => `<article class="health-card"><h3>${escapeHtml(title)}</h3><dl>${entries.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(typeof value === "number" ? value.toLocaleString("de-DE") : value)}</dd>`).join("")}</dl></article>`).join("");
+  } catch (error) { summary.innerHTML = `<p class="empty">${escapeHtml(operatorError(error))}</p>`; }
+}
+
+function formatBytes(value) { return `${(value / 1024 / 1024).toFixed(1)} MiB`; }
+function formatDuration(value) {
+  const seconds = Math.max(0, Math.floor(value)); const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
 function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("hidden", view.id !== `${name}-view`));
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === name));
   if (name === "audit" && state.token) loadAudit();
   if (name === "moderation" && state.token) loadModeration();
   if (name === "economy" && state.token) loadEconomyGrants();
+  if (name === "operations" && state.token) loadOperations();
 }
 
 function connect(token) {
@@ -208,10 +237,12 @@ byId("demo-moderator").addEventListener("click", () => {
 });
 byId("demo-support").addEventListener("click", () => { state.token = "local-admin-support"; setStatus(byId("session-status"), "Connected · economy support", "success"); showView("economy"); searchPlayers(); });
 byId("demo-approver").addEventListener("click", () => { state.token = "local-admin-economy-approver"; setStatus(byId("session-status"), "Connected · economy approver", "success"); showView("economy"); });
+byId("demo-operations").addEventListener("click", () => { state.token = "local-admin-operations"; setStatus(byId("session-status"), "Connected · operations viewer", "success"); showView("operations"); });
 byId("refresh-campaigns").addEventListener("click", loadCampaigns);
 byId("refresh-audit").addEventListener("click", loadAudit);
 byId("refresh-moderation").addEventListener("click", loadModeration);
 byId("refresh-grants").addEventListener("click", loadEconomyGrants);
+byId("refresh-operations").addEventListener("click", loadOperations);
 byId("player-search").addEventListener("submit", (event) => { event.preventDefault(); searchPlayers(new FormData(event.currentTarget).get("query")); });
 byId("grant-form").addEventListener("submit", submitGrant);
 byId("cancel-grant").addEventListener("click", () => byId("grant-form").classList.add("hidden"));

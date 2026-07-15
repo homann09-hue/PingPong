@@ -4,8 +4,17 @@ export interface OperationalMetrics {
   recordSpin(slotId: string, outcome: "returned" | "rejected"): void;
   recordAnalytics(accepted: number, duplicates: number): void;
   recordPush(result: "delivered" | "retry" | "failed" | "suppressed" | "invalid_token"): void;
+  snapshot(): OperationalMetricsSnapshot;
   render(): Promise<string>;
   readonly contentType: string;
+}
+
+export interface OperationalMetricsSnapshot {
+  readonly requests: { readonly total: number; readonly serverErrors: number; readonly averageDurationMilliseconds: number };
+  readonly spins: { readonly returned: number; readonly rejected: number };
+  readonly analytics: { readonly accepted: number; readonly duplicates: number };
+  readonly push: { readonly delivered: number; readonly retry: number; readonly failed: number; readonly suppressed: number; readonly invalidToken: number };
+  readonly runtime: { readonly uptimeSeconds: number; readonly residentMemoryBytes: number; readonly heapUsedBytes: number };
 }
 
 interface RequestMetric { count: number; duration: number }
@@ -33,6 +42,29 @@ export class PrometheusOperationalMetrics implements OperationalMetrics {
   }
   public recordPush(result: "delivered" | "retry" | "failed" | "suppressed" | "invalid_token"): void {
     this.push.set(result, (this.push.get(result) ?? 0) + 1);
+  }
+  public snapshot(): OperationalMetricsSnapshot {
+    let total = 0; let serverErrors = 0; let duration = 0;
+    for (const [key, metric] of this.requests) {
+      const [, , status] = JSON.parse(key) as [string, string, string];
+      total += metric.count; duration += metric.duration;
+      if (Number(status) >= 500) serverErrors += metric.count;
+    }
+    let returned = 0; let rejected = 0;
+    for (const [key, count] of this.spins) {
+      const [, outcome] = JSON.parse(key) as [string, "returned" | "rejected"];
+      if (outcome === "returned") returned += count; else rejected += count;
+    }
+    const memory = process.memoryUsage();
+    return {
+      requests: { total, serverErrors, averageDurationMilliseconds: total === 0 ? 0 : (duration / total) * 1_000 },
+      spins: { returned, rejected },
+      analytics: { accepted: this.analytics.get("accepted") ?? 0, duplicates: this.analytics.get("duplicate") ?? 0 },
+      push: { delivered: this.push.get("delivered") ?? 0, retry: this.push.get("retry") ?? 0,
+        failed: this.push.get("failed") ?? 0, suppressed: this.push.get("suppressed") ?? 0,
+        invalidToken: this.push.get("invalid_token") ?? 0 },
+      runtime: { uptimeSeconds: process.uptime(), residentMemoryBytes: memory.rss, heapUsedBytes: memory.heapUsed },
+    };
   }
   public async render(): Promise<string> {
     const lines = [

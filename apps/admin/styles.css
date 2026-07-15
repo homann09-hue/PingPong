@@ -20,7 +20,7 @@ h1, h2, p { margin-top: 0; } h1 { margin-bottom: 0; font-size: clamp(1.6rem, 4vw
 main { width: min(1180px, calc(100% - 2rem)); margin: 2rem auto 4rem; }
 .auth-panel, .view { background: rgba(15,20,37,.92); border: 1px solid #29314b; border-radius: 18px; padding: clamp(1rem, 3vw, 1.6rem); box-shadow: 0 18px 50px rgba(0,0,0,.22); }
 .auth-panel { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; }
-.auth-controls { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(5, auto); gap: .65rem; align-items: end; }
+.auth-controls { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(6, auto); gap: .65rem; align-items: end; }
 label { display: grid; gap: .45rem; color: #c6cce0; font-size: .83rem; font-weight: 650; }
 input, textarea, select { width: 100%; color: #f8f6ff; background: #0a0f20; border: 1px solid #343d5d; border-radius: 9px; padding: .75rem .8rem; outline: none; }
 input:focus, textarea:focus, select:focus { border-color: #b58cff; box-shadow: 0 0 0 3px rgba(181,140,255,.12); }
@@ -39,5 +39,14 @@ input:focus, textarea:focus, select:focus { border-color: #b58cff; box-shadow: 0
 .subheading { margin: 1.6rem 0 .8rem; color: #d7dcef; }
 .grant-form { margin: 1rem 0; padding: 1rem; border: 1px solid #3b4568; border-radius: 12px; background: #0b1122; }
 .grant-form.hidden { display: none; }
+.operations-summary { margin-bottom: 1rem; }
+.health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.health-card { padding: 1rem; border: 1px solid #303957; border-radius: 14px; background: #0c1122; }
+.health-card h3 { margin: 0 0 .8rem; font-size: .9rem; color: #d6dbed; }
+.health-card dl { display: grid; grid-template-columns: 1fr auto; gap: .55rem; margin: 0; }
+.health-card dt { color: #929bb5; font-size: .78rem; }.health-card dd { margin: 0; font-weight: 750; }
+.health-state { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid #274d42; border-radius: 12px; background: #0d2922; }
+.health-state.warning { border-color: #6a5425; background: #2a220f; }.health-state.critical { border-color: #71343f; background: #2c1118; }
+.health-state p { margin: 0; color: #aeb6ce; }
 @media (max-width: 850px) { .auth-panel { grid-template-columns: 1fr; }.auth-controls { grid-template-columns: 1fr 1fr; }.auth-controls label { grid-column: 1 / -1; } }
 @media (max-width: 620px) { .environment { display: none; }.auth-controls, .campaign-form { grid-template-columns: 1fr; }.wide { grid-column: auto; }.tabs { overflow-x: auto; }.section-heading { align-items: flex-end; } }

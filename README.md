@@ -177,6 +177,14 @@ dispatches for eligible, opted-in installations. In demo mode use the explicit e
 production operators supply a short-lived workforce JWT. The console never
 persists that token and is served with a strict CSP and `no-store` caching.
 
+The Operations tab provides a curated read-only health snapshot for the
+dedicated `operations_viewer` workforce role. It combines database readiness,
+process counters and durable queue aggregates for economy approvals, moderation,
+push, analytics and staff audit activity without exposing player identifiers or
+provider secrets. See `docs/work-packages/phase14-operations-health.md`.
+Apply `infra/postgres/024_operations_health_indexes.sql` after migrations 16,
+17, 21 and 23 before enabling the production console.
+
 Operational probes are available at `GET /health` and `GET /health/ready`.
 Prometheus-format runtime metrics are exposed at `GET /internal/metrics` only
 with `Authorization: Bearer <METRICS_TOKEN>`; production requires a token of at

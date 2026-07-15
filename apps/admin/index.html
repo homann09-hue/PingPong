@@ -34,6 +34,7 @@
           <button id="demo-moderator" type="button">Demo moderator</button>
           <button id="demo-support" type="button">Demo support</button>
           <button id="demo-approver" type="button">Demo approver</button>
+          <button id="demo-operations" type="button">Demo operations</button>
         </div>
         <p id="session-status" class="status" role="status">Not connected</p>
       </section>
@@ -44,6 +45,7 @@
         <button class="tab" data-view="audit" type="button">Audit log</button>
         <button class="tab" data-view="moderation" type="button">Moderation</button>
         <button class="tab" data-view="economy" type="button">Players &amp; economy</button>
+        <button class="tab" data-view="operations" type="button">Operations</button>
       </nav>
 
       <section id="campaigns-view" class="view" aria-labelledby="campaigns-title">
@@ -104,6 +106,15 @@
         <div id="players" class="campaign-grid"><p class="empty">Search for a player to request a controlled grant.</p></div>
         <h3 class="subheading">Approval queue</h3>
         <div id="economy-grants" class="campaign-grid"><p class="empty">No grants loaded.</p></div>
+      </section>
+
+      <section id="operations-view" class="view hidden" aria-labelledby="operations-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">SERVICE HEALTH</p><h2 id="operations-title">Operational overview</h2></div>
+          <button id="refresh-operations" type="button">Refresh snapshot</button>
+        </div>
+        <div id="operations-summary" class="operations-summary"><p class="empty">Connect an operations session to load health data.</p></div>
+        <div id="operations-metrics" class="health-grid"></div>
       </section>
     </main>
   </body>
