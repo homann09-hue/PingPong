@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresSocialStore } from "./postgres-social-store.js";
-import { ClanMembershipError, ClanPermissionError, SocialConflictError } from "./social-store.js";
+import { ClanMessageReportConflictError, ClanMembershipError, ClanPermissionError, ModerationCaseStateError, SocialConflictError } from "./social-store.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseSuite = databaseUrl ? describe : describe.skip;
@@ -30,6 +30,11 @@ databaseSuite("Postgres social graph", () => {
     if (!communityExists.rows[0]?.table_name) {
       const community = await readFile(new URL("../../../../infra/postgres/020_clan_community.sql", import.meta.url), "utf8");
       await pool.query(community);
+    }
+    const moderationExists = await pool.query<{ table_name: string | null }>("SELECT to_regclass('public.clan_moderation_cases') AS table_name");
+    if (!moderationExists.rows[0]?.table_name) {
+      const moderation = await readFile(new URL("../../../../infra/postgres/021_clan_moderation.sql", import.meta.url), "utf8");
+      await pool.query(moderation);
     }
     await pool.query("INSERT INTO players (id,level) VALUES ($1,12),($2,27),($3,19)", [firstPlayer, secondPlayer, thirdPlayer]);
     await store.getOverview(firstPlayer);
@@ -79,5 +84,19 @@ databaseSuite("Postgres social graph", () => {
     await store.removeClanMessage(firstPlayer, memberMessage.id);
     const feed = await store.listClanFeed(firstPlayer, undefined, 10);
     expect(feed.messages.find((message) => message.id === memberMessage.id)).toMatchObject({ status: "removed", body: null });
+  });
+
+  it("persists one report per player and atomically audits staff moderation", async () => {
+    const message = await store.postClanMessage(firstPlayer, "Moderation integration sample");
+    const report = await store.reportClanMessage(thirdPlayer, message.id, "spam", "Repeated promotion");
+    expect(report).toMatchObject({ messageId: message.id, reason: "spam", status: "open" });
+    await expect(store.reportClanMessage(thirdPlayer, message.id, "spam", null)).rejects.toBeInstanceOf(ClanMessageReportConflictError);
+    const moderationCase = (await store.listModerationCases("open", 10)).find((item) => item.messageId === message.id)!;
+    expect(moderationCase).toMatchObject({ reportCount: 1, reasons: { spam: 1 } });
+    const resolved = await store.resolveModerationCase(moderationCase.id, "integration-moderator", "remove_message", "Confirmed spam");
+    expect(resolved).toMatchObject({ status: "actioned", decision: "remove_message" });
+    await expect(store.resolveModerationCase(moderationCase.id, "other", "dismiss", "Already done")).rejects.toBeInstanceOf(ModerationCaseStateError);
+    expect((await store.listClanFeed(firstPlayer, undefined, 20)).messages.find((item) => item.id === message.id)).toMatchObject({ status: "removed", body: null });
+    expect((await store.listModerationAudit(10)).find((item) => item.caseId === moderationCase.id)).toMatchObject({ actor: "integration-moderator" });
   });
 });

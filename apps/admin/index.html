@@ -31,6 +31,7 @@
           <button id="connect" class="primary" type="button">Connect</button>
           <button id="demo-editor" type="button">Demo editor</button>
           <button id="demo-publisher" type="button">Demo publisher</button>
+          <button id="demo-moderator" type="button">Demo moderator</button>
         </div>
         <p id="session-status" class="status" role="status">Not connected</p>
       </section>
@@ -39,6 +40,7 @@
         <button class="tab active" data-view="campaigns" type="button">Campaigns</button>
         <button class="tab" data-view="create" type="button">New draft</button>
         <button class="tab" data-view="audit" type="button">Audit log</button>
+        <button class="tab" data-view="moderation" type="button">Moderation</button>
       </nav>
 
       <section id="campaigns-view" class="view" aria-labelledby="campaigns-title">
@@ -70,6 +72,14 @@
           <button id="refresh-audit" type="button">Refresh</button>
         </div>
         <div class="table-wrap"><table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th></tr></thead><tbody id="audit"><tr><td colspan="4" class="empty">No entries loaded.</td></tr></tbody></table></div>
+      </section>
+
+      <section id="moderation-view" class="view hidden" aria-labelledby="moderation-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">TRUST &amp; SAFETY</p><h2 id="moderation-title">Open message reports</h2></div>
+          <button id="refresh-moderation" type="button">Refresh</button>
+        </div>
+        <div id="moderation-cases" class="campaign-grid"><p class="empty">Connect a moderator session to load reports.</p></div>
       </section>
     </main>
   </body>

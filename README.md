@@ -141,6 +141,13 @@ Owners and officers can now issue durable clan invitations, while members share
 a cursor-paginated, rate-limited feed with author and role-based moderation.
 Apply `infra/postgres/020_clan_community.sql` and see
 `docs/work-packages/phase13-clan-community.md`.
+Players can report active messages by policy reason. A dedicated
+`social_moderator` workforce role reviews the aggregated queue, removes or
+dismisses each case exactly once, and records an immutable staff action without
+exposing reporter identities to other players. Apply
+`infra/postgres/021_clan_moderation.sql` after the community migration. The
+staff workflow is available from the Moderation tab at `/admin/`; demo mode
+uses the isolated `local-admin-moderator` identity.
 
 The lobby promotion is backed by the LiveOps campaign API. Workforce tokens use
 a dedicated issuer/audience and secret, with separate editor, publisher and

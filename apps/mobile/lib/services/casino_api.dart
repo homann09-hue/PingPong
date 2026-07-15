@@ -1022,6 +1022,29 @@ class CasinoApi {
     }
   }
 
+  Future<void> reportClanMessage(
+    String messageId,
+    String reason,
+    String? details,
+  ) async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/clans/feed/$messageId/reports'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'reason': reason, 'details': details}),
+    );
+    if (response.statusCode != 201) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 409) {
+        throw StateError('Diese Nachricht wurde bereits gemeldet');
+      }
+      throw StateError(
+        data['code'] == 'CLAN_MESSAGE_NOT_FOUND'
+            ? 'Die Nachricht ist nicht mehr verfügbar'
+            : 'Nachricht konnte nicht gemeldet werden',
+      );
+    }
+  }
+
   Future<ShopPurchaseView> purchaseShopOffer(String offerId) async {
     final response = await _client.post(
       Uri.parse('$base/v1/shop/offers/$offerId/purchase'),

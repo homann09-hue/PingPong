@@ -1,6 +1,6 @@
 import { jwtVerify } from "jose";
 
-export type AdminRole = "liveops_editor" | "liveops_publisher" | "liveops_auditor";
+export type AdminRole = "liveops_editor" | "liveops_publisher" | "liveops_auditor" | "social_moderator";
 export interface AdminPrincipal { readonly subject: string; readonly roles: readonly AdminRole[] }
 export interface AdminAuthenticator { authenticate(authorization: string | undefined): Promise<AdminPrincipal | null> }
 
@@ -17,7 +17,7 @@ export class AdminJwtAuthenticator implements AdminAuthenticator {
       const { payload } = await jwtVerify(authorization.slice(7), this.key, {
         algorithms: ["HS256"], issuer: "aurora-workforce", audience: "aurora-admin",
       });
-      const allowed = new Set<AdminRole>(["liveops_editor", "liveops_publisher", "liveops_auditor"]);
+      const allowed = new Set<AdminRole>(["liveops_editor", "liveops_publisher", "liveops_auditor", "social_moderator"]);
       const roles = Array.isArray(payload.roles) ? payload.roles.filter((role): role is AdminRole =>
         typeof role === "string" && allowed.has(role as AdminRole)) : [];
       return typeof payload.sub === "string" && roles.length > 0 ? { subject: payload.sub, roles } : null;
@@ -33,6 +33,9 @@ export class DemoAdminAuthenticator implements AdminAuthenticator {
     }
     if (authorization === "Bearer local-admin-publisher") {
       return { subject: "demo-publisher", roles: ["liveops_publisher", "liveops_auditor"] };
+    }
+    if (authorization === "Bearer local-admin-moderator") {
+      return { subject: "demo-moderator", roles: ["social_moderator"] };
     }
     return null;
   }

@@ -41,6 +41,44 @@ export interface ClanFeedPage {
   readonly nextCursor: string | null;
 }
 
+export type ClanMessageReportReason = "spam" | "harassment" | "hate" | "sexual" | "personal_data" | "other";
+export type ModerationCaseStatus = "open" | "actioned" | "dismissed";
+export type ModerationDecision = "remove_message" | "dismiss";
+
+export interface ClanMessageReportView {
+  readonly id: string;
+  readonly messageId: string;
+  readonly reason: ClanMessageReportReason;
+  readonly status: ModerationCaseStatus;
+  readonly createdAt: string;
+}
+
+export interface ModerationCaseView {
+  readonly id: string;
+  readonly clanId: string;
+  readonly messageId: string;
+  readonly messageBody: string;
+  readonly author: SocialPlayer;
+  readonly status: ModerationCaseStatus;
+  readonly reportCount: number;
+  readonly reasons: Readonly<Record<ClanMessageReportReason, number>>;
+  readonly firstReportedAt: string;
+  readonly lastReportedAt: string;
+  readonly resolvedAt: string | null;
+  readonly resolvedBy: string | null;
+  readonly decision: ModerationDecision | null;
+  readonly note: string | null;
+}
+
+export interface ModerationAuditEntry {
+  readonly id: string;
+  readonly caseId: string;
+  readonly actor: string;
+  readonly decision: ModerationDecision;
+  readonly note: string;
+  readonly createdAt: string;
+}
+
 export interface SocialOverview {
   readonly player: SocialPlayer;
   readonly friends: readonly SocialPlayer[];
@@ -63,6 +101,10 @@ export interface SocialStore {
   listClanFeed(playerId: string, cursor: string | undefined, limit: number): Promise<ClanFeedPage>;
   postClanMessage(playerId: string, body: string): Promise<ClanMessageView>;
   removeClanMessage(playerId: string, messageId: string): Promise<void>;
+  reportClanMessage(playerId: string, messageId: string, reason: ClanMessageReportReason, details: string | null): Promise<ClanMessageReportView>;
+  listModerationCases(status: ModerationCaseStatus, limit: number): Promise<readonly ModerationCaseView[]>;
+  resolveModerationCase(caseId: string, actor: string, decision: ModerationDecision, note: string): Promise<ModerationCaseView>;
+  listModerationAudit(limit: number): Promise<readonly ModerationAuditEntry[]>;
   close(): Promise<void>;
 }
 
@@ -75,6 +117,9 @@ export class ClanPermissionError extends Error {}
 export class ClanInvitationNotFoundError extends Error {}
 export class ClanMessageNotFoundError extends Error {}
 export class ClanMessageRateLimitError extends Error {}
+export class ClanMessageReportConflictError extends Error {}
+export class ModerationCaseNotFoundError extends Error {}
+export class ModerationCaseStateError extends Error {}
 
 export interface ClanFeedCursor {
   readonly createdAt: string;

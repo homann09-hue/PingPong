@@ -14,7 +14,7 @@ import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js"
 import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
 import type { SocialStore } from "./social/social-store.js";
-import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, SocialConflictError, SocialPlayerNotFoundError } from "./social/social-store.js";
+import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError } from "./social/social-store.js";
 import type { AdminAuthenticator, AdminRole } from "./admin/admin-auth.js";
 import type { LiveOpsStore } from "./liveops/liveops-store.js";
 import { CampaignNotFoundError, CampaignStateError, FourEyesViolationError } from "./liveops/liveops-store.js";
@@ -55,6 +55,10 @@ const clanFeedQuery = z.object({
   cursor: z.string().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(30),
 });
+const clanMessageReportBody = z.object({
+  reason: z.enum(["spam", "harassment", "hate", "sexual", "personal_data", "other"]),
+  details: z.string().trim().min(3).max(500).refine((value) => !/[\u0000-\u001F\u007F]/u.test(value), "Control characters are not allowed").nullable().optional().default(null),
+}).strict();
 const campaignBody = z.object({
   name: z.string().trim().min(3).max(80),
   startsAt: z.string().datetime(),
@@ -65,6 +69,14 @@ const campaignBody = z.object({
   }),
 }).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { message: "endsAt must be after startsAt" });
 const adminAuditQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(100) });
+const moderationCasesQuery = z.object({
+  status: z.enum(["open", "actioned", "dismissed"]).default("open"),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+const moderationResolutionBody = z.object({
+  decision: z.enum(["remove_message", "dismiss"]),
+  note: z.string().trim().min(3).max(500).refine((value) => !/[\u0000-\u001F\u007F]/u.test(value), "Control characters are not allowed"),
+}).strict();
 const analyticsBatchBody = z.object({ events: z.array(z.object({
   eventId: z.string().uuid(), name: z.enum(analyticsEventNames), occurredAt: z.string().datetime(),
   platform: z.enum(["ios", "android", "web"]), appVersion: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._+-]+$/),
@@ -455,6 +467,39 @@ export function buildApp(dependencies: AppDependencies) {
     if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
     return { entries: await dependencies.liveOpsStore.listAudit(query.data.limit) };
   });
+  app.get("/admin/v1/moderation/cases", async (request, reply) => {
+    if (!dependencies.socialStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "social_moderator")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const query = moderationCasesQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: query.error.issues });
+    return { cases: await dependencies.socialStore.listModerationCases(query.data.status, query.data.limit) };
+  });
+  app.post("/admin/v1/moderation/cases/:caseId/resolve", async (request, reply) => {
+    if (!dependencies.socialStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "social_moderator")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const caseId = z.string().uuid().safeParse((request.params as { caseId: string }).caseId);
+    const body = moderationResolutionBody.safeParse(request.body);
+    if (!caseId.success || !body.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return { case: await dependencies.socialStore.resolveModerationCase(caseId.data, principal.subject, body.data.decision, body.data.note) }; }
+    catch (error) {
+      if (error instanceof ModerationCaseNotFoundError) return reply.code(404).send({ code: "MODERATION_CASE_NOT_FOUND" });
+      if (error instanceof ModerationCaseStateError) return reply.code(409).send({ code: "MODERATION_CASE_ALREADY_RESOLVED" });
+      throw error;
+    }
+  });
+  app.get("/admin/v1/moderation/audit", async (request, reply) => {
+    if (!dependencies.socialStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "social_moderator")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const query = adminAuditQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    return { entries: await dependencies.socialStore.listModerationAudit(query.data.limit) };
+  });
   app.post("/v1/shop/offers/:offerId/purchase", async (request, reply) => {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
@@ -601,6 +646,21 @@ export function buildApp(dependencies: AppDependencies) {
       if (error instanceof ClanMessageNotFoundError) return reply.code(404).send({ code: "CLAN_MESSAGE_NOT_FOUND" });
       if (error instanceof ClanPermissionError) return reply.code(403).send({ code: "CLAN_PERMISSION_DENIED" });
       if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_REQUIRED" });
+      throw error;
+    }
+  });
+  app.post("/v1/clans/feed/:messageId/reports", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const messageId = z.string().uuid().safeParse((request.params as { messageId: string }).messageId);
+    const body = clanMessageReportBody.safeParse(request.body);
+    if (!messageId.success || !body.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return reply.code(201).send({ report: await dependencies.socialStore.reportClanMessage(playerId, messageId.data, body.data.reason, body.data.details) }); }
+    catch (error) {
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_REQUIRED" });
+      if (error instanceof ClanMessageNotFoundError) return reply.code(404).send({ code: "CLAN_MESSAGE_NOT_FOUND" });
+      if (error instanceof ClanMessageReportConflictError) return reply.code(409).send({ code: "CLAN_MESSAGE_REPORT_CONFLICT" });
       throw error;
     }
   });

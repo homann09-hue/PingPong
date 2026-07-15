@@ -1,4 +1,4 @@
-const state = { token: "", campaigns: [] };
+const state = { token: "", campaigns: [], moderationCases: [] };
 const byId = (id) => document.getElementById(id);
 
 function setStatus(element, message, type = "") {
@@ -12,6 +12,7 @@ function operatorError(error) {
     FORBIDDEN: "This action requires a different operator role.",
     FOUR_EYES_REQUIRED: "A different publisher must approve this draft.",
     CAMPAIGN_NOT_PUBLISHED: "Only published campaigns can be dispatched.",
+    MODERATION_CASE_ALREADY_RESOLVED: "This report was already resolved.",
   };
   return messages[error.message] ?? error.message;
 }
@@ -95,10 +96,44 @@ async function loadAudit() {
   }
 }
 
+async function loadModeration() {
+  const container = byId("moderation-cases");
+  container.innerHTML = '<p class="empty">Loading reports…</p>';
+  try {
+    const body = await api("/admin/v1/moderation/cases?status=open&limit=50");
+    state.moderationCases = body.cases;
+    if (!body.cases.length) {
+      container.innerHTML = '<p class="empty">The moderation queue is clear.</p>';
+      return;
+    }
+    container.innerHTML = body.cases.map((item) => `
+      <article class="campaign">
+        <header><div><p class="eyebrow">${escapeHtml(item.author.displayName)} · ${formatDate(item.lastReportedAt)}</p><h3>${item.reportCount} report${item.reportCount === 1 ? "" : "s"}</h3></div><span class="badge draft">OPEN</span></header>
+        <p class="subtitle">${escapeHtml(item.messageBody)}</p>
+        <div class="meta"><span>${Object.entries(item.reasons).filter(([, count]) => count).map(([reason, count]) => `${escapeHtml(reason)}: ${count}`).join(" · ")}</span><span>Clan ${escapeHtml(item.clanId)}</span></div>
+        <footer><button data-moderate="dismiss" data-case="${item.id}" type="button">Dismiss</button><button class="primary" data-moderate="remove_message" data-case="${item.id}" type="button">Remove message</button></footer>
+      </article>`).join("");
+    container.querySelectorAll("[data-moderate]").forEach((button) => button.addEventListener("click", () => resolveModeration(button.dataset.case, button.dataset.moderate)));
+  } catch (error) {
+    container.innerHTML = `<p class="empty">${escapeHtml(operatorError(error))}</p>`;
+  }
+}
+
+async function resolveModeration(caseId, decision) {
+  const note = window.prompt(decision === "remove_message" ? "Reason for removing this message:" : "Reason for dismissing this report:");
+  if (!note || note.trim().length < 3) return;
+  try {
+    await api(`/admin/v1/moderation/cases/${encodeURIComponent(caseId)}/resolve`, { method: "POST", body: JSON.stringify({ decision, note: note.trim() }) });
+    setStatus(byId("session-status"), "Moderation decision saved to the immutable audit trail.", "success");
+    await loadModeration();
+  } catch (error) { setStatus(byId("session-status"), operatorError(error), "error"); }
+}
+
 function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("hidden", view.id !== `${name}-view`));
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === name));
   if (name === "audit" && state.token) loadAudit();
+  if (name === "moderation" && state.token) loadModeration();
 }
 
 function connect(token) {
@@ -111,8 +146,14 @@ function connect(token) {
 byId("connect").addEventListener("click", () => connect(byId("token").value));
 byId("demo-editor").addEventListener("click", () => connect("local-admin-editor"));
 byId("demo-publisher").addEventListener("click", () => connect("local-admin-publisher"));
+byId("demo-moderator").addEventListener("click", () => {
+  state.token = "local-admin-moderator";
+  setStatus(byId("session-status"), "Connected · social moderator", "success");
+  showView("moderation");
+});
 byId("refresh-campaigns").addEventListener("click", loadCampaigns);
 byId("refresh-audit").addEventListener("click", loadAudit);
+byId("refresh-moderation").addEventListener("click", loadModeration);
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
 
 const form = byId("campaign-form");

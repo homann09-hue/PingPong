@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
-import type { ClanFeedPage, ClanInvitationView, ClanMessageView, ClanView, FriendRequestView, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
-import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, SocialConflictError, SocialPlayerNotFoundError, decodeClanFeedCursor, encodeClanFeedCursor } from "./social-store.js";
+import type { ClanFeedPage, ClanInvitationView, ClanMessageReportReason, ClanMessageReportView, ClanMessageView, ClanView, FriendRequestView, ModerationAuditEntry, ModerationCaseStatus, ModerationCaseView, ModerationDecision, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
+import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError, decodeClanFeedCursor, encodeClanFeedCursor } from "./social-store.js";
 
 interface PlayerRow { id: string; display_name: string; level: number }
 interface ClanRow { id: string; name: string; tag: string; member_count: string; member_limit: number; weekly_score: string; role?: "owner" | "officer" | "member" }
 interface InvitationRow extends ClanRow { invitation_id: string; inviter_id: string; inviter_name: string; inviter_level: number; expires_at: Date }
 interface MessageRow extends PlayerRow { message_id: string; body: string; status: "active" | "removed"; created_at: Date }
+interface ModerationCaseRow extends PlayerRow { case_id: string; clan_id: string; message_id: string; message_snapshot: string; status: ModerationCaseStatus; report_count: string; reasons: Partial<Record<ClanMessageReportReason, number>>; first_reported_at: Date; last_reported_at: Date; resolved_at: Date | null; resolved_by: string | null; decision: ModerationDecision | null; resolution_note: string | null }
+interface ModerationAuditRow { id: string; case_id: string; actor: string; decision: ModerationDecision; note: string; created_at: Date }
 
 /** PostgreSQL social graph adapter with transactional friend and clan membership changes. */
 export class PostgresSocialStore implements SocialStore {
@@ -304,6 +306,89 @@ export class PostgresSocialStore implements SocialStore {
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 
+  public async reportClanMessage(playerId: string, messageId: string, reason: ClanMessageReportReason, details: string | null): Promise<ClanMessageReportView> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const membership = await client.query<{ clan_id: string }>("SELECT clan_id FROM clan_members WHERE player_id=$1", [playerId]);
+      if (!membership.rows[0]) throw new ClanMembershipError();
+      const message = await client.query<{ clan_id: string; author_id: string; body: string; display_name: string; level: number }>(
+        `SELECT messages.clan_id,messages.author_id,messages.body,profiles.display_name,players.level
+           FROM clan_messages messages JOIN players ON players.id=messages.author_id
+           JOIN social_profiles profiles ON profiles.player_id=players.id
+          WHERE messages.id=$1 AND messages.status='active' FOR UPDATE OF messages`, [messageId],
+      );
+      const source = message.rows[0];
+      if (!source || source.clan_id !== membership.rows[0].clan_id) throw new ClanMessageNotFoundError();
+      if (source.author_id === playerId) throw new ClanMessageReportConflictError();
+      const caseId = randomUUID();
+      const moderationCase = await client.query<{ id: string; status: ModerationCaseStatus }>(
+        `INSERT INTO clan_moderation_cases (id,clan_id,message_id,author_id,author_display_name,author_level,message_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (message_id) DO UPDATE SET last_reported_at=now()
+           WHERE clan_moderation_cases.status='open'
+         RETURNING id,status`, [caseId, source.clan_id, messageId, source.author_id, source.display_name, source.level, source.body],
+      );
+      if (!moderationCase.rows[0]) throw new ClanMessageReportConflictError();
+      const reportId = randomUUID();
+      let inserted: { created_at: Date };
+      try {
+        inserted = (await client.query<{ created_at: Date }>(
+          "INSERT INTO clan_message_reports (id,case_id,reporter_id,reason,details) VALUES ($1,$2,$3,$4,$5) RETURNING created_at",
+          [reportId, moderationCase.rows[0].id, playerId, reason, details],
+        )).rows[0]!;
+      } catch (error) {
+        if ((error as { code?: string }).code === "23505") throw new ClanMessageReportConflictError();
+        throw error;
+      }
+      await client.query("COMMIT");
+      return { id: reportId, messageId, reason, status: "open", createdAt: inserted.created_at.toISOString() };
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+
+  public async listModerationCases(status: ModerationCaseStatus, limit: number): Promise<readonly ModerationCaseView[]> {
+    const result = await this.pool.query<ModerationCaseRow>(`${this.moderationCaseQuery()} WHERE cases.status=$1 ORDER BY cases.last_reported_at DESC LIMIT $2`, [status, limit]);
+    return result.rows.map((row) => this.moderationCase(row));
+  }
+
+  public async resolveModerationCase(caseId: string, actor: string, decision: ModerationDecision, note: string): Promise<ModerationCaseView> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{ message_id: string; status: ModerationCaseStatus }>(
+        "SELECT message_id,status FROM clan_moderation_cases WHERE id=$1 FOR UPDATE", [caseId],
+      );
+      const moderationCase = result.rows[0];
+      if (!moderationCase) throw new ModerationCaseNotFoundError();
+      if (moderationCase.status !== "open") throw new ModerationCaseStateError();
+      if (decision === "remove_message") {
+        await client.query(
+          "UPDATE clan_messages SET status='removed',body='[removed]',removed_at=now(),removed_by=NULL,removed_by_staff=$2 WHERE id=$1 AND status='active'",
+          [moderationCase.message_id, actor],
+        );
+      }
+      await client.query(
+        `UPDATE clan_moderation_cases SET status=$2,resolved_at=now(),resolved_by=$3,decision=$4,resolution_note=$5 WHERE id=$1`,
+        [caseId, decision === "remove_message" ? "actioned" : "dismissed", actor, decision, note],
+      );
+      await client.query(
+        "INSERT INTO clan_moderation_actions (id,case_id,actor,decision,note) VALUES ($1,$2,$3,$4,$5)",
+        [randomUUID(), caseId, actor, decision, note],
+      );
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    const updated = await this.pool.query<ModerationCaseRow>(`${this.moderationCaseQuery()} WHERE cases.id=$1`, [caseId]);
+    if (!updated.rows[0]) throw new ModerationCaseNotFoundError();
+    return this.moderationCase(updated.rows[0]);
+  }
+
+  public async listModerationAudit(limit: number): Promise<readonly ModerationAuditEntry[]> {
+    const result = await this.pool.query<ModerationAuditRow>(
+      "SELECT id,case_id,actor,decision,note,created_at FROM clan_moderation_actions ORDER BY created_at DESC LIMIT $1", [limit],
+    );
+    return result.rows.map((row) => ({ id: row.id, caseId: row.case_id, actor: row.actor, decision: row.decision, note: row.note, createdAt: row.created_at.toISOString() }));
+  }
+
   public async close(): Promise<void> { await this.pool.end(); }
 
   private async ensureProfile(queryable: Pick<Pool, "query"> | Pick<PoolClient, "query">, playerId: string): Promise<void> {
@@ -317,6 +402,21 @@ export class PostgresSocialStore implements SocialStore {
   private player(row?: PlayerRow): SocialPlayer { if (!row) throw new SocialPlayerNotFoundError(); return { id: row.id, displayName: row.display_name, level: row.level, online: false }; }
   private message(row: MessageRow): ClanMessageView {
     return { id: row.message_id, author: this.player(row), body: row.status === "active" ? row.body : null, status: row.status, createdAt: row.created_at.toISOString() };
+  }
+  private moderationCase(row: ModerationCaseRow): ModerationCaseView {
+    const reasons = { spam: 0, harassment: 0, hate: 0, sexual: 0, personal_data: 0, other: 0, ...row.reasons };
+    return { id: row.case_id, clanId: row.clan_id, messageId: row.message_id, messageBody: row.message_snapshot,
+      author: this.player(row), status: row.status, reportCount: Number(row.report_count), reasons,
+      firstReportedAt: row.first_reported_at.toISOString(), lastReportedAt: row.last_reported_at.toISOString(),
+      resolvedAt: row.resolved_at?.toISOString() ?? null, resolvedBy: row.resolved_by, decision: row.decision, note: row.resolution_note };
+  }
+  private moderationCaseQuery(): string {
+    return `SELECT cases.id AS case_id,cases.clan_id,cases.message_id,cases.message_snapshot,cases.status,
+      cases.first_reported_at,cases.last_reported_at,cases.resolved_at,cases.resolved_by,cases.decision,cases.resolution_note,
+      cases.author_id AS id,cases.author_display_name AS display_name,cases.author_level AS level,reports.report_count,reports.reasons
+      FROM clan_moderation_cases cases
+      JOIN LATERAL (SELECT COUNT(*)::text AS report_count,jsonb_object_agg(grouped.reason,grouped.amount) AS reasons
+        FROM (SELECT reason,COUNT(*)::int AS amount FROM clan_message_reports WHERE case_id=cases.id GROUP BY reason) grouped) reports ON true`;
   }
   private clan(row: ClanRow): ClanView { return { id: row.id, name: row.name, tag: row.tag, memberCount: Number(row.member_count), memberLimit: row.member_limit, weeklyScore: Number(row.weekly_score), ...(row.role ? { role: row.role } : {}) }; }
   private clanQuery(where: string): string {

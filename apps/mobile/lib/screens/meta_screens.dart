@@ -785,6 +785,8 @@ class _RewardTile extends StatelessWidget {
 
 typedef SocialIdCallback = Future<void> Function(String id);
 typedef ClanCreateCallback = Future<void> Function(String name, String tag);
+typedef ClanReportCallback =
+    Future<void> Function(String messageId, String reason, String? details);
 
 class ClubScreen extends StatelessWidget {
   const ClubScreen({
@@ -802,6 +804,7 @@ class ClubScreen extends StatelessWidget {
     required this.onAcceptClanInvitation,
     required this.onPostClanMessage,
     required this.onRemoveClanMessage,
+    required this.onReportClanMessage,
     required this.onLoadOlderMessages,
   });
 
@@ -812,6 +815,7 @@ class ClubScreen extends StatelessWidget {
   final SocialIdCallback onAddFriend, onAcceptFriend, onJoinClan;
   final SocialIdCallback onInviteToClan, onAcceptClanInvitation;
   final SocialIdCallback onPostClanMessage, onRemoveClanMessage;
+  final ClanReportCallback onReportClanMessage;
   final ClanCreateCallback onCreateClan;
   final Future<void> Function() onLeaveClan;
   final Future<void> Function() onLoadOlderMessages;
@@ -986,15 +990,30 @@ class ClubScreen extends StatelessWidget {
                     ? const TextStyle(fontStyle: FontStyle.italic)
                     : null,
               ),
-              trailing:
-                  message.status == 'active' &&
-                      (canModerate || message.author.id == overview!.player.id)
-                  ? IconButton(
-                      tooltip: 'Nachricht entfernen',
-                      onPressed: busy
-                          ? null
-                          : () => onRemoveClanMessage(message.id),
-                      icon: const Icon(Icons.delete_outline, size: 19),
+              trailing: message.status == 'active'
+                  ? PopupMenuButton<String>(
+                      enabled: !busy,
+                      tooltip: 'Nachrichtenaktionen',
+                      onSelected: (action) {
+                        if (action == 'remove') {
+                          onRemoveClanMessage(message.id);
+                        } else {
+                          _showMessageReport(context, message.id);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        if (canModerate ||
+                            message.author.id == overview!.player.id)
+                          const PopupMenuItem(
+                            value: 'remove',
+                            child: Text('Nachricht entfernen'),
+                          ),
+                        if (message.author.id != overview!.player.id)
+                          const PopupMenuItem(
+                            value: 'report',
+                            child: Text('Nachricht melden'),
+                          ),
+                      ],
                     )
                   : null,
             ),
@@ -1038,6 +1057,78 @@ class ClubScreen extends StatelessWidget {
     final body = controller.text.trim();
     controller.dispose();
     if (send == true && body.isNotEmpty) await onPostClanMessage(body);
+  }
+
+  Future<void> _showMessageReport(
+    BuildContext context,
+    String messageId,
+  ) async {
+    var reason = 'spam';
+    final details = TextEditingController();
+    final submit = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('NACHRICHT MELDEN'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: reason,
+                decoration: const InputDecoration(labelText: 'Grund'),
+                items: const [
+                  DropdownMenuItem(value: 'spam', child: Text('Spam')),
+                  DropdownMenuItem(
+                    value: 'harassment',
+                    child: Text('Belästigung'),
+                  ),
+                  DropdownMenuItem(value: 'hate', child: Text('Hassrede')),
+                  DropdownMenuItem(
+                    value: 'sexual',
+                    child: Text('Sexueller Inhalt'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'personal_data',
+                    child: Text('Persönliche Daten'),
+                  ),
+                  DropdownMenuItem(value: 'other', child: Text('Sonstiges')),
+                ],
+                onChanged: (value) =>
+                    setDialogState(() => reason = value ?? reason),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: details,
+                maxLength: 500,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Details (optional)',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('ABBRECHEN'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('MELDEN'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (submit == true) {
+      final note = details.text.trim();
+      await onReportClanMessage(
+        messageId,
+        reason,
+        note.length >= 3 ? note : null,
+      );
+    }
   }
 
   Future<void> _showCreateClan(BuildContext context) async {

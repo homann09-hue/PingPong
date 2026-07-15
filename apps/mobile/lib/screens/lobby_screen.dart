@@ -702,6 +702,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
           _socialAction(() => api.postClanMessage(body)),
       onRemoveClanMessage: (messageId) =>
           _socialAction(() => api.removeClanMessage(messageId)),
+      onReportClanMessage: (messageId, reason, details) => _socialAction(
+        () => api.reportClanMessage(messageId, reason, details),
+      ),
       onLoadOlderMessages: _loadOlderClanMessages,
     ),
     3 => EventsScreen(

@@ -169,6 +169,44 @@ describe("push messaging API", () => {
   });
 });
 
+describe("clan message trust and safety API", () => {
+  const socialStore = new InMemorySocialStore(playerId);
+  const memberId = "00000000-0000-4000-8000-000000000102";
+  const socialApp = buildApp({
+    authenticator: { authenticate: async (header) => header === "Bearer owner" ? playerId : header === "Bearer member" ? memberId : null },
+    spinStore: new InMemorySpinStore(1_000), socialStore, adminAuthenticator: new DemoAdminAuthenticator(),
+  });
+  afterAll(async () => socialApp.close());
+
+  it("reports, role-checks, resolves, removes, and audits a clan message", async () => {
+    const clan = await socialStore.createClan(playerId, "Safety Testers", "SAFE");
+    await socialStore.joinClan(memberId, clan.id);
+    const message = await socialStore.postClanMessage(playerId, "message requiring review");
+    const reportRequest = { method: "POST" as const, url: `/v1/clans/feed/${message.id}/reports`,
+      headers: { authorization: "Bearer member" }, payload: { reason: "harassment", details: "Targeted insult" } };
+    const reported = await socialApp.inject(reportRequest);
+    expect(reported.statusCode).toBe(201);
+    expect((await socialApp.inject(reportRequest)).statusCode).toBe(409);
+
+    expect((await socialApp.inject({ method: "GET", url: "/admin/v1/moderation/cases", headers: { authorization: "Bearer local-admin-editor" } })).statusCode).toBe(403);
+    const queue = await socialApp.inject({ method: "GET", url: "/admin/v1/moderation/cases", headers: { authorization: "Bearer local-admin-moderator" } });
+    expect(queue.statusCode).toBe(200);
+    expect(queue.json().cases[0]).toMatchObject({ messageId: message.id, reportCount: 1, status: "open" });
+    const caseId = queue.json().cases[0].id;
+    const resolved = await socialApp.inject({ method: "POST", url: `/admin/v1/moderation/cases/${caseId}/resolve`,
+      headers: { authorization: "Bearer local-admin-moderator" }, payload: { decision: "remove_message", note: "Policy violation confirmed" } });
+    expect(resolved.statusCode).toBe(200);
+    expect(resolved.json().case).toMatchObject({ status: "actioned", resolvedBy: "demo-moderator" });
+    expect((await socialApp.inject({ method: "POST", url: `/admin/v1/moderation/cases/${caseId}/resolve`,
+      headers: { authorization: "Bearer local-admin-moderator" }, payload: { decision: "dismiss", note: "second decision" } })).statusCode).toBe(409);
+
+    const feed = await socialApp.inject({ method: "GET", url: "/v1/clans/feed", headers: { authorization: "Bearer member" } });
+    expect(feed.json().messages.find((item: { id: string }) => item.id === message.id)).toMatchObject({ status: "removed", body: null });
+    const audit = await socialApp.inject({ method: "GET", url: "/admin/v1/moderation/audit", headers: { authorization: "Bearer local-admin-moderator" } });
+    expect(audit.json().entries[0]).toMatchObject({ caseId, actor: "demo-moderator", decision: "remove_message" });
+  });
+});
+
 describe("spin API", () => {
   it("requires an idempotency key", async () => {
     const response = await app.inject({ method: "POST", url: "/v1/slots/classic-3x3/spins", headers: { authorization: "Bearer valid" }, payload: { bet: 10 } });

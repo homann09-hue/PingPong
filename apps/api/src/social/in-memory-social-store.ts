@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type { ClanFeedPage, ClanInvitationView, ClanMessageView, ClanView, FriendRequestView, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
-import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, SocialConflictError, SocialPlayerNotFoundError, decodeClanFeedCursor, encodeClanFeedCursor } from "./social-store.js";
+import type { ClanFeedPage, ClanInvitationView, ClanMessageReportReason, ClanMessageReportView, ClanMessageView, ClanView, FriendRequestView, ModerationAuditEntry, ModerationCaseStatus, ModerationCaseView, ModerationDecision, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
+import { ClanInvitationNotFoundError, ClanMembershipError, ClanMessageNotFoundError, ClanMessageRateLimitError, ClanMessageReportConflictError, ClanNotFoundError, ClanPermissionError, FriendRequestNotFoundError, ModerationCaseNotFoundError, ModerationCaseStateError, SocialConflictError, SocialPlayerNotFoundError, decodeClanFeedCursor, encodeClanFeedCursor } from "./social-store.js";
 
 interface MutableClan { id: string; name: string; tag: string; memberLimit: number; weeklyScore: number }
 interface PendingRequest { id: string; senderId: string; recipientId: string; createdAt: string }
 interface MutableInvitation { id: string; clanId: string; inviterId: string; recipientId: string; status: "pending" | "accepted" | "cancelled"; expiresAt: string }
 interface MutableMessage { id: string; clanId: string; authorId: string; body: string; status: "active" | "removed"; createdAt: string }
+interface MutableReport { id: string; caseId: string; reporterId: string; reason: ClanMessageReportReason; details: string | null; createdAt: string }
+interface MutableCase { id: string; clanId: string; messageId: string; messageBody: string; authorId: string; status: ModerationCaseStatus; firstReportedAt: string; lastReportedAt: string; resolvedAt: string | null; resolvedBy: string | null; decision: ModerationDecision | null; note: string | null }
 
 /** Deterministic demo adapter with the same invariants as the PostgreSQL social store. */
 export class InMemorySocialStore implements SocialStore {
@@ -16,6 +18,9 @@ export class InMemorySocialStore implements SocialStore {
   private readonly memberships = new Map<string, { clanId: string; role: "owner" | "officer" | "member" }>();
   private readonly invitations = new Map<string, MutableInvitation>();
   private readonly messages = new Map<string, MutableMessage>();
+  private readonly reports = new Map<string, MutableReport>();
+  private readonly moderationCases = new Map<string, MutableCase>();
+  private readonly moderationAudit: ModerationAuditEntry[] = [];
 
   public constructor(private readonly localPlayerId: string) {
     const players: SocialPlayer[] = [
@@ -171,6 +176,47 @@ export class InMemorySocialStore implements SocialStore {
     message.status = "removed";
   }
 
+  public async reportClanMessage(playerId: string, messageId: string, reason: ClanMessageReportReason, details: string | null): Promise<ClanMessageReportView> {
+    const membership = this.requireClanMembership(playerId);
+    const message = this.messages.get(messageId);
+    if (!message || message.clanId !== membership.clanId || message.status !== "active") throw new ClanMessageNotFoundError();
+    if (message.authorId === playerId) throw new ClanMessageReportConflictError();
+    let moderationCase = [...this.moderationCases.values()].find((item) => item.messageId === messageId);
+    if (moderationCase?.status !== undefined && moderationCase.status !== "open") throw new ClanMessageReportConflictError();
+    if (moderationCase && [...this.reports.values()].some((item) => item.caseId === moderationCase!.id && item.reporterId === playerId)) {
+      throw new ClanMessageReportConflictError();
+    }
+    const now = new Date().toISOString();
+    moderationCase ??= { id: randomUUID(), clanId: message.clanId, messageId, messageBody: message.body, authorId: message.authorId,
+      status: "open", firstReportedAt: now, lastReportedAt: now, resolvedAt: null, resolvedBy: null, decision: null, note: null };
+    moderationCase.lastReportedAt = now;
+    this.moderationCases.set(moderationCase.id, moderationCase);
+    const report: MutableReport = { id: randomUUID(), caseId: moderationCase.id, reporterId: playerId, reason, details, createdAt: now };
+    this.reports.set(report.id, report);
+    return { id: report.id, messageId, reason, status: moderationCase.status, createdAt: now };
+  }
+
+  public async listModerationCases(status: ModerationCaseStatus, limit: number): Promise<readonly ModerationCaseView[]> {
+    return [...this.moderationCases.values()].filter((item) => item.status === status)
+      .sort((left, right) => right.lastReportedAt.localeCompare(left.lastReportedAt)).slice(0, limit).map((item) => this.caseView(item));
+  }
+
+  public async resolveModerationCase(caseId: string, actor: string, decision: ModerationDecision, note: string): Promise<ModerationCaseView> {
+    const moderationCase = this.moderationCases.get(caseId);
+    if (!moderationCase) throw new ModerationCaseNotFoundError();
+    if (moderationCase.status !== "open") throw new ModerationCaseStateError();
+    if (decision === "remove_message") {
+      const message = this.messages.get(moderationCase.messageId);
+      if (message) message.status = "removed";
+    }
+    moderationCase.status = decision === "remove_message" ? "actioned" : "dismissed";
+    moderationCase.resolvedAt = new Date().toISOString(); moderationCase.resolvedBy = actor; moderationCase.decision = decision; moderationCase.note = note;
+    this.moderationAudit.unshift({ id: randomUUID(), caseId, actor, decision, note, createdAt: moderationCase.resolvedAt });
+    return this.caseView(moderationCase);
+  }
+
+  public async listModerationAudit(limit: number): Promise<readonly ModerationAuditEntry[]> { return this.moderationAudit.slice(0, limit); }
+
   public async close(): Promise<void> {}
 
   private ensureAuthenticatedPlayer(id: string): SocialPlayer {
@@ -221,5 +267,11 @@ export class InMemorySocialStore implements SocialStore {
       status: message.status,
       createdAt: message.createdAt,
     };
+  }
+  private caseView(value: MutableCase): ModerationCaseView {
+    const reports = [...this.reports.values()].filter((item) => item.caseId === value.id);
+    const reasons = { spam: 0, harassment: 0, hate: 0, sexual: 0, personal_data: 0, other: 0 };
+    for (const report of reports) reasons[report.reason] += 1;
+    return { ...value, author: this.requirePlayer(value.authorId), reportCount: reports.length, reasons };
   }
 }

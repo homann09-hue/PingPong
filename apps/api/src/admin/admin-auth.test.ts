@@ -8,7 +8,7 @@ const key = new TextEncoder().encode(secret);
 describe("AdminJwtAuthenticator", () => {
   it("accepts only the dedicated workforce issuer, audience, and allow-listed roles", async () => {
     const authenticator = new AdminJwtAuthenticator(secret);
-    const token = await new SignJWT({ roles: ["liveops_editor", "unknown_role"] })
+    const token = await new SignJWT({ roles: ["liveops_editor", "social_moderator", "unknown_role"] })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject("operator-42")
       .setIssuer("aurora-workforce")
@@ -19,7 +19,7 @@ describe("AdminJwtAuthenticator", () => {
 
     await expect(authenticator.authenticate(`Bearer ${token}`)).resolves.toEqual({
       subject: "operator-42",
-      roles: ["liveops_editor"],
+      roles: ["liveops_editor", "social_moderator"],
     });
   });
 
