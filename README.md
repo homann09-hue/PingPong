@@ -141,6 +141,12 @@ log. Level/VIP targeting and active UTC windows are evaluated by the server.
 Apply `infra/postgres/015_liveops_admin.sql` and configure a separate
 `ADMIN_JWT_SECRET` before starting production mode.
 
+The staff console is served at `http://localhost:8080/admin/`. It provides a
+responsive campaign registry, draft form, role-separated publication action and
+immutable audit view. In demo mode use the explicit editor/publisher buttons;
+production operators supply a short-lived workforce JWT. The console never
+persists that token and is served with a strict CSP and `no-store` caching.
+
 Authenticated wallet reads are available through `GET /v1/wallet` and
 `GET /v1/wallet/transactions?limit=50`. Ledger rows are immutable, use a
 transaction-specific idempotency key, include balances before and after, and

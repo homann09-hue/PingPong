@@ -61,7 +61,9 @@ support UTC scheduling, level/VIP targeting, separate workforce JWTs, editor /
 publisher / auditor RBAC, mandatory second-actor publication, an append-only
 PostgreSQL audit trail and a server-driven Flutter lobby banner. Clan roles
 beyond owner and member, chat, invitations, moderation, inbox, push, targeting
-previews and the visual admin application remain planned.
+previews, enterprise SSO and the broader player/economy/health admin modules
+remain planned. A responsive LiveOps console for campaign drafts, publication
+and audit review is implemented at `/admin/`.
 
 ## Phase 4 — scale and launch readiness
 

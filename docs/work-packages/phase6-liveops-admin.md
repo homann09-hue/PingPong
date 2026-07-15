@@ -43,6 +43,13 @@ client destinations rather than arbitrary URLs. The branded font is bundled for
 both its primary and Material fallback family, so the web build does not depend
 on Google Fonts at runtime.
 
+The separately served `/admin/` staff console provides a responsive campaign
+registry, validated draft form, publication control and audit table. It keeps
+the workforce token only in memory, escapes all server-provided content before
+rendering, and uses same-origin API calls. Admin documents and assets are served
+with `Cache-Control: no-store` and a CSP that permits scripts, styles and network
+requests only from the same origin.
+
 ## Verification
 
 - Admin JWT tests cover the dedicated audience and role allow-list.
@@ -51,12 +58,14 @@ on Google Fonts at runtime.
 - PostgreSQL integration covers audience filtering, four-eyes publication,
   transactional audit writes and database-level audit immutability.
 - Flutter analysis and widget tests pass; the release web build succeeds.
-- Browser verification confirms the campaign banner is visible, opens Live
-  Events, and generates no new console warnings or errors.
+- Browser verification confirms the player campaign banner is visible, opens
+  Live Events, and generates no new console warnings or errors.
+- Local HTTP verification covers the admin document security headers and the
+  complete editor-create / publisher-approve workflow; JavaScript syntax and
+  the production TypeScript build pass.
 
 ## Remaining scope
 
-This package is the secure backend vertical slice, not the complete visual admin
-application. Targeting previews, revision/archival workflows, economy grants,
-push orchestration, analytics dashboards and the admin UI remain separate work
-packages.
+The LiveOps console is not the complete studio back office. Enterprise OIDC,
+targeting previews, revision/archival workflows, economy grants, push
+orchestration and analytics/health dashboards remain separate work packages.

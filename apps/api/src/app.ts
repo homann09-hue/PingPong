@@ -99,7 +99,11 @@ export function buildApp(dependencies: AppDependencies) {
         return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
       }
     }
-    if (request.url.startsWith("/admin/")) {
+    if (request.url === "/admin" || request.url.startsWith("/admin/")) {
+      reply.header("cache-control", "no-store");
+      reply.header("content-security-policy", "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'");
+    }
+    if (request.url.startsWith("/admin/v1/")) {
       const rate = authRateLimiter.consume(`admin:${request.ip}`, 120, 60_000);
       reply.header("x-ratelimit-remaining", rate.remaining);
       if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
@@ -463,8 +467,13 @@ export function buildApp(dependencies: AppDependencies) {
     }
   });
   const webRoot = fileURLToPath(new URL("../../../apps/mobile/build/web", import.meta.url));
-  if (process.env.NODE_ENV !== "test" && existsSync(webRoot)) {
-    void app.register(staticFiles, { root: webRoot, prefix: "/" });
+  const adminRoot = fileURLToPath(new URL("../../admin", import.meta.url));
+  if (process.env.NODE_ENV !== "test") {
+    if (existsSync(adminRoot)) {
+      void app.register(staticFiles, { root: adminRoot, prefix: "/admin/", decorateReply: false, cacheControl: false });
+      app.get("/admin", async (_request, reply) => reply.redirect("/admin/"));
+    }
+    if (existsSync(webRoot)) void app.register(staticFiles, { root: webRoot, prefix: "/" });
   }
   app.post("/v1/slots/:slotId/spins", async (request, reply) => {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);

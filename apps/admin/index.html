@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Aurora Control</title>
+    <link rel="stylesheet" href="/admin/styles.css">
+    <script type="module" src="/admin/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AURORA OPERATIONS</p>
+        <h1>LiveOps Control</h1>
+      </div>
+      <div class="environment"><span></span> <span id="environment-name">Environment</span></div>
+    </header>
+
+    <main>
+      <section class="auth-panel" aria-labelledby="access-title">
+        <div>
+          <p class="eyebrow">WORKFORCE ACCESS</p>
+          <h2 id="access-title">Operator session</h2>
+          <p class="muted">Tokens remain in memory and are never persisted by this client.</p>
+        </div>
+        <div class="auth-controls">
+          <label>Bearer token
+            <input id="token" type="password" autocomplete="off" placeholder="Workforce JWT">
+          </label>
+          <button id="connect" class="primary" type="button">Connect</button>
+          <button id="demo-editor" type="button">Demo editor</button>
+          <button id="demo-publisher" type="button">Demo publisher</button>
+        </div>
+        <p id="session-status" class="status" role="status">Not connected</p>
+      </section>
+
+      <nav class="tabs" aria-label="Admin sections">
+        <button class="tab active" data-view="campaigns" type="button">Campaigns</button>
+        <button class="tab" data-view="create" type="button">New draft</button>
+        <button class="tab" data-view="audit" type="button">Audit log</button>
+      </nav>
+
+      <section id="campaigns-view" class="view" aria-labelledby="campaigns-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">LIVEOPS</p><h2 id="campaigns-title">Campaign registry</h2></div>
+          <button id="refresh-campaigns" type="button">Refresh</button>
+        </div>
+        <div id="campaigns" class="campaign-grid"><p class="empty">Connect an operator session to load campaigns.</p></div>
+      </section>
+
+      <section id="create-view" class="view hidden" aria-labelledby="create-title">
+        <div class="section-heading"><div><p class="eyebrow">EDITOR WORKFLOW</p><h2 id="create-title">Create campaign draft</h2></div></div>
+        <form id="campaign-form" class="campaign-form">
+          <label>Internal name<input name="name" required minlength="3" maxlength="80" placeholder="Weekend retention push"></label>
+          <label>Player headline<input name="title" required minlength="3" maxlength="60" placeholder="MEGA COIN WEEK"></label>
+          <label class="wide">Subtitle<textarea name="subtitle" required minlength="3" maxlength="140" rows="3" placeholder="Spiele Events und sichere dir exklusive Belohnungen"></textarea></label>
+          <label>CTA label<input name="ctaLabel" required minlength="2" maxlength="24" value="EVENTS"></label>
+          <label>Minimum level<input name="minLevel" required type="number" min="1" max="10000" value="1"></label>
+          <label>Minimum VIP points<input name="minVipPoints" required type="number" min="0" max="1000000000" value="0"></label>
+          <label>Starts at<input name="startsAt" required type="datetime-local"></label>
+          <label>Ends at<input name="endsAt" required type="datetime-local"></label>
+          <div class="wide form-actions"><button class="primary" type="submit">Save draft</button><p id="form-status" class="status" role="status"></p></div>
+        </form>
+      </section>
+
+      <section id="audit-view" class="view hidden" aria-labelledby="audit-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">COMPLIANCE</p><h2 id="audit-title">Immutable audit trail</h2></div>
+          <button id="refresh-audit" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th></tr></thead><tbody id="audit"><tr><td colspan="4" class="empty">No entries loaded.</td></tr></tbody></table></div>
+      </section>
+    </main>
+  </body>
+</html>
