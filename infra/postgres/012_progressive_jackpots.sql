@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE progressive_jackpots (
+CREATE TABLE IF NOT EXISTS progressive_jackpots (
   tier text PRIMARY KEY CHECK (tier IN ('MINI', 'MINOR', 'GRAND')),
   pool_amount bigint NOT NULL CHECK (pool_amount >= 0),
   seed_amount bigint NOT NULL CHECK (seed_amount > 0),

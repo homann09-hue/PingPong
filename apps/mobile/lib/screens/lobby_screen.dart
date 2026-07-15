@@ -37,12 +37,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<MissionView> missions = const [];
   List<LiveEventView> liveEvents = const [];
   List<ShopOfferView> shopOffers = const [];
+  SocialOverviewView? socialOverview;
   TimedRewardView? hourlyReward;
   TimedRewardView? dailyReward;
   WheelView? rewardWheel;
   List<Map<String, dynamic>> tournamentLeaders = const [];
   int tab = 0;
   bool rewardBusy = false;
+  bool socialBusy = false;
   String? shopBusyOfferId;
   bool dailyClaimed = false;
   final claimedQuests = <String>{};
@@ -53,6 +55,35 @@ class _LobbyScreenState extends State<LobbyScreen> {
     super.initState();
     _loadProfile();
     _loadShopOffers();
+    _loadSocial();
+  }
+
+  Future<void> _loadSocial() async {
+    try {
+      final loaded = await api.socialOverview();
+      if (mounted) setState(() => socialOverview = loaded);
+    } on StateError {
+      // The social surface communicates unavailable state without fake data.
+    }
+  }
+
+  Future<void> _socialAction(Future<void> Function() action) async {
+    if (socialBusy) return;
+    setState(() => socialBusy = true);
+    try {
+      await action();
+      await _loadSocial();
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Social-Aktion konnte nicht abgeschlossen werden.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => socialBusy = false);
+    }
   }
 
   Future<void> _loadShopOffers() async {
@@ -325,7 +356,18 @@ class _LobbyScreenState extends State<LobbyScreen> {
       missions: missions,
       onMissionClaim: _claimMission,
     ),
-    2 => const ClubScreen(),
+    2 => ClubScreen(
+      overview: socialOverview,
+      busy: socialBusy,
+      onAddFriend: (playerId) =>
+          _socialAction(() => api.sendFriendRequest(playerId)),
+      onAcceptFriend: (requestId) =>
+          _socialAction(() => api.acceptFriendRequest(requestId)),
+      onJoinClan: (clanId) => _socialAction(() => api.joinClan(clanId)),
+      onCreateClan: (name, tag) =>
+          _socialAction(() => api.createClan(name, tag)),
+      onLeaveClan: () => _socialAction(api.leaveClan),
+    ),
     3 => EventsScreen(
       events: liveEvents,
       rewardBusy: rewardBusy,

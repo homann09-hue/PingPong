@@ -127,6 +127,12 @@ unique database constraint. Apply
 `infra/postgres/008_missions.sql` and
 `infra/postgres/009_mission_tiers.sql` when upgrading an existing database.
 
+The Club surface is backed by the authenticated social API rather than local
+widget state. It supports durable friend requests, accepted friendships, clan
+creation, clan discovery, membership and leave operations. PostgreSQL enforces
+one clan per player, canonical friendship pairs, unique pending requests and
+unique clan names/tags. Apply `infra/postgres/014_social.sql` for this slice.
+
 Authenticated wallet reads are available through `GET /v1/wallet` and
 `GET /v1/wallet/transactions?limit=50`. Ledger rows are immutable, use a
 transaction-specific idempotency key, include balances before and after, and

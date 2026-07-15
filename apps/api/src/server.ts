@@ -4,6 +4,8 @@ import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { IdentityService } from "./identity/identity-service.js";
 import { InMemoryIdentityStore } from "./identity/in-memory-identity-store.js";
 import { PostgresIdentityStore } from "./identity/postgres-identity-store.js";
+import { InMemorySocialStore } from "./social/in-memory-social-store.js";
+import { PostgresSocialStore } from "./social/postgres-social-store.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -25,6 +27,7 @@ const app = buildApp({
       }
     : identityService,
   spinStore: demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStore.connect(databaseUrl!),
+  socialStore: demoMode ? new InMemorySocialStore(demoPlayerId) : PostgresSocialStore.connect(databaseUrl!),
   identityService,
 });
 try {

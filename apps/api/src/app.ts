@@ -13,6 +13,8 @@ import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGe
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
 import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
+import type { SocialStore } from "./social/social-store.js";
+import { ClanMembershipError, ClanNotFoundError, FriendRequestNotFoundError, SocialConflictError, SocialPlayerNotFoundError } from "./social/social-store.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -27,6 +29,11 @@ const guestAuthBody = z.object({
   platform: z.enum(["ios", "android", "web"]),
 });
 const refreshAuthBody = z.object({ refreshToken: z.string().min(32).max(512) });
+const friendRequestBody = z.object({ playerId: z.string().uuid() });
+const clanBody = z.object({
+  name: z.string().trim().min(3).max(32).regex(/^[A-Za-z0-9 _-]+$/),
+  tag: z.string().trim().min(3).max(8).regex(/^[A-Za-z0-9]+$/),
+});
 const rewardAmounts = new Map([
   ["daily", 250_000],
   ["spin-10", 100_000],
@@ -49,6 +56,7 @@ export interface AppDependencies {
   readonly authenticator: Authenticator;
   readonly spinStore: SpinStore;
   readonly identityService?: IdentityService;
+  readonly socialStore?: SocialStore;
 }
 
 /** Builds the HTTP composition root with explicit, replaceable infrastructure ports. */
@@ -193,6 +201,72 @@ export function buildApp(dependencies: AppDependencies) {
     } catch (error) {
       if (error instanceof InsufficientGemsError) return reply.code(409).send({ code: "INSUFFICIENT_GEMS" });
       if (error instanceof ShopOfferLimitReachedError) return reply.code(409).send({ code: "SHOP_OFFER_LIMIT_REACHED" });
+      throw error;
+    }
+  });
+  app.get("/v1/social/overview", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return dependencies.socialStore.getOverview(playerId);
+  });
+  app.post("/v1/social/friend-requests", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const body = friendRequestBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    try { return reply.code(201).send(await dependencies.socialStore.sendFriendRequest(playerId, body.data.playerId)); }
+    catch (error) {
+      if (error instanceof SocialPlayerNotFoundError) return reply.code(404).send({ code: "PLAYER_NOT_FOUND" });
+      if (error instanceof SocialConflictError) return reply.code(409).send({ code: "FRIEND_REQUEST_CONFLICT" });
+      throw error;
+    }
+  });
+  app.post("/v1/social/friend-requests/:requestId/accept", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const requestId = z.string().uuid().safeParse((request.params as { requestId: string }).requestId);
+    if (!requestId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return { friend: await dependencies.socialStore.acceptFriendRequest(playerId, requestId.data) }; }
+    catch (error) {
+      if (error instanceof FriendRequestNotFoundError) return reply.code(404).send({ code: "FRIEND_REQUEST_NOT_FOUND" });
+      throw error;
+    }
+  });
+  app.post("/v1/clans", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const body = clanBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    try { return reply.code(201).send({ clan: await dependencies.socialStore.createClan(playerId, body.data.name, body.data.tag) }); }
+    catch (error) {
+      if (error instanceof ClanMembershipError || error instanceof SocialConflictError) return reply.code(409).send({ code: "CLAN_CONFLICT" });
+      throw error;
+    }
+  });
+  app.post("/v1/clans/:clanId/join", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const clanId = z.string().uuid().safeParse((request.params as { clanId: string }).clanId);
+    if (!clanId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    try { return { clan: await dependencies.socialStore.joinClan(playerId, clanId.data) }; }
+    catch (error) {
+      if (error instanceof ClanNotFoundError) return reply.code(404).send({ code: "CLAN_NOT_FOUND" });
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_CONFLICT" });
+      throw error;
+    }
+  });
+  app.post("/v1/clans/leave", async (request, reply) => {
+    if (!dependencies.socialStore) return reply.code(503).send({ code: "SOCIAL_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    try { await dependencies.socialStore.leaveClan(playerId); return reply.code(204).send(); }
+    catch (error) {
+      if (error instanceof ClanMembershipError) return reply.code(409).send({ code: "CLAN_MEMBERSHIP_CONFLICT" });
       throw error;
     }
   });
@@ -359,6 +433,7 @@ export function buildApp(dependencies: AppDependencies) {
   app.addHook("onClose", async () => {
     await dependencies.spinStore.close();
     await dependencies.identityService?.close();
+    await dependencies.socialStore?.close();
   });
   return app;
 }

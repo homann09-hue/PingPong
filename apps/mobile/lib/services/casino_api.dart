@@ -304,6 +304,53 @@ class SlotPaytable {
   final Map<String, Map<String, dynamic>> symbols;
 }
 
+class SocialPlayerView {
+  const SocialPlayerView({
+    required this.id,
+    required this.displayName,
+    required this.level,
+    required this.online,
+  });
+  final String id, displayName;
+  final int level;
+  final bool online;
+}
+
+class FriendRequestView {
+  const FriendRequestView({required this.id, required this.player});
+  final String id;
+  final SocialPlayerView player;
+}
+
+class ClanView {
+  const ClanView({
+    required this.id,
+    required this.name,
+    required this.tag,
+    required this.memberCount,
+    required this.memberLimit,
+    required this.weeklyScore,
+    required this.role,
+  });
+  final String id, name, tag;
+  final int memberCount, memberLimit, weeklyScore;
+  final String? role;
+}
+
+class SocialOverviewView {
+  const SocialOverviewView({
+    required this.friends,
+    required this.incomingRequests,
+    required this.suggestions,
+    required this.currentClan,
+    required this.discoverClans,
+  });
+  final List<SocialPlayerView> friends, suggestions;
+  final List<FriendRequestView> incomingRequests;
+  final ClanView? currentClan;
+  final List<ClanView> discoverClans;
+}
+
 class CasinoApi {
   static const _configuredBase = String.fromEnvironment('API_URL');
   static final base = _configuredBase.isNotEmpty
@@ -517,6 +564,90 @@ class CasinoApi {
         .toList(growable: false);
   }
 
+  Future<SocialOverviewView> socialOverview() async {
+    final response = await http.get(
+      Uri.parse('$base/v1/social/overview'),
+      headers: {'authorization': 'Bearer local-demo'},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Social-Daten konnten nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return SocialOverviewView(
+      friends: (data['friends'] as List).map(_socialPlayer).toList(),
+      incomingRequests: (data['incomingRequests'] as List).map((value) {
+        final item = value as Map<String, dynamic>;
+        return FriendRequestView(
+          id: item['id'] as String,
+          player: _socialPlayer(item['player']),
+        );
+      }).toList(),
+      suggestions: (data['suggestions'] as List).map(_socialPlayer).toList(),
+      currentClan: data['currentClan'] == null
+          ? null
+          : _clan(data['currentClan']),
+      discoverClans: (data['discoverClans'] as List).map(_clan).toList(),
+    );
+  }
+
+  Future<void> sendFriendRequest(String playerId) async {
+    final response = await http.post(
+      Uri.parse('$base/v1/social/friend-requests'),
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer local-demo',
+      },
+      body: jsonEncode({'playerId': playerId}),
+    );
+    if (response.statusCode != 201) {
+      throw StateError('Freundschaftsanfrage fehlgeschlagen');
+    }
+  }
+
+  Future<void> acceptFriendRequest(String requestId) async {
+    final response = await http.post(
+      Uri.parse('$base/v1/social/friend-requests/$requestId/accept'),
+      headers: {'authorization': 'Bearer local-demo'},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Freundschaftsanfrage konnte nicht angenommen werden');
+    }
+  }
+
+  Future<void> joinClan(String clanId) async {
+    final response = await http.post(
+      Uri.parse('$base/v1/clans/$clanId/join'),
+      headers: {'authorization': 'Bearer local-demo'},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Clan-Beitritt fehlgeschlagen');
+    }
+  }
+
+  Future<void> createClan(String name, String tag) async {
+    final response = await http.post(
+      Uri.parse('$base/v1/clans'),
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer local-demo',
+      },
+      body: jsonEncode({'name': name, 'tag': tag}),
+    );
+    if (response.statusCode != 201) {
+      throw StateError('Clan konnte nicht erstellt werden');
+    }
+  }
+
+  Future<void> leaveClan() async {
+    final response = await http.post(
+      Uri.parse('$base/v1/clans/leave'),
+      headers: {'authorization': 'Bearer local-demo'},
+    );
+    if (response.statusCode != 204) {
+      throw StateError('Clan konnte nicht verlassen werden');
+    }
+  }
+
   Future<ShopPurchaseView> purchaseShopOffer(String offerId) async {
     final response = await http.post(
       Uri.parse('$base/v1/shop/offers/$offerId/purchase'),
@@ -538,6 +669,29 @@ class CasinoApi {
       gemsSpent: data['gemsSpent'] as int,
       coinBalance: data['coinBalance'] as int,
       gemBalance: data['gemBalance'] as int,
+    );
+  }
+
+  static SocialPlayerView _socialPlayer(dynamic value) {
+    final data = value as Map<String, dynamic>;
+    return SocialPlayerView(
+      id: data['id'] as String,
+      displayName: data['displayName'] as String,
+      level: data['level'] as int,
+      online: data['online'] as bool,
+    );
+  }
+
+  static ClanView _clan(dynamic value) {
+    final data = value as Map<String, dynamic>;
+    return ClanView(
+      id: data['id'] as String,
+      name: data['name'] as String,
+      tag: data['tag'] as String,
+      memberCount: data['memberCount'] as int,
+      memberLimit: data['memberLimit'] as int,
+      weeklyScore: data['weeklyScore'] as int,
+      role: data['role'] as String?,
     );
   }
 

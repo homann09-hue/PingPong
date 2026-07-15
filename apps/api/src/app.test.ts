@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
+import { InMemorySocialStore } from "./social/in-memory-social-store.js";
 
 const playerId = "00000000-0000-4000-8000-000000000001";
 const app = buildApp({
@@ -110,6 +111,47 @@ describe("spin API", () => {
     expect(limited.statusCode).toBe(409);
     expect(limited.json().code).toBe("SHOP_OFFER_LIMIT_REACHED");
     await shopApp.close();
+  });
+  it("persists authenticated friend requests and clan membership", async () => {
+    const socialStore = new InMemorySocialStore(playerId);
+    const socialApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(1_000),
+      socialStore,
+    });
+    const overview = await socialApp.inject({ method: "GET", url: "/v1/social/overview", headers: { authorization: "Bearer valid" } });
+    const suggestion = overview.json().suggestions[0] as { id: string };
+    const request = await socialApp.inject({
+      method: "POST", url: "/v1/social/friend-requests", headers: { authorization: "Bearer valid" }, payload: { playerId: suggestion.id },
+    });
+    const duplicate = await socialApp.inject({
+      method: "POST", url: "/v1/social/friend-requests", headers: { authorization: "Bearer valid" }, payload: { playerId: suggestion.id },
+    });
+    const clanId = (overview.json().discoverClans[0] as { id: string }).id;
+    const joined = await socialApp.inject({ method: "POST", url: `/v1/clans/${clanId}/join`, headers: { authorization: "Bearer valid" } });
+    const persisted = await socialApp.inject({ method: "GET", url: "/v1/social/overview", headers: { authorization: "Bearer valid" } });
+    expect(overview.statusCode).toBe(200);
+    expect(request.statusCode).toBe(201);
+    expect(duplicate.statusCode).toBe(409);
+    expect(joined.statusCode).toBe(200);
+    expect(persisted.json().currentClan.id).toBe(clanId);
+    await socialApp.close();
+  });
+  it("accepts only friend requests addressed to the authenticated player", async () => {
+    const socialStore = new InMemorySocialStore(playerId);
+    const senderId = "00000000-0000-4000-8000-000000000101";
+    const pending = await socialStore.sendFriendRequest(senderId, playerId);
+    const socialApp = buildApp({
+      authenticator: { authenticate: async () => playerId }, spinStore: new InMemorySpinStore(1_000), socialStore,
+    });
+    const accepted = await socialApp.inject({
+      method: "POST", url: `/v1/social/friend-requests/${pending.id}/accept`, headers: { authorization: "Bearer valid" },
+    });
+    const overview = await socialApp.inject({ method: "GET", url: "/v1/social/overview", headers: { authorization: "Bearer valid" } });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json().friend.displayName).toBe("LuckyLuna");
+    expect(overview.json().friends).toHaveLength(1);
+    await socialApp.close();
   });
   it("publishes tiered daily and weekly missions with cadence-specific periods", async () => {
     const response = await app.inject({ method: "GET", url: "/v1/missions", headers: { authorization: "Bearer valid" } });

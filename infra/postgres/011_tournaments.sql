@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE tournament_scores (
+CREATE TABLE IF NOT EXISTS tournament_scores (
   player_id uuid NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   tournament_id text NOT NULL,
   period_key date NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE tournament_scores (
   PRIMARY KEY (player_id, tournament_id, period_key)
 );
 
-CREATE INDEX tournament_scores_leaderboard_idx
+CREATE INDEX IF NOT EXISTS tournament_scores_leaderboard_idx
   ON tournament_scores (tournament_id, period_key, score DESC, updated_at ASC);
 
 COMMIT;

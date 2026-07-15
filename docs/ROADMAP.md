@@ -48,11 +48,17 @@ inside CI and asserts that measured variance ordering agrees with low, medium,
 high, and very-high labels. The CLI supports 10-million-spin release runs; those
 long reports are not yet a substitute for exact theoretical enumeration.
 
-## Phase 3 — LiveOps and social
+## Phase 3 — LiveOps and social (started)
 
 Segmentation, offers, events, tournaments, leaderboards, friends, clans, inbox and
 push. Build an RBAC admin application with four-eyes approvals for economy grants,
 config publishing, targeting previews, audit export and live health dashboards.
+
+Implemented vertical slice: authenticated social overview, durable friend
+requests/friendships and persistent clan creation/discovery/membership with
+PostgreSQL constraints and a functional Flutter surface. Clan roles beyond owner
+and member, chat, invitations, moderation, inbox, push, segmentation and the
+admin application remain planned.
 
 ## Phase 4 — scale and launch readiness
 

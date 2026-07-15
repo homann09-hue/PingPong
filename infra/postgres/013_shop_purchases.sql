@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE shop_purchases (
+CREATE TABLE IF NOT EXISTS shop_purchases (
   id uuid PRIMARY KEY,
   player_id uuid NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   offer_id text NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE shop_purchases (
   UNIQUE (player_id, idempotency_key)
 );
 
-CREATE UNIQUE INDEX shop_purchases_limited_offer_idx
+CREATE UNIQUE INDEX IF NOT EXISTS shop_purchases_limited_offer_idx
   ON shop_purchases (player_id, offer_id, period_key)
   WHERE period_key IS NOT NULL;
 

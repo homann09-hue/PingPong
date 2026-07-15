@@ -626,63 +626,252 @@ class _RewardTile extends StatelessWidget {
   }
 }
 
-class ClubScreen extends StatefulWidget {
-  const ClubScreen({super.key});
+typedef SocialIdCallback = Future<void> Function(String id);
+typedef ClanCreateCallback = Future<void> Function(String name, String tag);
 
-  @override
-  State<ClubScreen> createState() => _ClubScreenState();
-}
+class ClubScreen extends StatelessWidget {
+  const ClubScreen({
+    super.key,
+    required this.overview,
+    required this.busy,
+    required this.onAddFriend,
+    required this.onAcceptFriend,
+    required this.onJoinClan,
+    required this.onCreateClan,
+    required this.onLeaveClan,
+  });
 
-class _ClubScreenState extends State<ClubScreen> {
-  bool joined = false;
+  final SocialOverviewView? overview;
+  final bool busy;
+  final SocialIdCallback onAddFriend, onAcceptFriend, onJoinClan;
+  final ClanCreateCallback onCreateClan;
+  final Future<void> Function() onLeaveClan;
 
   @override
   Widget build(BuildContext context) => MetaPage(
     title: 'FORTUNE CLUB',
-    subtitle: joined
-        ? 'Gemeinsam sammelt ihr Punkte für die Wochenliga.'
-        : 'Tritt einem aktiven Club bei und schalte Team-Belohnungen frei.',
+    subtitle: 'Echte Freunde, persistente Clans und gemeinsame Wochenziele.',
     icon: Icons.groups_rounded,
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: MetaStyle.card(const Color(0xffa75bff)),
-          child: Column(
+    child: overview == null
+        ? Container(
+            padding: const EdgeInsets.all(24),
+            decoration: MetaStyle.card(const Color(0xffa75bff)),
+            child: const Text(
+              'SOCIAL-DATEN WERDEN GELADEN',
+              style: MetaStyle.title,
+            ),
+          )
+        : Column(
             children: [
-              const Icon(
-                Icons.shield_rounded,
-                size: 76,
-                color: Color(0xffffd45c),
-              ),
+              _clanSection(context),
+              const SizedBox(height: 14),
+              _friendsSection(),
+            ],
+          ),
+  );
+
+  Widget _clanSection(BuildContext context) {
+    final current = overview!.currentClan;
+    return Column(
+      children: [
+        const Text('DEIN CLAN', style: MetaStyle.hero),
+        const SizedBox(height: 10),
+        if (current != null)
+          _ClanCard(
+            clan: current,
+            busy: busy,
+            actionLabel: current.role == 'owner' ? 'ANFÜHRER' : 'VERLASSEN',
+            onAction: current.role == 'owner' || busy ? null : onLeaveClan,
+          )
+        else ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: MetaStyle.card(const Color(0xffa75bff)),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.shield_rounded,
+                  size: 64,
+                  color: Color(0xffffd45c),
+                ),
+                const Text('FINDE DEINEN CLAN', style: MetaStyle.title),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : () => _showCreateClan(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('CLAN GRÜNDEN'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final clan in overview!.discoverClans)
+            _ClanCard(
+              clan: clan,
+              busy: busy,
+              actionLabel: 'BEITRETEN',
+              onAction: busy ? null : () => onJoinClan(clan.id),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _friendsSection() => Column(
+    children: [
+      const Text('FREUNDE', style: MetaStyle.hero),
+      const SizedBox(height: 10),
+      for (final request in overview!.incomingRequests)
+        _SocialPlayerTile(
+          player: request.player,
+          label: 'ANNEHMEN',
+          onPressed: busy ? null : () => onAcceptFriend(request.id),
+        ),
+      for (final friend in overview!.friends)
+        _SocialPlayerTile(player: friend, label: 'FREUND', onPressed: null),
+      if (overview!.friends.isEmpty && overview!.incomingRequests.isEmpty)
+        const Text('Noch keine Freunde verbunden.', style: MetaStyle.caption),
+      const SizedBox(height: 14),
+      const Text('SPIELER ENTDECKEN', style: MetaStyle.title),
+      const SizedBox(height: 8),
+      for (final player in overview!.suggestions)
+        _SocialPlayerTile(
+          player: player,
+          label: 'HINZUFÜGEN',
+          onPressed: busy ? null : () => onAddFriend(player.id),
+        ),
+    ],
+  );
+
+  Future<void> _showCreateClan(BuildContext context) async {
+    final name = TextEditingController();
+    final tag = TextEditingController();
+    final create = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('CLAN GRÜNDEN'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              maxLength: 32,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: tag,
+              maxLength: 8,
+              decoration: const InputDecoration(labelText: 'Tag'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ABBRECHEN'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('GRÜNDEN'),
+          ),
+        ],
+      ),
+    );
+    if (create == true &&
+        name.text.trim().length >= 3 &&
+        tag.text.trim().length >= 3) {
+      await onCreateClan(name.text.trim(), tag.text.trim().toUpperCase());
+    }
+    name.dispose();
+    tag.dispose();
+  }
+}
+
+class _ClanCard extends StatelessWidget {
+  const _ClanCard({
+    required this.clan,
+    required this.busy,
+    required this.actionLabel,
+    required this.onAction,
+  });
+  final ClanView clan;
+  final bool busy;
+  final String actionLabel;
+  final Future<void> Function()? onAction;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(14),
+    decoration: MetaStyle.card(const Color(0xffa75bff)),
+    child: Row(
+      children: [
+        CircleAvatar(
+          backgroundColor: const Color(0xff6b2bd9),
+          child: Text(clan.tag.substring(0, 1)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(clan.name, style: MetaStyle.title),
               Text(
-                joined ? 'AURORA LEGENDS' : 'FINDE DEINEN CLUB',
-                style: MetaStyle.hero,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                joined
-                    ? 'Rang 18  •  42 / 50 Mitglieder'
-                    : '50 Spieler • wöchentliche Club-Missionen',
+                '${clan.memberCount}/${clan.memberLimit} MITGLIEDER  •  ${_compact(clan.weeklyScore)} PUNKTE',
                 style: MetaStyle.caption,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: joined ? null : () => setState(() => joined = true),
-                icon: Icon(joined ? Icons.check : Icons.group_add),
-                label: Text(joined ? 'BEIGETRETEN' : 'JETZT BEITRETEN'),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        const _RankingRow(rank: 1, name: 'Royal Spinners', score: '8.4B'),
-        const _RankingRow(rank: 2, name: 'Lucky Dragons', score: '7.9B'),
-        const _RankingRow(rank: 3, name: 'Aurora Legends', score: '7.2B'),
+        FilledButton(
+          onPressed: onAction == null ? null : () => onAction!(),
+          child: Text(busy ? '…' : actionLabel),
+        ),
       ],
     ),
   );
 }
+
+class _SocialPlayerTile extends StatelessWidget {
+  const _SocialPlayerTile({
+    required this.player,
+    required this.label,
+    required this.onPressed,
+  });
+  final SocialPlayerView player;
+  final String label;
+  final Future<void> Function()? onPressed;
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      leading: Stack(
+        children: [
+          const CircleAvatar(child: Icon(Icons.person)),
+          if (player.online)
+            const Positioned(
+              right: 0,
+              bottom: 0,
+              child: CircleAvatar(
+                radius: 5,
+                backgroundColor: Color(0xff54e6a5),
+              ),
+            ),
+        ],
+      ),
+      title: Text(player.displayName, style: MetaStyle.title),
+      subtitle: Text('LEVEL ${player.level}', style: MetaStyle.caption),
+      trailing: TextButton(
+        onPressed: onPressed == null ? null : () => onPressed!(),
+        child: Text(label),
+      ),
+    ),
+  );
+}
+
+String _compact(int value) => value >= 1000000
+    ? '${(value / 1000000).toStringAsFixed(1)}M'
+    : value.toString();
 
 typedef EventClaimCallback =
     Future<void> Function(String eventId, String milestoneId);

@@ -1,0 +1,153 @@
+import { randomUUID } from "node:crypto";
+import { Pool, type PoolClient } from "pg";
+import type { ClanView, FriendRequestView, SocialOverview, SocialPlayer, SocialStore } from "./social-store.js";
+import { ClanMembershipError, ClanNotFoundError, FriendRequestNotFoundError, SocialConflictError, SocialPlayerNotFoundError } from "./social-store.js";
+
+interface PlayerRow { id: string; display_name: string; level: number }
+interface ClanRow { id: string; name: string; tag: string; member_count: string; member_limit: number; weekly_score: string; role?: "owner" | "officer" | "member" }
+
+/** PostgreSQL social graph adapter with transactional friend and clan membership changes. */
+export class PostgresSocialStore implements SocialStore {
+  public constructor(private readonly pool: Pool) {}
+  public static connect(connectionString: string): PostgresSocialStore {
+    return new PostgresSocialStore(new Pool({ connectionString, max: 10, idleTimeoutMillis: 30_000 }));
+  }
+
+  public async getOverview(playerId: string): Promise<SocialOverview> {
+    await this.ensureProfile(this.pool, playerId);
+    const playerResult = await this.pool.query<PlayerRow>(
+      "SELECT p.id, s.display_name, p.level FROM players p JOIN social_profiles s ON s.player_id=p.id WHERE p.id=$1", [playerId],
+    );
+    const player = this.player(playerResult.rows[0]);
+    const friends = await this.pool.query<PlayerRow>(
+      `SELECT p.id, profiles.display_name, p.level
+         FROM friendships f
+         JOIN players p ON p.id=CASE WHEN f.player_low=$1 THEN f.player_high ELSE f.player_low END
+         JOIN social_profiles profiles ON profiles.player_id=p.id
+        WHERE f.player_low=$1 OR f.player_high=$1 ORDER BY profiles.display_name LIMIT 100`, [playerId],
+    );
+    const incoming = await this.pool.query<PlayerRow & { request_id: string; created_at: Date }>(
+      `SELECT requests.id AS request_id, requests.created_at, p.id, profiles.display_name, p.level
+         FROM friend_requests requests JOIN players p ON p.id=requests.sender_id
+         JOIN social_profiles profiles ON profiles.player_id=p.id
+        WHERE requests.recipient_id=$1 AND requests.status='pending' ORDER BY requests.created_at DESC LIMIT 50`, [playerId],
+    );
+    const suggestions = await this.pool.query<PlayerRow>(
+      `SELECT p.id, profiles.display_name, p.level FROM social_profiles profiles JOIN players p ON p.id=profiles.player_id
+        WHERE p.id<>$1 AND p.status='active'
+          AND NOT EXISTS (SELECT 1 FROM friendships f WHERE (f.player_low=$1 AND f.player_high=p.id) OR (f.player_high=$1 AND f.player_low=p.id))
+          AND NOT EXISTS (SELECT 1 FROM friend_requests r WHERE r.status='pending' AND ((r.sender_id=$1 AND r.recipient_id=p.id) OR (r.recipient_id=$1 AND r.sender_id=p.id)))
+        ORDER BY p.level DESC, profiles.display_name LIMIT 10`, [playerId],
+    );
+    const currentClan = await this.pool.query<ClanRow>(this.clanQuery("members.player_id=$1"), [playerId]);
+    const discoverClans = await this.pool.query<ClanRow>(
+      `SELECT clans.id,clans.name,clans.tag,clans.member_limit,clans.weekly_score,
+              NULL::text AS role,
+              (SELECT COUNT(*) FROM clan_members count_members WHERE count_members.clan_id=clans.id) AS member_count
+         FROM clans WHERE clans.status='active'
+          AND NOT EXISTS (SELECT 1 FROM clan_members own WHERE own.player_id=$1 AND own.clan_id=clans.id)
+        ORDER BY clans.weekly_score DESC LIMIT 20`, [playerId],
+    );
+    return {
+      player,
+      friends: friends.rows.map((row) => this.player(row)),
+      incomingRequests: incoming.rows.map((row) => ({ id: row.request_id, player: this.player(row), createdAt: row.created_at.toISOString() })),
+      suggestions: suggestions.rows.map((row) => this.player(row)),
+      currentClan: currentClan.rows[0] ? this.clan(currentClan.rows[0]) : null,
+      discoverClans: discoverClans.rows.map((row) => this.clan(row)),
+    };
+  }
+
+  public async sendFriendRequest(playerId: string, targetPlayerId: string): Promise<FriendRequestView> {
+    if (playerId === targetPlayerId) throw new SocialConflictError();
+    const target = await this.pool.query<PlayerRow>(
+      "SELECT p.id, s.display_name, p.level FROM players p JOIN social_profiles s ON s.player_id=p.id WHERE p.id=$1 AND p.status='active'", [targetPlayerId],
+    );
+    if (!target.rows[0]) throw new SocialPlayerNotFoundError();
+    const existing = await this.pool.query(
+      `SELECT 1 FROM friendships WHERE (player_low=LEAST($1::uuid,$2::uuid) AND player_high=GREATEST($1::uuid,$2::uuid))
+       UNION ALL SELECT 1 FROM friend_requests WHERE status='pending' AND ((sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1)) LIMIT 1`,
+      [playerId, targetPlayerId],
+    );
+    if (existing.rowCount) throw new SocialConflictError();
+    const id = randomUUID(); const createdAt = new Date();
+    try {
+      await this.pool.query("INSERT INTO friend_requests (id,sender_id,recipient_id) VALUES ($1,$2,$3)", [id, playerId, targetPlayerId]);
+    } catch (error) { if ((error as { code?: string }).code === "23505") throw new SocialConflictError(); throw error; }
+    return { id, player: this.player(target.rows[0]), createdAt: createdAt.toISOString() };
+  }
+
+  public async acceptFriendRequest(playerId: string, requestId: string): Promise<SocialPlayer> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const request = await client.query<{ sender_id: string }>(
+        "SELECT sender_id FROM friend_requests WHERE id=$1 AND recipient_id=$2 AND status='pending' FOR UPDATE", [requestId, playerId],
+      );
+      if (!request.rows[0]) throw new FriendRequestNotFoundError();
+      const senderId = request.rows[0].sender_id;
+      await client.query(
+        "INSERT INTO friendships (player_low,player_high) VALUES (LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING",
+        [playerId, senderId],
+      );
+      await client.query("UPDATE friend_requests SET status='accepted',responded_at=now() WHERE id=$1", [requestId]);
+      const sender = await client.query<PlayerRow>(
+        "SELECT p.id, s.display_name, p.level FROM players p JOIN social_profiles s ON s.player_id=p.id WHERE p.id=$1", [senderId],
+      );
+      await client.query("COMMIT"); return this.player(sender.rows[0]);
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+
+  public async createClan(playerId: string, name: string, tag: string): Promise<ClanView> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN"); await this.ensureProfile(client, playerId);
+      if ((await client.query("SELECT 1 FROM clan_members WHERE player_id=$1 FOR UPDATE", [playerId])).rowCount) throw new ClanMembershipError();
+      const id = randomUUID();
+      try { await client.query("INSERT INTO clans (id,name,tag,owner_id) VALUES ($1,$2,$3,$4)", [id, name, tag.toUpperCase(), playerId]); }
+      catch (error) { if ((error as { code?: string }).code === "23505") throw new SocialConflictError(); throw error; }
+      await client.query("INSERT INTO clan_members (clan_id,player_id,role) VALUES ($1,$2,'owner')", [id, playerId]);
+      await client.query("COMMIT");
+      return { id, name, tag: tag.toUpperCase(), memberCount: 1, memberLimit: 50, weeklyScore: 0, role: "owner" };
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+
+  public async joinClan(playerId: string, clanId: string): Promise<ClanView> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN"); await this.ensureProfile(client, playerId);
+      if ((await client.query("SELECT 1 FROM clan_members WHERE player_id=$1 FOR UPDATE", [playerId])).rowCount) throw new ClanMembershipError();
+      const clan = await client.query<{ member_limit: number }>("SELECT member_limit FROM clans WHERE id=$1 AND status='active' FOR UPDATE", [clanId]);
+      if (!clan.rows[0]) throw new ClanNotFoundError();
+      const count = Number((await client.query<{ count: string }>("SELECT COUNT(*) AS count FROM clan_members WHERE clan_id=$1", [clanId])).rows[0]!.count);
+      if (count >= clan.rows[0].member_limit) throw new ClanMembershipError();
+      await client.query("INSERT INTO clan_members (clan_id,player_id,role) VALUES ($1,$2,'member')", [clanId, playerId]);
+      const result = await client.query<ClanRow>(this.clanQuery("clans.id=$1 AND members.player_id=$2"), [clanId, playerId]);
+      await client.query("COMMIT"); return this.clan(result.rows[0]!);
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+
+  public async leaveClan(playerId: string): Promise<void> {
+    const membership = await this.pool.query<{ role: string }>("SELECT role FROM clan_members WHERE player_id=$1", [playerId]);
+    if (!membership.rows[0] || membership.rows[0].role === "owner") throw new ClanMembershipError();
+    await this.pool.query("DELETE FROM clan_members WHERE player_id=$1", [playerId]);
+  }
+
+  public async close(): Promise<void> { await this.pool.end(); }
+
+  private async ensureProfile(queryable: Pick<Pool, "query"> | Pick<PoolClient, "query">, playerId: string): Promise<void> {
+    const inserted = await queryable.query(
+      `INSERT INTO social_profiles (player_id,display_name)
+       SELECT id, 'PLAYER-' || upper(left(replace(id::text,'-',''),6)) FROM players WHERE id=$1
+       ON CONFLICT (player_id) DO NOTHING`, [playerId],
+    );
+    if (!inserted.rowCount && !(await queryable.query("SELECT 1 FROM social_profiles WHERE player_id=$1", [playerId])).rowCount) throw new SocialPlayerNotFoundError();
+  }
+  private player(row?: PlayerRow): SocialPlayer { if (!row) throw new SocialPlayerNotFoundError(); return { id: row.id, displayName: row.display_name, level: row.level, online: false }; }
+  private clan(row: ClanRow): ClanView { return { id: row.id, name: row.name, tag: row.tag, memberCount: Number(row.member_count), memberLimit: row.member_limit, weeklyScore: Number(row.weekly_score), ...(row.role ? { role: row.role } : {}) }; }
+  private clanQuery(where: string): string {
+    return `SELECT clans.id,clans.name,clans.tag,clans.member_limit,clans.weekly_score,members.role,
+      (SELECT COUNT(*) FROM clan_members count_members WHERE count_members.clan_id=clans.id) AS member_count
+      FROM clans LEFT JOIN clan_members members ON members.clan_id=clans.id WHERE clans.status='active' AND ${where}`;
+  }
+}

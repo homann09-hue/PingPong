@@ -57,6 +57,49 @@ void main() {
     expect(find.text('COIN SHOP'), findsOneWidget);
   });
 
+  testWidgets('club uses authoritative social overview and join callback', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    String? joinedClan;
+    const clan = ClanView(
+      id: '10000000-0000-4000-8000-000000000001',
+      name: 'Royal Spinners',
+      tag: 'ROYAL',
+      memberCount: 12,
+      memberLimit: 50,
+      weeklyScore: 8400000,
+      role: null,
+    );
+    const overview = SocialOverviewView(
+      friends: [],
+      incomingRequests: [],
+      suggestions: [],
+      currentClan: null,
+      discoverClans: [clan],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClubScreen(
+            overview: overview,
+            busy: false,
+            onAddFriend: (_) async {},
+            onAcceptFriend: (_) async {},
+            onJoinClan: (id) async => joinedClan = id,
+            onCreateClan: (_, _) async {},
+            onLeaveClan: () async {},
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Royal Spinners'), findsOneWidget);
+    expect(find.text('12/50 MITGLIEDER  •  8.4M PUNKTE'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'BEITRETEN'));
+    await tester.pump();
+    expect(joinedClan, clan.id);
+  });
+
   testWidgets('shop renders server offers and invokes play-money purchase', (
     tester,
   ) async {
