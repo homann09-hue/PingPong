@@ -639,8 +639,9 @@ describe("spin API", () => {
     expect(response.json().symbols.A.payouts[5]).toBeGreaterThan(0);
     const ways = await app.inject({ method: "GET", url: "/v1/slots/candy-carnival/paytable" });
     expect(ways.json()).toMatchObject({
-      version: 4,
-      mathModelVersion: "4.0.0",
+      version: 5,
+      mathModelVersion: "5.0.0",
+      volatility: "very_high",
       evaluation: {
         type: "ways", minimumReels: 3, betDivisor: 165,
         ways: 3_125, minimumWays: 32, maximumWays: 3_125, variable: true,
@@ -655,9 +656,9 @@ describe("spin API", () => {
       symbols: { C: { kind: "coin", payouts: {} } },
     });
     const jungle = await app.inject({ method: "GET", url: "/v1/slots/jungle-temple/paytable" });
-    expect(jungle.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
+    expect(jungle.json()).toMatchObject({ version: 4, mathModelVersion: "4.0.0", volatility: "high" });
     const frozen = await app.inject({ method: "GET", url: "/v1/slots/frozen-kingdom/paytable" });
-    expect(frozen.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
+    expect(frozen.json()).toMatchObject({ version: 4, mathModelVersion: "4.0.0", volatility: "very_high" });
     const neon = await app.inject({ method: "GET", url: "/v1/slots/neon-nights/paytable" });
     expect(neon.json()).toMatchObject({
       version: 3, mathModelVersion: "3.0.0",

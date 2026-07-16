@@ -62,18 +62,20 @@ and settlement audit.
 Dragon Peak applies a capped 2× multiplier for every winning wild on a payline
 (up to 32×). Candy Carnival now uses the advertised sticky-wild state throughout
 its free-spin sequence instead of an expanding-wild approximation.
-Jungle Temple v3 promotes every visible J→Q, Q→K and K→A when three temple
+Jungle Temple v4 promotes every visible J→Q, Q→K and K→A when three temple
 bonus symbols land, before the server evaluates the upgraded grid.
-Frozen Kingdom v3 uses contiguous wild blocks embedded directly in all five
-reel strips. Visible stacks are reported by the engine and highlighted by the
-client before sticky-wild persistence continues through free spins.
+Frozen Kingdom v4 uses contiguous wild blocks embedded directly in all five
+base reel strips, then switches to dedicated free-spin strips with retrigger
+scatters and injects one deterministic Ice Wild on every free spin. Visible
+stacks and injected cells are reported by the engine and highlighted by the
+client before sticky-wild persistence continues through the feature.
 Neon Nights v3 adds visible ×2 symbols that combine additively up to ×8 and
 multiply the complete authoritative round win. The engine returns their exact
 positions and applied factor for client animation and settlement audit.
 Dragon Peak v3 replaces its fixed free-spin multiplier with an Ultimate Free
 Spins ladder: spins 1–3 use ×2, spins 4–7 use ×3, and spin 8 onward uses ×5.
 Every free-spin round reports its index and active ladder factor.
-Candy Carnival v4 varies every reel independently between two and five visible
+Candy Carnival v5 varies every reel independently between two and five visible
 rows, producing 32 to 3,125 Ways. The current row vector and exact Ways count
 are settled by the server and returned with every base and free-spin layout.
 
@@ -111,7 +113,7 @@ other feature at once.
 
 Every theme has a distinct versioned reel model and its own paytable/feature
 profile. A deterministic 100,000-spin calibration sample per theme currently
-measures approximately 92.3–96.0% return and 32.1–52.5% spin hit frequency.
+measures approximately 93.3–94.4% return and 29.9–63.0% spin hit frequency.
 These samples are regression evidence, not a substitute for exact combinatorial
 certification. The in-game info button reads the published server paytable,
 RTP target, volatility, and line count.

@@ -6,7 +6,12 @@ describe("published theme math profiles", () => {
   it("keeps deterministic RTP, hit frequency, and volatility inside release guardrails", () => {
     const samples = 100_000;
     const bet = 100;
-    const varianceByProfile = new Map<string, number[]>();
+    const varianceRanges = {
+      low: { minimum: 0, maximum: 10 },
+      medium: { minimum: 10, maximum: 18 },
+      high: { minimum: 18, maximum: 30 },
+      very_high: { minimum: 30, maximum: Number.POSITIVE_INFINITY },
+    } as const;
     for (const config of themedConfigs) {
       const engine = new SlotEngine(config);
       let returned = 0;
@@ -21,9 +26,7 @@ describe("published theme math profiles", () => {
       const sampledRtp = returned / (samples * bet);
       const sampledHitFrequency = hits / samples;
       const sampledVariance = squaredMultipliers / samples - sampledRtp ** 2;
-      const profileVariances = varianceByProfile.get(config.math.volatility) ?? [];
-      profileVariances.push(sampledVariance);
-      varianceByProfile.set(config.math.volatility, profileVariances);
+      const varianceRange = varianceRanges[config.math.volatility];
       expect(sampledRtp, `${config.id} sampled RTP`).toBeGreaterThan(0.75);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeLessThan(1.15);
       if (["pharaoh-oasis", "dragon-peak", "candy-carnival", "pirate-bay", "neon-nights", "frozen-kingdom", "jungle-temple", "vegas-gold"].includes(config.id)) {
@@ -33,23 +36,18 @@ describe("published theme math profiles", () => {
         Math.abs(sampledHitFrequency - config.math.expectedHitFrequency),
         `${config.id} sampled hit frequency`,
       ).toBeLessThan(0.06);
+      expect(sampledVariance, `${config.id} minimum ${config.math.volatility} variance`).toBeGreaterThanOrEqual(varianceRange.minimum);
+      expect(sampledVariance, `${config.id} maximum ${config.math.volatility} variance`).toBeLessThan(varianceRange.maximum);
     }
-    const average = (profile: string) => {
-      const values = varianceByProfile.get(profile)!;
-      return values.reduce((sum, value) => sum + value, 0) / values.length;
-    };
-    expect(average("low")).toBeLessThan(average("medium"));
-    expect(average("medium")).toBeLessThan(average("high"));
-    expect(average("high")).toBeLessThan(average("very_high"));
   }, 30_000);
 
   it("publishes a distinct versioned reel model for every theme", () => {
     const signatures = themedConfigs.map((config) => JSON.stringify(config.reels));
     expect(new Set(signatures).size).toBe(themedConfigs.length);
     expect(themedConfigs.find((config) => config.id === "candy-carnival")).toMatchObject({
-      version: 4,
+      version: 5,
       rows: 5,
-      math: { mathModelVersion: "4.0.0" },
+      math: { mathModelVersion: "5.0.0", volatility: "very_high" },
     });
     expect(themedConfigs.find((config) => config.id === "vegas-gold")).toMatchObject({
       version: 3,
@@ -60,12 +58,13 @@ describe("published theme math profiles", () => {
       math: { mathModelVersion: "3.0.0" },
     });
     expect(themedConfigs.find((config) => config.id === "jungle-temple")).toMatchObject({
-      version: 3,
-      math: { mathModelVersion: "3.0.0" },
+      version: 4,
+      math: { mathModelVersion: "4.0.0", volatility: "high" },
     });
     expect(themedConfigs.find((config) => config.id === "frozen-kingdom")).toMatchObject({
-      version: 3,
-      math: { mathModelVersion: "3.0.0" },
+      version: 4,
+      math: { mathModelVersion: "4.0.0" },
+      features: { freeSpins: { extraWilds: { symbol: "W", count: 1 } } },
     });
     expect(themedConfigs.find((config) => config.id === "neon-nights")).toMatchObject({
       version: 3,

@@ -250,10 +250,19 @@ export class SlotEngine {
         const swap = rng.nextInt(index + 1);
         [positions[index], positions[swap]] = [positions[swap]!, positions[index]!];
       }
-      for (const [reel, row] of positions.slice(0, extraWilds.count)) {
+      const injected = positions.slice(0, extraWilds.count);
+      for (const [reel, row] of injected) {
         grid[reel]![row] = extraWilds.symbol;
       }
-      events.push({ type: "free_spins.modified", data: { mode: "extra_wilds", symbol: extraWilds.symbol, count: extraWilds.count } });
+      events.push({
+        type: "free_spins.modified",
+        data: {
+          mode: "extra_wilds",
+          symbol: extraWilds.symbol,
+          count: extraWilds.count,
+          positions: injected.map(([reel, row]) => `${reel}:${row}`).join(","),
+        },
+      });
     }
     if (feature.reelStrips) {
       events.push({ type: "free_spins.modified", data: { mode: "special_reels" } });

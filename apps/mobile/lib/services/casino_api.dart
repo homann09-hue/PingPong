@@ -614,6 +614,14 @@ class CasinoApi {
       final ladderData = ladderEvents.isEmpty
           ? null
           : ladderEvents.last['data'] as Map<String, dynamic>;
+      final extraWildEvents = events.where((event) {
+        if (event['type'] != 'free_spins.modified') return false;
+        final data = event['data'] as Map<String, dynamic>;
+        return data['mode'] == 'extra_wilds';
+      });
+      final extraWildData = extraWildEvents.isEmpty
+          ? null
+          : extraWildEvents.last['data'] as Map<String, dynamic>;
       final layoutEvents = events.where(
         (event) => event['type'] == 'layout.changed',
       );
@@ -656,6 +664,13 @@ class CasinoApi {
       }
       if (mysteryData != null) {
         for (final encoded in (mysteryData['positions'] as String).split(',')) {
+          winningCells.add(encoded);
+        }
+      }
+      if (extraWildData != null) {
+        for (final encoded in (extraWildData['positions'] as String).split(
+          ',',
+        )) {
           winningCells.add(encoded);
         }
       }
@@ -702,8 +717,10 @@ class CasinoApi {
             : upgradeLabel != null
             ? upgradeLabel
             : eventTypes.contains('free_spins.modified')
-            ? ladderData == null
-                  ? 'ENHANCED FREE SPINS'
+            ? extraWildData != null
+                  ? 'SPECIAL REELS • +${extraWildData['count']} ICE WILD'
+                  : ladderData == null
+                  ? 'SPECIAL FREE-SPIN REELS'
                   : 'ULTIMATE FREE SPIN ${ladderData['spin']} • ×${ladderData['multiplier']}'
             : eventTypes.contains('multiplier.applied')
             ? switch (multiplierData?['source']) {

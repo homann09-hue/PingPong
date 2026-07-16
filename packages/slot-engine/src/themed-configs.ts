@@ -176,7 +176,7 @@ export const dragonPeakConfig = game(
 );
 
 export const candyCarnivalConfig = game(
-  "candy-carnival", "Candy Carnival", "medium",
+  "candy-carnival", "Candy Carnival", "very_high",
   reelStrips([
     "AAKQJAAKSWQABAJKQASWJAKA", "KAAQJAKAWSQBAAKQJASAKWQA", "QAAKSJAWAAKBQJASAAKWQJAA",
     "JAAKQAWJASKBAAQJAKSAAWKA", "AAJKSAAQWKBJAAQKSAJAWAKA",
@@ -191,7 +191,7 @@ export const candyCarnivalConfig = game(
     cascades: { maxSteps: 3, multiplierStep: 0, maxMultiplier: 1 },
     freeSpins: { scatterSymbol: "S", awards: { 3: 5, 4: 8, 5: 12 }, maxTotal: 50, winMultiplier: 1 },
   },
-  { version: 4, mathModelVersion: "4.0.0", rows: 5 },
+  { version: 5, mathModelVersion: "5.0.0", rows: 5 },
 );
 
 export const pirateBayConfig = game(
@@ -232,22 +232,29 @@ export const neonNightsConfig = game(
 );
 
 export const frozenKingdomConfig = game(
-  "frozen-kingdom", "Frozen Kingdom", "medium",
+  "frozen-kingdom", "Frozen Kingdom", "very_high",
   reelStrips([
     "AAKQJAAWWSQKBAJAKQASWJAKA", "KAAQJAKSAWWQBAAKQJAWASKQA", "QAAKSWWAJAAKBQJASAAKWQJAA",
     "JAAKQASJAWWKBAAQJAKWASAKA", "AAJKWWAAQSKBJAAQKSAJAWAKA",
   ], 0, ["W"]),
-  scalePaytable(frequentWins, 4.56),
+  scalePaytable(frequentWins, 2.56),
   {
     stackedWild: { symbol: "W", minimumSize: 2 },
     stickyWild: { symbol: "W", maxSticky: 15 },
-    freeSpins: { scatterSymbol: "S", awards: { 3: 5, 4: 8, 5: 12 }, maxTotal: 50, winMultiplier: 1 },
+    freeSpins: {
+      scatterSymbol: "S", awards: { 3: 5, 4: 8, 5: 12 }, maxTotal: 50, winMultiplier: 1,
+      reelStrips: reelStrips([
+        "AAKQJAAWWSQKBAJAKQASWWJAKA", "KAAQJAKSAWWQBAAKQJAWASKQWWA", "QAAKSWWAJAAKBQJASAAKWWQJAA",
+        "JAAKQASJAWWKBAAQJAKWASAKWWA", "AAJKWWAAQSKBJAAQKSAJAWWAKA",
+      ], 0, ["W"]),
+      extraWilds: { symbol: "W", count: 1 },
+    },
   },
-  { version: 3, mathModelVersion: "3.0.0" },
+  { version: 4, mathModelVersion: "4.0.0" },
 );
 
 export const jungleTempleConfig = game(
-  "jungle-temple", "Jungle Temple", "very_high",
+  "jungle-temple", "Jungle Temple", "high",
   reelStrips([
     "AKQJAKQSAJKBQJAKWQKAJQKS", "KQAJKQAJWSKQBAJQKAKSJQAJ", "QAJKSAKQJABKQWJAKQSAJKQA",
     "JAKQJSAKQWJABKQAJKSAQKJ", "AQJKSAKQJABQKWJAKQSAJKQA",
@@ -263,7 +270,7 @@ export const jungleTempleConfig = game(
     wheelBonus: { scatterSymbol: "B", minimumCount: 3, multipliers: [3, 5, 8, 10, 15, 25, 50, 100] },
     bonusBuy: { costMultiplier: 50 },
   },
-  { version: 3, mathModelVersion: "3.0.0" },
+  { version: 4, mathModelVersion: "4.0.0" },
 );
 
 export const vegasGoldConfig = game(

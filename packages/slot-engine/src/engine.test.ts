@@ -665,7 +665,8 @@ describe("configurable evaluation and feature modifiers", () => {
     const freeSpin = result.rounds.find((round) => round.phase === "free_spin")!;
     expect(freeSpin.grid.flat().filter((symbol) => symbol === "W")).toHaveLength(1);
     expect(freeSpin.events).toContainEqual({
-      type: "free_spins.modified", data: { mode: "extra_wilds", symbol: "W", count: 1 },
+      type: "free_spins.modified",
+      data: { mode: "extra_wilds", symbol: "W", count: 1, positions: "0:0" },
     });
     expect(freeSpin.events).toContainEqual({
       type: "free_spins.modified", data: { mode: "special_reels" },
