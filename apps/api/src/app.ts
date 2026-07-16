@@ -278,13 +278,21 @@ export function buildApp(dependencies: AppDependencies) {
     const { slotId } = request.params as { slotId: string };
     const config = configs.get(slotId);
     if (!config) return reply.code(404).send({ code: "SLOT_NOT_FOUND" });
+    const variableRows = config.features?.variableRows;
+    const minimumWays = variableRows?.optionsByReel.reduce((ways, options) => ways * options[0]!, 1);
+    const maximumWays = variableRows?.optionsByReel.reduce((ways, options) => ways * options.at(-1)!, 1);
     return {
       id: config.id,
       name: config.name,
       version: config.version,
       lines: config.paylines.length,
       evaluation: config.features?.ways
-        ? { type: "ways", ...config.features.ways, ways: config.rows ** config.reels.length }
+        ? {
+            type: "ways", ...config.features.ways,
+            ways: maximumWays ?? config.rows ** config.reels.length,
+            variable: variableRows !== undefined,
+            ...(minimumWays !== undefined ? { minimumWays, maximumWays } : {}),
+          }
         : { type: "lines", lines: config.paylines.length },
       targetRtp: config.math.targetRtp,
       volatility: config.math.volatility,

@@ -639,9 +639,12 @@ describe("spin API", () => {
     expect(response.json().symbols.A.payouts[5]).toBeGreaterThan(0);
     const ways = await app.inject({ method: "GET", url: "/v1/slots/candy-carnival/paytable" });
     expect(ways.json()).toMatchObject({
-      version: 3,
-      mathModelVersion: "3.0.0",
-      evaluation: { type: "ways", minimumReels: 3, betDivisor: 62, ways: 243 },
+      version: 4,
+      mathModelVersion: "4.0.0",
+      evaluation: {
+        type: "ways", minimumReels: 3, betDivisor: 165,
+        ways: 3_125, minimumWays: 32, maximumWays: 3_125, variable: true,
+      },
     });
     const vegas = await app.inject({ method: "GET", url: "/v1/slots/vegas-gold/paytable" });
     expect(vegas.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });

@@ -70,6 +70,9 @@ positions and applied factor for client animation and settlement audit.
 Dragon Peak v3 replaces its fixed free-spin multiplier with an Ultimate Free
 Spins ladder: spins 1–3 use ×2, spins 4–7 use ×3, and spin 8 onward uses ×5.
 Every free-spin round reports its index and active ladder factor.
+Candy Carnival v4 varies every reel independently between two and five visible
+rows, producing 32 to 3,125 Ways. The current row vector and exact Ways count
+are settled by the server and returned with every base and free-spin layout.
 
 All eight games use a server-authoritative local jackpot ladder. Three, four,
 or five scatters award MINI (5×), MINOR (25×), or GRAND (500×) respectively.

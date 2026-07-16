@@ -27,7 +27,7 @@ const frequentWins: Paytable = {
 const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "pharaoh-oasis": 0.39,
   "dragon-peak": 0.321,
-  "candy-carnival": 0.538,
+  "candy-carnival": 0.63,
   "pirate-bay": 0.299,
   "neon-nights": 0.485,
   "frozen-kingdom": 0.467,
@@ -92,10 +92,10 @@ function game(
   reels: string[][],
   paytable: Paytable,
   features: FeatureConfig,
-  release: { readonly version?: number; readonly mathModelVersion?: string } = {},
+  release: { readonly version?: number; readonly mathModelVersion?: string; readonly rows?: number } = {},
 ) {
   return parseSlotConfig({
-    id, name, version: release.version ?? 2, rows: 3, reels, paylines: lines,
+    id, name, version: release.version ?? 2, rows: release.rows ?? 3, reels, paylines: lines,
     symbols: symbols(
       paytable,
       reels.some((strip) => strip.includes("C")),
@@ -174,12 +174,15 @@ export const candyCarnivalConfig = game(
   ]),
   scalePaytable(frequentWins, 5),
   {
-    ways: { minimumReels: 3, betDivisor: 62 },
+    variableRows: {
+      optionsByReel: [[2, 3, 4, 5], [2, 3, 4, 5], [2, 3, 4, 5], [2, 3, 4, 5], [2, 3, 4, 5]],
+    },
+    ways: { minimumReels: 3, betDivisor: 165 },
     stickyWild: { symbol: "W", maxSticky: 15 },
     cascades: { maxSteps: 3, multiplierStep: 0, maxMultiplier: 1 },
     freeSpins: { scatterSymbol: "S", awards: { 3: 5, 4: 8, 5: 12 }, maxTotal: 50, winMultiplier: 1 },
   },
-  { version: 3, mathModelVersion: "3.0.0" },
+  { version: 4, mathModelVersion: "4.0.0", rows: 5 },
 );
 
 export const pirateBayConfig = game(

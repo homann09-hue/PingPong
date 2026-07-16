@@ -47,8 +47,9 @@ describe("published theme math profiles", () => {
     const signatures = themedConfigs.map((config) => JSON.stringify(config.reels));
     expect(new Set(signatures).size).toBe(themedConfigs.length);
     expect(themedConfigs.find((config) => config.id === "candy-carnival")).toMatchObject({
-      version: 3,
-      math: { mathModelVersion: "3.0.0" },
+      version: 4,
+      rows: 5,
+      math: { mathModelVersion: "4.0.0" },
     });
     expect(themedConfigs.find((config) => config.id === "vegas-gold")).toMatchObject({
       version: 3,

@@ -374,6 +374,8 @@ class SlotPaytable {
     required this.lines,
     required this.evaluationType,
     required this.ways,
+    required this.minimumWays,
+    required this.variableWays,
     required this.targetRtp,
     required this.volatility,
     required this.expectedHitFrequency,
@@ -385,7 +387,8 @@ class SlotPaytable {
 
   final int lines;
   final String evaluationType;
-  final int? ways;
+  final int? ways, minimumWays;
+  final bool variableWays;
   final double targetRtp, expectedHitFrequency;
   final String volatility;
   final int maxWinMultiplier;
@@ -546,6 +549,8 @@ class CasinoApi {
       lines: data['lines'] as int,
       evaluationType: evaluationType,
       ways: evaluationType == 'ways' ? evaluation!['ways'] as int : null,
+      minimumWays: evaluation?['minimumWays'] as int?,
+      variableWays: evaluation?['variable'] as bool? ?? false,
       targetRtp: (data['targetRtp'] as num).toDouble(),
       volatility: data['volatility'] as String,
       expectedHitFrequency: (data['expectedHitFrequency'] as num).toDouble(),
@@ -609,6 +614,12 @@ class CasinoApi {
       final ladderData = ladderEvents.isEmpty
           ? null
           : ladderEvents.last['data'] as Map<String, dynamic>;
+      final layoutEvents = events.where(
+        (event) => event['type'] == 'layout.changed',
+      );
+      final layoutData = layoutEvents.isEmpty
+          ? null
+          : layoutEvents.last['data'] as Map<String, dynamic>;
       final wins = (round['wins'] as List).cast<Map<String, dynamic>>();
       final winningCells = <String>{};
       for (final win in wins) {
@@ -693,6 +704,8 @@ class CasinoApi {
               }
             : eventTypes.contains('respin.started')
             ? 'RESPIN'
+            : layoutData != null
+            ? 'MEGAWAYS • ${layoutData['ways']} WAYS'
             : null,
         winningCells: winningCells,
         winLabel: winLabel,

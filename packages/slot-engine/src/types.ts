@@ -29,6 +29,9 @@ export interface WinClassDefinition {
 }
 
 export interface FeatureConfig {
+  readonly variableRows?: {
+    readonly optionsByReel: readonly (readonly number[])[];
+  };
   readonly ways?: {
     readonly minimumReels: number;
     readonly betDivisor: number;
@@ -180,7 +183,7 @@ export interface WaysWin {
 export type Win = LineWin | ScatterWin | WaysWin;
 
 export interface EngineEvent {
-  readonly type: "wild.expanded" | "wild.stacked" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "symbol.upgraded" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
+  readonly type: "layout.changed" | "wild.expanded" | "wild.stacked" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "symbol.upgraded" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
   readonly data: Readonly<Record<string, number | string>>;
 }
 

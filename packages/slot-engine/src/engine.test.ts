@@ -503,6 +503,43 @@ describe("SlotEngine", () => {
 });
 
 describe("configurable evaluation and feature modifiers", () => {
+  it("generates jagged deterministic reel heights and evaluates their actual ways", () => {
+    const config = parseSlotConfig({
+      id: "variable-ways-test", version: 1, name: "Variable Ways Test", rows: 4,
+      reels: [["A"], ["A"], ["A"]], paylines: [[0, 0, 0]],
+      symbols: { A: { kind: "regular", payouts: { 3: 1 } } },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        variableRows: { optionsByReel: [[2], [3], [4]] },
+        ways: { minimumReels: 3, betDivisor: 1 },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 41n });
+    expect(result.grid.map((reel) => reel.length)).toEqual([2, 3, 4]);
+    expect(result.wins).toContainEqual({
+      kind: "ways", symbol: "A", count: 3, ways: 24, amount: 240,
+      cells: [
+        [0, 0], [0, 1],
+        [1, 0], [1, 1], [1, 2],
+        [2, 0], [2, 1], [2, 2], [2, 3],
+      ],
+    });
+    expect(result.rounds[0]!.events).toContainEqual({
+      type: "layout.changed", data: { rows: "2,3,4", ways: 24 },
+    });
+    expect(new SlotEngine(config).spin({ bet: 10, seed: 41n })).toEqual(result);
+  });
+
+  it("rejects variable reel heights without ways evaluation", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-variable-rows", version: 1, name: "Invalid Variable Rows", rows: 3,
+      reels: [["A"], ["A"], ["A"]], paylines: [[0, 0, 0]],
+      symbols: { A: { kind: "regular", payouts: {} } },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: { variableRows: { optionsByReel: [[2, 3], [2, 3], [2, 3]] } },
+    })).toThrow("require ways evaluation");
+  });
+
   it("evaluates deterministic all-ways combinations from the leftmost reel", () => {
     const config = parseSlotConfig({
       id: "ways-test", version: 1, name: "Ways Test", rows: 2,

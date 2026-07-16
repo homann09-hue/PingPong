@@ -31,6 +31,11 @@ const schema = z.object({
     minimumMultiplier: z.number().min(0),
   })).min(1).max(5).optional(),
   features: z.object({
+    variableRows: z.object({
+      optionsByReel: z.array(
+        z.array(z.number().int().min(1).max(12)).min(1).max(12),
+      ).min(3).max(12),
+    }).optional(),
     ways: z.object({
       minimumReels: z.number().int().min(2).max(12),
       betDivisor: z.number().int().positive().max(1_000_000),
@@ -167,6 +172,20 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   if (config.features?.ways && config.features.ways.minimumReels > config.reels.length) {
     throw new Error("Ways minimum reels must fit the configured reel count");
   }
+  const variableRows = config.features?.variableRows;
+  if (variableRows) {
+    if (!config.features?.ways) throw new Error("Variable rows require ways evaluation");
+    if (variableRows.optionsByReel.length !== config.reels.length) {
+      throw new Error("Variable-row options must match the configured reel count");
+    }
+    if (variableRows.optionsByReel.some((options) => options.some((value, index) => (
+      value > config.rows || (index > 0 && value <= options[index - 1]!)
+    )))) {
+      throw new Error("Variable-row options must be unique, ascending, and fit the configured rows");
+    }
+    const maxWays = variableRows.optionsByReel.reduce((ways, options) => ways * options.at(-1)!, 1);
+    if (!Number.isSafeInteger(maxWays)) throw new Error("Variable-row maximum ways must be a safe integer");
+  }
   const expanding = config.features?.expandingWild?.symbols ?? [];
   if (expanding.some((symbol) => config.symbols[symbol]?.kind !== "wild")) {
     throw new Error("Expanding wild feature must reference wild symbols");
@@ -252,7 +271,10 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   if (freeSpins?.extraWilds && config.symbols[freeSpins.extraWilds.symbol]?.kind !== "wild") {
     throw new Error("Free-spin extra wilds must reference a wild symbol");
   }
-  if (freeSpins?.extraWilds && freeSpins.extraWilds.count > config.reels.length * config.rows) {
+  const minimumVisibleCells = variableRows
+    ? variableRows.optionsByReel.reduce((sum, options) => sum + options[0]!, 0)
+    : config.reels.length * config.rows;
+  if (freeSpins?.extraWilds && freeSpins.extraWilds.count > minimumVisibleCells) {
     throw new Error("Free-spin extra wild count must fit the configured grid");
   }
   const mystery = config.features?.mysteryReveal;

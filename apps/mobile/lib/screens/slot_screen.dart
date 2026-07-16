@@ -291,7 +291,7 @@ class _SlotScreenState extends State<SlotScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '${paytable.evaluationType == 'ways' ? '${paytable.ways ?? ''} WAYS' : '${paytable.lines} GEWINNLINIEN'}  •  RTP-ZIEL ${(paytable.targetRtp * 100).toStringAsFixed(1)}%  •  ${paytable.volatility.toUpperCase()}',
+                    '${paytable.evaluationType == 'ways' ? '${paytable.variableWays ? 'BIS ZU ' : ''}${paytable.ways ?? ''} WAYS' : '${paytable.lines} GEWINNLINIEN'}  •  RTP-ZIEL ${(paytable.targetRtp * 100).toStringAsFixed(1)}%  •  ${paytable.volatility.toUpperCase()}',
                     style: TextStyle(
                       color: widget.game.primary,
                       fontWeight: FontWeight.w900,

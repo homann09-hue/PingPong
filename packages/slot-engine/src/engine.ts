@@ -13,7 +13,7 @@ export class SlotEngine {
     if (request.bonusBuy && !this.config.features?.bonusBuy) throw new RangeError("bonus buy is not configured for this game");
     const rng = new DeterministicRng(request.seed);
     const stops = this.config.reels.map((strip) => rng.nextInt(strip.length));
-    const baseGrid = this.gridFromStops(stops);
+    const baseGrid = this.gridFromStops(stops, this.rowCounts(rng));
     const rounds: SpinRound[] = [];
     let freeSpinsRemaining = 0;
     let freeSpinsPlayed = 0;
@@ -117,6 +117,7 @@ export class SlotEngine {
     rng: DeterministicRng, output: SpinRound[], initialEvents: EngineEvent[] = [], winMultiplier = 1,
   ): SpinRound & { events: EngineEvent[] } {
     const events: EngineEvent[] = [...initialEvents];
+    this.recordVariableLayout(input, events);
     if (winMultiplier > 1) events.push({ type: "multiplier.applied", data: { source: "free_spin", multiplier: winMultiplier } });
     const upgraded = this.upgradeSymbols(input, events);
     const revealed = this.revealMystery(upgraded, rng, events);
@@ -158,14 +159,32 @@ export class SlotEngine {
     return { phase, index, grid, wins, events, totalWin: wins.reduce((sum, win) => sum + win.amount, 0) };
   }
 
-  private gridFromStops(stops: readonly number[]): string[][] {
-    return this.config.reels.map((strip, reel) => Array.from({ length: this.config.rows }, (_, row) => strip[(stops[reel]! + row) % strip.length]!));
+  private gridFromStops(stops: readonly number[], rowCounts: readonly number[]): string[][] {
+    return this.config.reels.map((strip, reel) => Array.from(
+      { length: rowCounts[reel]! }, (_, row) => strip[(stops[reel]! + row) % strip.length]!,
+    ));
   }
 
   private randomGrid(rng: DeterministicRng, reels = this.config.reels): string[][] {
-    return reels.map((strip) => {
+    const rowCounts = this.rowCounts(rng);
+    return reels.map((strip, reel) => {
       const stop = rng.nextInt(strip.length);
-      return Array.from({ length: this.config.rows }, (_, row) => strip[(stop + row) % strip.length]!);
+      return Array.from({ length: rowCounts[reel]! }, (_, row) => strip[(stop + row) % strip.length]!);
+    });
+  }
+
+  private rowCounts(rng: DeterministicRng): number[] {
+    const variable = this.config.features?.variableRows;
+    if (!variable) return this.config.reels.map(() => this.config.rows);
+    return variable.optionsByReel.map((options) => options[rng.nextInt(options.length)]!);
+  }
+
+  private recordVariableLayout(input: readonly (readonly string[])[], events: EngineEvent[]): void {
+    if (!this.config.features?.variableRows) return;
+    const rows = input.map((reel) => reel.length);
+    events.push({
+      type: "layout.changed",
+      data: { rows: rows.join(","), ways: rows.reduce((product, count) => product * count, 1) },
     });
   }
 
@@ -216,16 +235,14 @@ export class SlotEngine {
     const feature = this.config.features?.freeSpins;
     const grid = input.map((reel) => [...reel]);
     if (!feature) return grid;
-    const positions = Array.from({ length: this.config.reels.length * this.config.rows }, (_, index) => index);
+    const positions = grid.flatMap((reel, reelIndex) => reel.map((_, row) => [reelIndex, row] as const));
     const extraWilds = feature.extraWilds;
     if (extraWilds) {
       for (let index = positions.length - 1; index > 0; index--) {
         const swap = rng.nextInt(index + 1);
         [positions[index], positions[swap]] = [positions[swap]!, positions[index]!];
       }
-      for (const position of positions.slice(0, extraWilds.count)) {
-        const reel = Math.floor(position / this.config.rows);
-        const row = position % this.config.rows;
+      for (const [reel, row] of positions.slice(0, extraWilds.count)) {
         grid[reel]![row] = extraWilds.symbol;
       }
       events.push({ type: "free_spins.modified", data: { mode: "extra_wilds", symbol: extraWilds.symbol, count: extraWilds.count } });
@@ -241,7 +258,7 @@ export class SlotEngine {
     const expanding = new Set(this.config.features?.expandingWild?.symbols ?? []);
     grid.forEach((reel, reelIndex) => {
       const symbol = reel.find((value) => expanding.has(value));
-      if (symbol) { grid[reelIndex] = Array(this.config.rows).fill(symbol) as string[]; events.push({ type: "wild.expanded", data: { reel: reelIndex, symbol } }); }
+      if (symbol) { grid[reelIndex] = Array(reel.length).fill(symbol) as string[]; events.push({ type: "wild.expanded", data: { reel: reelIndex, symbol } }); }
     });
     return grid;
   }
@@ -271,7 +288,7 @@ export class SlotEngine {
       const parts = key.split(":");
       const reel = Number(parts[0]!);
       const row = Number(parts[1]!);
-      grid[reel]![row] = feature.symbol;
+      if (row < grid[reel]!.length) grid[reel]![row] = feature.symbol;
     }
     for (let reel = 0; reel < grid.length && stickyCells.size < feature.maxSticky; reel++) {
       for (let row = 0; row < grid[reel]!.length && stickyCells.size < feature.maxSticky; row++) {
@@ -287,12 +304,16 @@ export class SlotEngine {
     if (walking) {
       let cells = baseGrid.flatMap((reel, reelIndex) => reel.flatMap((symbol, row) => symbol === walking.symbol ? [[reelIndex, row] as [number, number]] : []));
       for (let step = 1; step <= walking.maxSteps && cells.length > 0; step++) {
-        cells = cells
+        const moved = cells
           .map(([reel, row]) => [reel + (walking.direction === "right" ? 1 : -1), row] as [number, number])
           .filter(([reel]) => reel >= 0 && reel < this.config.reels.length);
-        if (cells.length === 0) break;
+        if (moved.length === 0) break;
         const events: EngineEvent[] = [{ type: "respin.started", data: { index: step } }, { type: "wild.walked", data: { step, count: cells.length, symbol: walking.symbol } }];
         const grid = this.revealMystery(this.randomGrid(rng), rng, events);
+        this.recordVariableLayout(grid, events);
+        cells = moved.filter(([reel, row]) => row < grid[reel]!.length);
+        if (cells.length === 0) break;
+        events[1] = { type: "wild.walked", data: { step, count: cells.length, symbol: walking.symbol } };
         for (const [reel, row] of cells) grid[reel]![row] = walking.symbol;
         const wins = this.evaluateWins(grid, bet, true, events);
         rounds.push(this.round("respin", step, grid, wins, events));
@@ -306,6 +327,7 @@ export class SlotEngine {
     for (let index = 1; index <= respins.count; index++) {
       const events: EngineEvent[] = [{ type: "respin.started", data: { index, triggerCount: triggers } }];
       const grid = this.revealMystery(this.randomGrid(rng), rng, events);
+      this.recordVariableLayout(grid, events);
       const wins = this.evaluateWins(grid, bet, true, events);
       rounds.push(this.round("respin", index, grid, wins, events));
     }
