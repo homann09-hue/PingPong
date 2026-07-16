@@ -72,6 +72,10 @@ const schema = z.object({
       awards: z.record(z.coerce.number().int().positive(), z.number().int().positive()),
       maxTotal: z.number().int().min(1).max(1_000),
       winMultiplier: z.number().int().min(1).max(100).optional(),
+      multiplierLadder: z.array(z.object({
+        fromSpin: z.number().int().min(1).max(1_000),
+        multiplier: z.number().int().min(1).max(1_000),
+      })).min(1).max(100).optional(),
       reelStrips: z.array(z.array(z.string()).min(1)).min(3).max(12).optional(),
       extraWilds: z.object({
         symbol: z.string(),
@@ -219,6 +223,24 @@ export function parseSlotConfig(input: unknown): SlotConfig {
     throw new Error("Free spins must reference a scatter symbol");
   }
   const freeSpins = config.features?.freeSpins;
+  if (freeSpins?.winMultiplier !== undefined && freeSpins.multiplierLadder) {
+    throw new Error("Free spins cannot combine a fixed multiplier with a multiplier ladder");
+  }
+  if (freeSpins?.multiplierLadder) {
+    const ladder = freeSpins.multiplierLadder;
+    if (ladder[0]!.fromSpin !== 1) {
+      throw new Error("Free-spin multiplier ladder must start at spin one");
+    }
+    if (ladder.some((step, index) => (
+      step.fromSpin > freeSpins.maxTotal
+      || (index > 0 && (
+        step.fromSpin <= ladder[index - 1]!.fromSpin
+        || step.multiplier <= ladder[index - 1]!.multiplier
+      ))
+    ))) {
+      throw new Error("Free-spin multiplier ladder must increase within the configured limit");
+    }
+  }
   if (freeSpins?.reelStrips) {
     if (freeSpins.reelStrips.length !== config.reels.length) {
       throw new Error("Free-spin reel strips must match the base reel count");

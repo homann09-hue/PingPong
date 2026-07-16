@@ -630,8 +630,8 @@ describe("spin API", () => {
     const response = await app.inject({ method: "GET", url: "/v1/slots/dragon-peak/paytable" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      id: "dragon-peak", version: 2, lines: 20, targetRtp: 0.94, volatility: "high",
-      maxWinMultiplier: 5_000, mathModelVersion: "2.0.0",
+      id: "dragon-peak", version: 3, lines: 20, targetRtp: 0.94, volatility: "high",
+      maxWinMultiplier: 5_000, mathModelVersion: "3.0.0",
       evaluation: { type: "lines", lines: 20 },
     });
     expect(response.json().bet.steps).toEqual([100, 200, 500, 1_000, 2_000, 5_000, 10_000]);

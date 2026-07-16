@@ -26,7 +26,7 @@ const frequentWins: Paytable = {
 
 const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "pharaoh-oasis": 0.39,
-  "dragon-peak": 0.32,
+  "dragon-peak": 0.321,
   "candy-carnival": 0.538,
   "pirate-bay": 0.299,
   "neon-nights": 0.485,
@@ -150,12 +150,20 @@ export const dragonPeakConfig = game(
     "AKQJAKQSAJKBQJAKWQKAJQKS", "KQAJKQAJWSKQBAJQKAKSJQAJ", "QAJKSAKQJABKQWJAKQSAJKQA",
     "JAKQJSAKQWJABKQAJKSAQKJ", "AQJKSAKQJABQKWJAKQSAJKQA",
   ]),
-  scalePaytable(highVariance, 5.8),
+  scalePaytable(highVariance, 5.4),
   {
     wildMultiplier: { symbol: "W", multiplier: 2, maxTotalMultiplier: 32 },
     cascades: { maxSteps: 8, multiplierStep: 1, maxMultiplier: 10 },
-    freeSpins: { scatterSymbol: "S", awards: { 3: 6, 4: 10, 5: 15 }, maxTotal: 80, winMultiplier: 2 },
+    freeSpins: {
+      scatterSymbol: "S", awards: { 3: 6, 4: 10, 5: 15 }, maxTotal: 80,
+      multiplierLadder: [
+        { fromSpin: 1, multiplier: 2 },
+        { fromSpin: 4, multiplier: 3 },
+        { fromSpin: 8, multiplier: 5 },
+      ],
+    },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const candyCarnivalConfig = game(

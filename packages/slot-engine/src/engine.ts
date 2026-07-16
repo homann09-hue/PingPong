@@ -35,7 +35,13 @@ export class SlotEngine {
       const configuredReels = this.config.features?.freeSpins?.reelStrips ?? this.config.reels;
       const modifiedGrid = this.applyFreeSpinModifiers(this.randomGrid(rng, configuredReels), rng, stickyEvents);
       const freeGrid = this.applyStickyWild(modifiedGrid, stickyCells, stickyEvents);
-      const freeMultiplier = this.config.features?.freeSpins?.winMultiplier ?? 1;
+      const freeMultiplier = this.freeSpinMultiplier(freeSpinsPlayed);
+      if (this.config.features?.freeSpins?.multiplierLadder) {
+        stickyEvents.push({
+          type: "free_spins.modified",
+          data: { mode: "multiplier_ladder", spin: freeSpinsPlayed, multiplier: freeMultiplier },
+        });
+      }
       const round = this.playPrimary("free_spin", freeSpinsPlayed, freeGrid, request.bet, rng, rounds, stickyEvents, freeMultiplier);
       this.playCoinCollect(round.grid, request.bet, rng, rounds);
       const retrigger = this.freeSpinAward(round.grid);
@@ -472,6 +478,18 @@ export class SlotEngine {
     if (!feature) return 0;
     const count = grid.flat().filter((symbol) => symbol === feature.scatterSymbol).length;
     return feature.awards[count] ?? 0;
+  }
+
+  private freeSpinMultiplier(spin: number): number {
+    const feature = this.config.features?.freeSpins;
+    const ladder = feature?.multiplierLadder;
+    if (!ladder) return feature?.winMultiplier ?? 1;
+    let multiplier = ladder[0]!.multiplier;
+    for (const step of ladder) {
+      if (step.fromSpin > spin) break;
+      multiplier = step.multiplier;
+    }
+    return multiplier;
   }
 
   private playPickBonus(grid: readonly (readonly string[])[], bet: number, rng: DeterministicRng, rounds: SpinRound[]): void {

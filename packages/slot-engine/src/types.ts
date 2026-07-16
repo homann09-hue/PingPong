@@ -64,6 +64,10 @@ export interface FeatureConfig {
     readonly awards: Readonly<Record<number, number>>;
     readonly maxTotal: number;
     readonly winMultiplier?: number;
+    readonly multiplierLadder?: readonly {
+      readonly fromSpin: number;
+      readonly multiplier: number;
+    }[];
     readonly reelStrips?: readonly (readonly string[])[];
     readonly extraWilds?: {
       readonly symbol: string;

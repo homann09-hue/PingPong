@@ -67,6 +67,9 @@ client before sticky-wild persistence continues through free spins.
 Neon Nights v3 adds visible ×2 symbols that combine additively up to ×8 and
 multiply the complete authoritative round win. The engine returns their exact
 positions and applied factor for client animation and settlement audit.
+Dragon Peak v3 replaces its fixed free-spin multiplier with an Ultimate Free
+Spins ladder: spins 1–3 use ×2, spins 4–7 use ×3, and spin 8 onward uses ×5.
+Every free-spin round reports its index and active ladder factor.
 
 All eight games use a server-authoritative local jackpot ladder. Three, four,
 or five scatters award MINI (5×), MINOR (25×), or GRAND (500×) respectively.

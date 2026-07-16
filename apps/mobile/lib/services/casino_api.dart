@@ -601,6 +601,14 @@ class CasinoApi {
               final data = event['data'] as Map<String, dynamic>;
               return '${data['from']}→${data['to']}';
             }).join(' • ')}';
+      final ladderEvents = events.where((event) {
+        if (event['type'] != 'free_spins.modified') return false;
+        final data = event['data'] as Map<String, dynamic>;
+        return data['mode'] == 'multiplier_ladder';
+      });
+      final ladderData = ladderEvents.isEmpty
+          ? null
+          : ladderEvents.last['data'] as Map<String, dynamic>;
       final wins = (round['wins'] as List).cast<Map<String, dynamic>>();
       final winningCells = <String>{};
       for (final win in wins) {
@@ -672,7 +680,9 @@ class CasinoApi {
             : upgradeLabel != null
             ? upgradeLabel
             : eventTypes.contains('free_spins.modified')
-            ? 'ENHANCED FREE SPINS'
+            ? ladderData == null
+                  ? 'ENHANCED FREE SPINS'
+                  : 'ULTIMATE FREE SPIN ${ladderData['spin']} • ×${ladderData['multiplier']}'
             : eventTypes.contains('multiplier.applied')
             ? switch (multiplierData?['source']) {
                 'cascade' => 'CASCADE ×${multiplierData?['multiplier']}',

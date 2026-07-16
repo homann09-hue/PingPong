@@ -36,6 +36,50 @@ describe("configuration-driven layouts", () => {
     expect(result.rounds.flatMap((round) => round.events).some((event) => event.type === "free_spins.awarded")).toBe(true);
   });
 
+  it("advances a configured multiplier ladder by free-spin index", () => {
+    const config = parseSlotConfig({
+      id: "free-spin-ladder", version: 1, name: "Free Spin Ladder", rows: 1,
+      reels: [["S"], ["S"], ["S"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 1 } },
+        S: { kind: "scatter", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        freeSpins: {
+          scatterSymbol: "S", awards: { 3: 3 }, maxTotal: 3,
+          reelStrips: [["A"], ["A"], ["A"]],
+          multiplierLadder: [
+            { fromSpin: 1, multiplier: 2 },
+            { fromSpin: 2, multiplier: 3 },
+          ],
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 7n });
+    const freeRounds = result.rounds.filter((round) => round.phase === "free_spin");
+    expect(freeRounds.map((round) => round.totalWin)).toEqual([20, 30, 30]);
+    expect(freeRounds.map((round) => round.events.find(
+      (event) => event.type === "free_spins.modified" && event.data.mode === "multiplier_ladder",
+    )?.data.multiplier)).toEqual([2, 3, 3]);
+  });
+
+  it("rejects simultaneous fixed and ladder free-spin multipliers", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-free-spin-ladder", version: 1, name: "Invalid Free Spin Ladder", rows: 1,
+      reels: [["S"], ["S"], ["S"]], paylines: [[0, 0, 0]],
+      symbols: { S: { kind: "scatter", payouts: {} } },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        freeSpins: {
+          scatterSymbol: "S", awards: { 3: 1 }, maxTotal: 3,
+          winMultiplier: 2,
+          multiplierLadder: [{ fromSpin: 1, multiplier: 2 }],
+        },
+      },
+    })).toThrow("cannot combine a fixed multiplier");
+  });
+
   it("expands configured wilds and bounds cascade depth", () => {
     const config = parseSlotConfig({
       id: "cascade-test", version: 1, name: "Cascade Test", rows: 3,
