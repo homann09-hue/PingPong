@@ -29,6 +29,10 @@ export interface WinClassDefinition {
 }
 
 export interface FeatureConfig {
+  readonly ways?: {
+    readonly minimumReels: number;
+    readonly betDivisor: number;
+  };
   readonly expandingWild?: { readonly symbols: readonly string[] };
   readonly stickyWild?: { readonly symbol: string; readonly maxSticky: number };
   readonly walkingWild?: {
@@ -51,6 +55,15 @@ export interface FeatureConfig {
     readonly awards: Readonly<Record<number, number>>;
     readonly maxTotal: number;
     readonly winMultiplier?: number;
+    readonly reelStrips?: readonly (readonly string[])[];
+    readonly extraWilds?: {
+      readonly symbol: string;
+      readonly count: number;
+    };
+  };
+  readonly mysteryReveal?: {
+    readonly symbol: string;
+    readonly targets: readonly string[];
   };
   readonly cascades?: {
     readonly maxSteps: number;
@@ -86,7 +99,7 @@ export interface FeatureConfig {
 }
 
 export interface SymbolDefinition {
-  readonly kind: "regular" | "wild" | "scatter";
+  readonly kind: "regular" | "wild" | "scatter" | "mystery";
   readonly payouts: Readonly<Record<number, number>>;
 }
 
@@ -128,10 +141,19 @@ export interface ScatterWin {
   readonly cells: readonly [number, number][];
 }
 
-export type Win = LineWin | ScatterWin;
+export interface WaysWin {
+  readonly kind: "ways";
+  readonly symbol: string;
+  readonly count: number;
+  readonly ways: number;
+  readonly amount: number;
+  readonly cells: readonly [number, number][];
+}
+
+export type Win = LineWin | ScatterWin | WaysWin;
 
 export interface EngineEvent {
-  readonly type: "wild.expanded" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
+  readonly type: "wild.expanded" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
   readonly data: Readonly<Record<string, number | string>>;
 }
 

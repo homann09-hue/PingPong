@@ -298,3 +298,92 @@ describe("SlotEngine", () => {
     for (let seed = 0n; seed < 10_000n; seed++) expect(Number.isSafeInteger(engine.spin({ bet: 7, seed }).totalWin)).toBe(true);
   });
 });
+
+describe("configurable evaluation and feature modifiers", () => {
+  it("evaluates deterministic all-ways combinations from the leftmost reel", () => {
+    const config = parseSlotConfig({
+      id: "ways-test", version: 1, name: "Ways Test", rows: 2,
+      reels: [["A"], ["A"], ["A"]], paylines: [[0, 0, 0]],
+      symbols: { A: { kind: "regular", payouts: { 3: 5 } } },
+      math: { targetRtp: 0.9, volatility: "medium", expectedHitFrequency: 1 },
+      features: { ways: { minimumReels: 3, betDivisor: 8 } },
+    });
+    const result = new SlotEngine(config).spin({ bet: 100, seed: 17n });
+    expect(result.wins).toContainEqual({
+      kind: "ways", symbol: "A", count: 3, ways: 8, amount: 500,
+      cells: [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1]],
+    });
+    expect(result.rounds[0]!.events).toContainEqual({
+      type: "ways.win", data: { symbol: "A", count: 3, ways: 8 },
+    });
+  });
+
+  it("lets a leading wild substitute for a symbol introduced on a later reel", () => {
+    const config = parseSlotConfig({
+      id: "ways-leading-wild", version: 1, name: "Ways Leading Wild", rows: 1,
+      reels: [["W"], ["B"], ["B"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 2 } },
+        B: { kind: "regular", payouts: { 3: 3 } },
+        W: { kind: "wild", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "medium", expectedHitFrequency: 1 },
+      features: { ways: { minimumReels: 3, betDivisor: 1 } },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 19n });
+    expect(result.wins).toContainEqual({
+      kind: "ways", symbol: "B", count: 3, ways: 1, amount: 30,
+      cells: [[0, 0], [1, 0], [2, 0]],
+    });
+    expect(result.wins.some((win) => win.kind === "ways" && win.symbol === "A")).toBe(false);
+  });
+
+  it("reveals mystery symbols before authoritative win evaluation", () => {
+    const config = parseSlotConfig({
+      id: "mystery-test", version: 1, name: "Mystery Test", rows: 1,
+      reels: [["M"], ["M"], ["M"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 4 } },
+        M: { kind: "mystery", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: { mysteryReveal: { symbol: "M", targets: ["A"] } },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 9n });
+    expect(result.grid).toEqual([["A"], ["A"], ["A"]]);
+    expect(result.totalWin).toBe(40);
+    expect(result.rounds[0]!.events).toContainEqual({
+      type: "mystery.revealed", data: { symbol: "M", target: "A", count: 3 },
+    });
+  });
+
+  it("uses special free-spin reels and injects deterministic extra wilds", () => {
+    const config = parseSlotConfig({
+      id: "enhanced-free-spins", version: 1, name: "Enhanced Free Spins", rows: 1,
+      reels: [["S"], ["S"], ["S"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 3 } },
+        W: { kind: "wild", payouts: {} },
+        S: { kind: "scatter", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        freeSpins: {
+          scatterSymbol: "S", awards: { 3: 1 }, maxTotal: 1,
+          reelStrips: [["A"], ["A"], ["A"]],
+          extraWilds: { symbol: "W", count: 1 },
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 23n });
+    const freeSpin = result.rounds.find((round) => round.phase === "free_spin")!;
+    expect(freeSpin.grid.flat().filter((symbol) => symbol === "W")).toHaveLength(1);
+    expect(freeSpin.events).toContainEqual({
+      type: "free_spins.modified", data: { mode: "extra_wilds", symbol: "W", count: 1 },
+    });
+    expect(freeSpin.events).toContainEqual({
+      type: "free_spins.modified", data: { mode: "special_reels" },
+    });
+    expect(result).toEqual(new SlotEngine(config).spin({ bet: 10, seed: 23n }));
+  });
+});

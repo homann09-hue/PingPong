@@ -44,11 +44,11 @@ Stand: 14. Juli 2026
 - Der PostgreSQL-Integrationstest benötigt `TEST_DATABASE_URL`; CI stellt dafür
   PostgreSQL 17 bereit und lokal wurde er erfolgreich gegen Docker ausgeführt.
 - Das Flutter-SDK im iCloud-Projekt ist teilweise ausgelagert und sein Tool-Snapshot muss vollständig neu materialisiert werden. Xcode 27 Beta ist unter `~/Downloads/Xcode-beta.app` vorhanden, die Lizenz ist bereits akzeptiert und die iOS-27-Simulatoren sind verfügbar.
-- Ways-, Cluster- und echtes dynamisches Megaways-Scoring sind Erweiterungspunkte, aber noch keine freigegebenen Produktionsmodelle.
+- All-Ways-Scoring ist als versionierter Evaluator freigegeben und wird von Candy Carnival mit 243 Ways verwendet. Cluster- und echtes dynamisches Megaways-Scoring bleiben Erweiterungspunkte.
 
 ## Nächste professionelle Ausbaustufe
 
-1. Eigene Ways-/Cluster-Resolver mit exakten Referenztests und separaten Math-Versionen.
+1. Eigene Cluster- und dynamische Megaways-Resolver mit exakten Referenztests und separaten Math-Versionen.
 2. 10-Millionen-Spin-Release-Gates und automatisch archivierte Math-Reports pro Slot-Version.
 3. Vollständige PostgreSQL-Testumgebung und End-to-End-Wallettests unter Parallelität.
 4. Slot-spezifische Bonus-State-Machines statt ausschließlich generischer Feature-Komposition.

@@ -1,5 +1,5 @@
 import { DeterministicRng } from "./rng.js";
-import type { EngineEvent, LineWin, ScatterWin, SlotConfig, SpinRequest, SpinResult, SpinRound, Win } from "./types.js";
+import type { EngineEvent, LineWin, ScatterWin, SlotConfig, SpinRequest, SpinResult, SpinRound, WaysWin, Win } from "./types.js";
 
 /** Pure deterministic evaluator and bounded feature state machine. */
 export class SlotEngine {
@@ -31,7 +31,9 @@ export class SlotEngine {
       freeSpinsRemaining--;
       freeSpinsPlayed++;
       const stickyEvents: EngineEvent[] = [];
-      const freeGrid = this.applyStickyWild(this.randomGrid(rng), stickyCells, stickyEvents);
+      const configuredReels = this.config.features?.freeSpins?.reelStrips ?? this.config.reels;
+      const modifiedGrid = this.applyFreeSpinModifiers(this.randomGrid(rng, configuredReels), rng, stickyEvents);
+      const freeGrid = this.applyStickyWild(modifiedGrid, stickyCells, stickyEvents);
       const freeMultiplier = this.config.features?.freeSpins?.winMultiplier ?? 1;
       const round = this.playPrimary("free_spin", freeSpinsPlayed, freeGrid, request.bet, rng, rounds, stickyEvents, freeMultiplier);
       const retrigger = this.freeSpinAward(round.grid);
@@ -108,7 +110,8 @@ export class SlotEngine {
   ): SpinRound & { events: EngineEvent[] } {
     const events: EngineEvent[] = [...initialEvents];
     if (winMultiplier > 1) events.push({ type: "multiplier.applied", data: { source: "free_spin", multiplier: winMultiplier } });
-    const grid = this.expandWilds(input, events);
+    const revealed = this.revealMystery(input, rng, events);
+    const grid = this.expandWilds(revealed, events);
     const wins = this.evaluateWins(grid, bet, true, events, winMultiplier);
     const round = this.round(phase, index, grid, wins, events);
     output.push(round);
@@ -117,10 +120,11 @@ export class SlotEngine {
     let currentWins = wins;
     const maxSteps = this.config.features?.cascades?.maxSteps ?? 0;
     for (let step = 1; step <= maxSteps; step++) {
-      const cells = this.winningLineCells(currentWins);
+      const cells = this.winningPrimaryCells(currentWins);
       if (cells.length === 0) break;
       const cascadeEvents: EngineEvent[] = [{ type: "cascade.started", data: { step } }];
       current = this.refill(current, cells, rng);
+      current = this.revealMystery(current, rng, cascadeEvents);
       current = this.expandWilds(current, cascadeEvents);
       const cascadeFeature = this.config.features!.cascades!;
       const cascadeMultiplier = Math.min(
@@ -132,7 +136,7 @@ export class SlotEngine {
       }
       const cascadeWins = this.evaluateWins(current, bet, false, cascadeEvents, cascadeMultiplier);
       output.push(this.round("cascade", step, current, cascadeWins, cascadeEvents));
-      if (!cascadeWins.some((win) => win.kind === "line")) break;
+      if (!cascadeWins.some((win) => win.kind === "line" || win.kind === "ways")) break;
       currentWins = cascadeWins;
     }
     return round;
@@ -146,8 +150,49 @@ export class SlotEngine {
     return this.config.reels.map((strip, reel) => Array.from({ length: this.config.rows }, (_, row) => strip[(stops[reel]! + row) % strip.length]!));
   }
 
-  private randomGrid(rng: DeterministicRng): string[][] {
-    return this.gridFromStops(this.config.reels.map((strip) => rng.nextInt(strip.length)));
+  private randomGrid(rng: DeterministicRng, reels = this.config.reels): string[][] {
+    return reels.map((strip) => {
+      const stop = rng.nextInt(strip.length);
+      return Array.from({ length: this.config.rows }, (_, row) => strip[(stop + row) % strip.length]!);
+    });
+  }
+
+  private revealMystery(input: readonly (readonly string[])[], rng: DeterministicRng, events: EngineEvent[]): string[][] {
+    const feature = this.config.features?.mysteryReveal;
+    const grid = input.map((reel) => [...reel]);
+    if (!feature) return grid;
+    const cells = grid.flatMap((reel, reelIndex) => reel.flatMap((symbol, row) =>
+      symbol === feature.symbol ? [[reelIndex, row] as [number, number]] : [],
+    ));
+    if (cells.length === 0) return grid;
+    const target = feature.targets[rng.nextInt(feature.targets.length)]!;
+    for (const [reel, row] of cells) grid[reel]![row] = target;
+    events.push({ type: "mystery.revealed", data: { symbol: feature.symbol, target, count: cells.length } });
+    return grid;
+  }
+
+  private applyFreeSpinModifiers(input: readonly (readonly string[])[], rng: DeterministicRng, events: EngineEvent[]): string[][] {
+    const feature = this.config.features?.freeSpins;
+    const grid = input.map((reel) => [...reel]);
+    if (!feature) return grid;
+    const positions = Array.from({ length: this.config.reels.length * this.config.rows }, (_, index) => index);
+    const extraWilds = feature.extraWilds;
+    if (extraWilds) {
+      for (let index = positions.length - 1; index > 0; index--) {
+        const swap = rng.nextInt(index + 1);
+        [positions[index], positions[swap]] = [positions[swap]!, positions[index]!];
+      }
+      for (const position of positions.slice(0, extraWilds.count)) {
+        const reel = Math.floor(position / this.config.rows);
+        const row = position % this.config.rows;
+        grid[reel]![row] = extraWilds.symbol;
+      }
+      events.push({ type: "free_spins.modified", data: { mode: "extra_wilds", symbol: extraWilds.symbol, count: extraWilds.count } });
+    }
+    if (feature.reelStrips) {
+      events.push({ type: "free_spins.modified", data: { mode: "special_reels" } });
+    }
+    return grid;
   }
 
   private expandWilds(input: readonly (readonly string[])[], events: EngineEvent[]): string[][] {
@@ -188,9 +233,9 @@ export class SlotEngine {
           .map(([reel, row]) => [reel + (walking.direction === "right" ? 1 : -1), row] as [number, number])
           .filter(([reel]) => reel >= 0 && reel < this.config.reels.length);
         if (cells.length === 0) break;
-        const grid = this.randomGrid(rng);
-        for (const [reel, row] of cells) grid[reel]![row] = walking.symbol;
         const events: EngineEvent[] = [{ type: "respin.started", data: { index: step } }, { type: "wild.walked", data: { step, count: cells.length, symbol: walking.symbol } }];
+        const grid = this.revealMystery(this.randomGrid(rng), rng, events);
+        for (const [reel, row] of cells) grid[reel]![row] = walking.symbol;
         const wins = this.evaluateWins(grid, bet, true, events);
         rounds.push(this.round("respin", step, grid, wins, events));
       }
@@ -201,8 +246,8 @@ export class SlotEngine {
     const triggers = baseGrid.flat().filter((symbol) => symbol === respins.triggerSymbol).length;
     if (triggers < respins.minimumCount) return;
     for (let index = 1; index <= respins.count; index++) {
-      const grid = this.randomGrid(rng);
       const events: EngineEvent[] = [{ type: "respin.started", data: { index, triggerCount: triggers } }];
+      const grid = this.revealMystery(this.randomGrid(rng), rng, events);
       const wins = this.evaluateWins(grid, bet, true, events);
       rounds.push(this.round("respin", index, grid, wins, events));
     }
@@ -212,7 +257,9 @@ export class SlotEngine {
     grid: readonly (readonly string[])[], bet: number, includeScatter: boolean,
     events: EngineEvent[], roundMultiplier = 1,
   ): Win[] {
-    const wins: Win[] = this.evaluateLines(grid, bet, events, roundMultiplier);
+    const wins: Win[] = this.config.features?.ways
+      ? this.evaluateWays(grid, bet, events, roundMultiplier)
+      : this.evaluateLines(grid, bet, events, roundMultiplier);
     if (!includeScatter) return wins;
     for (const [symbol, definition] of Object.entries(this.config.symbols)) {
       if (definition.kind !== "scatter") continue;
@@ -241,6 +288,40 @@ export class SlotEngine {
       if (left && right && left.symbol === right.symbol && left.count === values.length && right.count === values.length) return [left];
       return [left, right].filter((win): win is LineWin => win !== null);
     });
+  }
+
+  private evaluateWays(
+    grid: readonly (readonly string[])[], bet: number, events: EngineEvent[], roundMultiplier: number,
+  ): WaysWin[] {
+    const feature = this.config.features!.ways!;
+    const wilds = new Set(Object.entries(this.config.symbols).filter(([, value]) => value.kind === "wild").map(([key]) => key));
+    const regulars = Object.entries(this.config.symbols)
+      .filter(([, definition]) => definition.kind === "regular")
+      .map(([symbol]) => symbol);
+    const candidates = regulars.length > 0 ? regulars : [...wilds];
+    const wins: WaysWin[] = [];
+    for (const candidate of candidates) {
+      const candidateIsWild = wilds.has(candidate);
+      const cellsByReel: [number, number][][] = [];
+      for (let reel = 0; reel < grid.length; reel++) {
+        const matches = grid[reel]!.flatMap((symbol, row) =>
+          symbol === candidate || (!candidateIsWild && wilds.has(symbol)) ? [[reel, row] as [number, number]] : [],
+        );
+        if (matches.length === 0) break;
+        cellsByReel.push(matches);
+      }
+      const count = cellsByReel.length;
+      if (count < feature.minimumReels) continue;
+      if (!candidateIsWild && !cellsByReel.some((cells) => cells.some(([reel, row]) => grid[reel]![row] === candidate))) continue;
+      const payout = this.config.symbols[candidate]?.payouts[count] ?? 0;
+      if (payout <= 0) continue;
+      const ways = cellsByReel.reduce((product, cells) => product * cells.length, 1);
+      const amount = Math.floor((payout * bet * ways * roundMultiplier) / feature.betDivisor);
+      if (amount <= 0) continue;
+      wins.push({ kind: "ways", symbol: candidate, count, ways, amount, cells: cellsByReel.flat() });
+      events.push({ type: "ways.win", data: { symbol: candidate, count, ways } });
+    }
+    return wins;
   }
 
   private evaluateLineDirection(
@@ -288,8 +369,8 @@ export class SlotEngine {
       };
   }
 
-  private winningLineCells(wins: readonly Win[]): [number, number][] {
-    return [...new Map(wins.filter((win): win is LineWin => win.kind === "line").flatMap((win) => win.cells).map((cell) => [cell.join(":"), cell])).values()];
+  private winningPrimaryCells(wins: readonly Win[]): [number, number][] {
+    return [...new Map(wins.filter((win) => win.kind === "line" || win.kind === "ways").flatMap((win) => win.cells).map((cell) => [cell.join(":"), cell])).values()];
   }
 
   private refill(grid: readonly (readonly string[])[], cells: readonly [number, number][], rng: DeterministicRng): string[][] {

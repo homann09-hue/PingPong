@@ -629,10 +629,17 @@ describe("spin API", () => {
     expect(response.json()).toMatchObject({
       id: "dragon-peak", version: 2, lines: 20, targetRtp: 0.94, volatility: "high",
       maxWinMultiplier: 5_000, mathModelVersion: "2.0.0",
+      evaluation: { type: "lines", lines: 20 },
     });
     expect(response.json().bet.steps).toEqual([100, 200, 500, 1_000, 2_000, 5_000, 10_000]);
     expect(response.json().symbols.W.kind).toBe("wild");
     expect(response.json().symbols.A.payouts[5]).toBeGreaterThan(0);
+    const ways = await app.inject({ method: "GET", url: "/v1/slots/candy-carnival/paytable" });
+    expect(ways.json()).toMatchObject({
+      version: 3,
+      mathModelVersion: "3.0.0",
+      evaluation: { type: "ways", minimumReels: 3, betDivisor: 62, ways: 243 },
+    });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

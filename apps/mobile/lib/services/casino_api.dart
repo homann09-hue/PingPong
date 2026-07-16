@@ -370,6 +370,8 @@ class RewardClaimException implements Exception {
 class SlotPaytable {
   const SlotPaytable({
     required this.lines,
+    required this.evaluationType,
+    required this.ways,
     required this.targetRtp,
     required this.volatility,
     required this.expectedHitFrequency,
@@ -380,6 +382,8 @@ class SlotPaytable {
   });
 
   final int lines;
+  final String evaluationType;
+  final int? ways;
   final double targetRtp, expectedHitFrequency;
   final String volatility;
   final int maxWinMultiplier;
@@ -534,8 +538,12 @@ class CasinoApi {
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final rawSymbols = data['symbols'] as Map<String, dynamic>;
+    final evaluation = data['evaluation'] as Map<String, dynamic>?;
+    final evaluationType = evaluation?['type'] as String? ?? 'lines';
     return SlotPaytable(
       lines: data['lines'] as int,
+      evaluationType: evaluationType,
+      ways: evaluationType == 'ways' ? evaluation!['ways'] as int : null,
       targetRtp: (data['targetRtp'] as num).toDouble(),
       volatility: data['volatility'] as String,
       expectedHitFrequency: (data['expectedHitFrequency'] as num).toDouble(),
@@ -591,11 +599,14 @@ class CasinoApi {
         }
       }
       final lineWins = wins.where((win) => win['kind'] == 'line').toList();
+      final waysWins = wins.where((win) => win['kind'] == 'ways').toList();
       final scatterWins = wins
           .where((win) => win['kind'] == 'scatter')
           .toList();
       final winLabel = lineWins.isNotEmpty
           ? '${lineWins.first['count']}× ${lineWins.first['symbol']}  •  ${lineWins.length} ${lineWins.length == 1 ? 'LINIE' : 'LINIEN'}'
+          : waysWins.isNotEmpty
+          ? '${waysWins.first['ways']} WAYS • ${waysWins.first['count']}× ${waysWins.first['symbol']}'
           : scatterWins.isNotEmpty
           ? '${scatterWins.first['count']}× SCATTER'
           : null;
@@ -622,6 +633,10 @@ class CasinoApi {
             ? 'WALKING WILD'
             : eventTypes.contains('wild.stuck')
             ? 'STICKY WILDS'
+            : eventTypes.contains('mystery.revealed')
+            ? 'MYSTERY REVEAL'
+            : eventTypes.contains('free_spins.modified')
+            ? 'ENHANCED FREE SPINS'
             : eventTypes.contains('multiplier.applied')
             ? switch (multiplierData?['source']) {
                 'cascade' => 'CASCADE ×${multiplierData?['multiplier']}',

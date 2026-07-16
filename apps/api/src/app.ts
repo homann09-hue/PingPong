@@ -283,6 +283,9 @@ export function buildApp(dependencies: AppDependencies) {
       name: config.name,
       version: config.version,
       lines: config.paylines.length,
+      evaluation: config.features?.ways
+        ? { type: "ways", ...config.features.ways, ways: config.rows ** config.reels.length }
+        : { type: "lines", lines: config.paylines.length },
       targetRtp: config.math.targetRtp,
       volatility: config.math.volatility,
       expectedHitFrequency: config.math.expectedHitFrequency,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { SlotConfig } from "./types.js";
 
 const symbolSchema = z.object({
-  kind: z.enum(["regular", "wild", "scatter"]),
+  kind: z.enum(["regular", "wild", "scatter", "mystery"]),
   payouts: z.record(z.coerce.number().int().positive(), z.number().int().nonnegative()),
 });
 
@@ -31,6 +31,10 @@ const schema = z.object({
     minimumMultiplier: z.number().min(0),
   })).min(1).max(5).optional(),
   features: z.object({
+    ways: z.object({
+      minimumReels: z.number().int().min(2).max(12),
+      betDivisor: z.number().int().positive().max(1_000_000),
+    }).optional(),
     expandingWild: z.object({ symbols: z.array(z.string()).min(1) }).optional(),
     stickyWild: z.object({
       symbol: z.string(),
@@ -56,6 +60,15 @@ const schema = z.object({
       awards: z.record(z.coerce.number().int().positive(), z.number().int().positive()),
       maxTotal: z.number().int().min(1).max(1_000),
       winMultiplier: z.number().int().min(1).max(100).optional(),
+      reelStrips: z.array(z.array(z.string()).min(1)).min(3).max(12).optional(),
+      extraWilds: z.object({
+        symbol: z.string(),
+        count: z.number().int().min(1).max(60),
+      }).optional(),
+    }).optional(),
+    mysteryReveal: z.object({
+      symbol: z.string(),
+      targets: z.array(z.string()).min(1).max(20),
     }).optional(),
     cascades: z.object({
       maxSteps: z.number().int().min(1).max(100),
@@ -121,6 +134,9 @@ export function parseSlotConfig(input: unknown): SlotConfig {
     if (line.length !== config.reels.length) throw new Error("Each payline must address every reel");
     if (line.some((row) => row >= config.rows)) throw new Error("Payline row is outside the grid");
   }
+  if (config.features?.ways && config.features.ways.minimumReels > config.reels.length) {
+    throw new Error("Ways minimum reels must fit the configured reel count");
+  }
   const expanding = config.features?.expandingWild?.symbols ?? [];
   if (expanding.some((symbol) => config.symbols[symbol]?.kind !== "wild")) {
     throw new Error("Expanding wild feature must reference wild symbols");
@@ -144,6 +160,30 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   const scatter = config.features?.freeSpins?.scatterSymbol;
   if (scatter && config.symbols[scatter]?.kind !== "scatter") {
     throw new Error("Free spins must reference a scatter symbol");
+  }
+  const freeSpins = config.features?.freeSpins;
+  if (freeSpins?.reelStrips) {
+    if (freeSpins.reelStrips.length !== config.reels.length) {
+      throw new Error("Free-spin reel strips must match the base reel count");
+    }
+    if (freeSpins.reelStrips.some((strip) => strip.some((symbol) => !symbols.has(symbol)))) {
+      throw new Error("Free-spin reel strips reference an unknown symbol");
+    }
+  }
+  if (freeSpins?.extraWilds && config.symbols[freeSpins.extraWilds.symbol]?.kind !== "wild") {
+    throw new Error("Free-spin extra wilds must reference a wild symbol");
+  }
+  if (freeSpins?.extraWilds && freeSpins.extraWilds.count > config.reels.length * config.rows) {
+    throw new Error("Free-spin extra wild count must fit the configured grid");
+  }
+  const mystery = config.features?.mysteryReveal;
+  if (mystery) {
+    if (config.symbols[mystery.symbol]?.kind !== "mystery") {
+      throw new Error("Mystery reveal must reference a mystery symbol");
+    }
+    if (mystery.targets.some((symbol) => !symbols.has(symbol) || symbol === mystery.symbol)) {
+      throw new Error("Mystery reveal targets must reference other configured symbols");
+    }
   }
   const bonusScatter = config.features?.pickBonus?.scatterSymbol;
   if (bonusScatter && config.symbols[bonusScatter]?.kind !== "scatter") {

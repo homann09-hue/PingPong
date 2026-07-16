@@ -22,10 +22,11 @@ class SlotScreen extends StatefulWidget {
 }
 
 class _SlotScreenState extends State<SlotScreen> {
-  static const _betSteps = [100, 200, 500, 1000, 2000, 5000, 10000];
   final api = CasinoApi(), random = Random();
   late int balance, level, xp, vipPoints;
   int bet = 100, win = 0, free = 0;
+  List<int> betSteps = const [100, 200, 500, 1000, 2000, 5000, 10000];
+  String evaluationLabel = '20 LINES';
   int spins = 0, totalWon = 0, totalFreeSpins = 0;
   int autoSpinsRemaining = 0;
   bool autoplay = false, stopAutoplayRequested = false, turbo = false;
@@ -53,6 +54,7 @@ class _SlotScreenState extends State<SlotScreen> {
     xp = widget.xp;
     vipPoints = widget.vipPoints;
     _loadJackpots();
+    _loadPaytableMetadata();
     unawaited(
       api.trackEvent('screen.viewed', screen: 'slot', slotId: widget.game.id),
     );
@@ -67,6 +69,22 @@ class _SlotScreenState extends State<SlotScreen> {
       );
     } on StateError {
       // Seed values keep offline startup and widget tests usable.
+    }
+  }
+
+  Future<void> _loadPaytableMetadata() async {
+    try {
+      final paytable = await api.paytable(widget.game.id);
+      if (!mounted) return;
+      setState(() {
+        betSteps = paytable.betSteps;
+        if (!betSteps.contains(bet)) bet = betSteps.first;
+        evaluationLabel = paytable.evaluationType == 'ways'
+            ? '${paytable.ways ?? ''} WAYS'.trim()
+            : '${paytable.lines} LINES';
+      });
+    } on StateError {
+      // Bundled defaults remain usable while metadata is temporarily offline.
     }
   }
 
@@ -273,7 +291,7 @@ class _SlotScreenState extends State<SlotScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '${paytable.lines} GEWINNLINIEN  •  RTP-ZIEL ${(paytable.targetRtp * 100).toStringAsFixed(1)}%  •  ${paytable.volatility.toUpperCase()}',
+                    '${paytable.evaluationType == 'ways' ? '${paytable.ways ?? ''} WAYS' : '${paytable.lines} GEWINNLINIEN'}  •  RTP-ZIEL ${(paytable.targetRtp * 100).toStringAsFixed(1)}%  •  ${paytable.volatility.toUpperCase()}',
                     style: TextStyle(
                       color: widget.game.primary,
                       fontWeight: FontWeight.w900,
@@ -285,8 +303,10 @@ class _SlotScreenState extends State<SlotScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Der angezeigte Einsatz ist der Gesamteinsatz. Liniengewinne werden aus Gesamteinsatz ÷ Gewinnlinien berechnet.',
+                  Text(
+                    paytable.evaluationType == 'ways'
+                        ? 'Der angezeigte Einsatz ist der Gesamteinsatz. Gewinne entstehen aus gleichen Symbolen auf aufeinanderfolgenden Walzen; mehrere Treffer pro Walze erhöhen die Anzahl der Ways.'
+                        : 'Der angezeigte Einsatz ist der Gesamteinsatz. Liniengewinne werden aus Gesamteinsatz ÷ Gewinnlinien berechnet.',
                   ),
                   const SizedBox(height: 14),
                   for (final entry in paytable.symbols.entries)
@@ -733,18 +753,20 @@ class _SlotScreenState extends State<SlotScreen> {
         children: [
           IconButton.filled(
             constraints: const BoxConstraints.tightFor(width: 42, height: 42),
-            onPressed: spinning || autoplay || _betSteps.indexOf(bet) <= 0
+            onPressed: spinning || autoplay || betSteps.indexOf(bet) <= 0
                 ? null
-                : () => setState(
-                    () => bet = _betSteps[_betSteps.indexOf(bet) - 1],
-                  ),
+                : () =>
+                      setState(() => bet = betSteps[betSteps.indexOf(bet) - 1]),
             icon: const Icon(Icons.remove),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Column(
               children: [
-                const Text('20 LINES • BET', style: TextStyle(fontSize: 9)),
+                Text(
+                  '$evaluationLabel • BET',
+                  style: const TextStyle(fontSize: 9),
+                ),
                 Text(
                   _fmt(bet),
                   style: const TextStyle(fontWeight: FontWeight.w900),
@@ -757,11 +779,10 @@ class _SlotScreenState extends State<SlotScreen> {
             onPressed:
                 spinning ||
                     autoplay ||
-                    _betSteps.indexOf(bet) >= _betSteps.length - 1
+                    betSteps.indexOf(bet) >= betSteps.length - 1
                 ? null
-                : () => setState(
-                    () => bet = _betSteps[_betSteps.indexOf(bet) + 1],
-                  ),
+                : () =>
+                      setState(() => bet = betSteps[betSteps.indexOf(bet) + 1]),
             icon: const Icon(Icons.add),
           ),
           const SizedBox(width: 8),
