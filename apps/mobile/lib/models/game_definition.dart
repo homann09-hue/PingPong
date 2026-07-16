@@ -117,11 +117,11 @@ const games = [
     symbolSet: 'frozen',
     jackpot: '64.750.000',
     unlockLevel: 7,
-    features: 'STICKY ICE WILDS • 5 FREE SPINS',
+    features: 'STACKED ICE WILDS • STICKY WILDS • 5 FREE SPINS',
     primary: Color(0xff52e7ff),
     secondary: Color(0xff2453b8),
     category: 'FREE SPINS',
-    packageVersion: 2,
+    packageVersion: 3,
     packageSizeMb: 20,
   ),
   GameDefinition(

@@ -50,6 +50,37 @@ describe("configuration-driven layouts", () => {
     expect(result.rounds[0]!.events.some((event) => event.type === "wild.expanded")).toBe(true);
   });
 
+  it("detects reel-strip wild stacks without changing the settled grid", () => {
+    const config = parseSlotConfig({
+      id: "stacked-wild-test", version: 1, name: "Stacked Wild Test", rows: 3,
+      reels: [["W"], ["A"], ["A"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 1 } },
+        W: { kind: "wild", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: { stackedWild: { symbol: "W", minimumSize: 2 } },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 5n });
+    expect(result.grid[0]).toEqual(["W", "W", "W"]);
+    expect(result.rounds[0]!.events).toContainEqual({
+      type: "wild.stacked", data: { reel: 0, startRow: 0, size: 3, symbol: "W" },
+    });
+  });
+
+  it("rejects stacked-wild configurations without a matching reel block", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-stacked-wild", version: 1, name: "Invalid Stacked Wild", rows: 3,
+      reels: [["W", "A", "A"], ["A"], ["A"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: {} },
+        W: { kind: "wild", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: { stackedWild: { symbol: "W", minimumSize: 2 } },
+    })).toThrow("matching reel-strip stack");
+  });
+
   it("settles deterministic pick bonuses as server-authoritative rounds", () => {
     const config = parseSlotConfig({
       id: "bonus-test", version: 1, name: "Bonus Test", rows: 1,

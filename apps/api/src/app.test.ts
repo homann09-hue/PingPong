@@ -653,6 +653,8 @@ describe("spin API", () => {
     });
     const jungle = await app.inject({ method: "GET", url: "/v1/slots/jungle-temple/paytable" });
     expect(jungle.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
+    const frozen = await app.inject({ method: "GET", url: "/v1/slots/frozen-kingdom/paytable" });
+    expect(frozen.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

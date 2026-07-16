@@ -609,6 +609,17 @@ class CasinoApi {
           winningCells.add('${coordinates[0]}:${coordinates[1]}');
         }
       }
+      for (final event in events.where(
+        (event) => event['type'] == 'wild.stacked',
+      )) {
+        final data = event['data'] as Map<String, dynamic>;
+        final reel = data['reel'] as int;
+        final startRow = data['startRow'] as int;
+        final size = data['size'] as int;
+        for (var row = startRow; row < startRow + size; row++) {
+          winningCells.add('$reel:$row');
+        }
+      }
       final lineWins = wins.where((win) => win['kind'] == 'line').toList();
       final waysWins = wins.where((win) => win['kind'] == 'ways').toList();
       final scatterWins = wins
@@ -643,6 +654,8 @@ class CasinoApi {
             ? 'MAX WIN'
             : eventTypes.contains('wild.walked')
             ? 'WALKING WILD'
+            : eventTypes.contains('wild.stacked')
+            ? 'STACKED WILDS'
             : eventTypes.contains('wild.stuck')
             ? 'STICKY WILDS'
             : eventTypes.contains('mystery.revealed')

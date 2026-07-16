@@ -36,6 +36,10 @@ const schema = z.object({
       betDivisor: z.number().int().positive().max(1_000_000),
     }).optional(),
     expandingWild: z.object({ symbols: z.array(z.string()).min(1) }).optional(),
+    stackedWild: z.object({
+      symbol: z.string(),
+      minimumSize: z.number().int().min(2).max(12),
+    }).optional(),
     stickyWild: z.object({
       symbol: z.string(),
       maxSticky: z.number().int().min(1).max(60),
@@ -154,6 +158,24 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   const expanding = config.features?.expandingWild?.symbols ?? [];
   if (expanding.some((symbol) => config.symbols[symbol]?.kind !== "wild")) {
     throw new Error("Expanding wild feature must reference wild symbols");
+  }
+  const stacked = config.features?.stackedWild;
+  if (stacked) {
+    if (config.symbols[stacked.symbol]?.kind !== "wild") {
+      throw new Error("Stacked wild feature must reference a wild symbol");
+    }
+    if (stacked.minimumSize > config.rows) {
+      throw new Error("Stacked wild minimum must fit the configured rows");
+    }
+    const hasStack = config.reels.some((strip) => {
+      const circular = [...strip, ...strip.slice(0, stacked.minimumSize - 1)];
+      let run = 0;
+      return circular.some((symbol) => {
+        run = symbol === stacked.symbol ? run + 1 : 0;
+        return run >= stacked.minimumSize;
+      });
+    });
+    if (!hasStack) throw new Error("Stacked wild feature requires a matching reel-strip stack");
   }
   const sticky = config.features?.stickyWild?.symbol;
   if (sticky && config.symbols[sticky]?.kind !== "wild") {

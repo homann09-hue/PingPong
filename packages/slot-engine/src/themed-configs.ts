@@ -30,7 +30,7 @@ const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "candy-carnival": 0.538,
   "pirate-bay": 0.299,
   "neon-nights": 0.50,
-  "frozen-kingdom": 0.44,
+  "frozen-kingdom": 0.467,
   "jungle-temple": 0.323,
   "vegas-gold": 0.52,
 };
@@ -42,12 +42,19 @@ function scalePaytable(paytable: Paytable, factor: number): Paytable {
   ])) as unknown as Paytable;
 }
 
-function reelStrips(patterns: readonly [string, string, string, string, string], rotation = 0): string[][] {
+function reelStrips(
+  patterns: readonly [string, string, string, string, string],
+  rotation = 0,
+  preserveRuns: readonly string[] = [],
+): string[][] {
   const lowSymbols = ["X", "Y", "Z", "T"] as const;
   return patterns.map((pattern, reel) => {
-    const strip = [...pattern].flatMap((symbol, position) => [
+    const source = [...pattern];
+    const strip = source.flatMap((symbol, position) => [
       symbol,
-      lowSymbols[(position + reel) % lowSymbols.length]!,
+      ...(preserveRuns.includes(symbol) && source[position + 1] === symbol
+        ? []
+        : [lowSymbols[(position + reel) % lowSymbols.length]!]),
     ]);
     const offset = rotation % strip.length;
     return [...strip.slice(offset), ...strip.slice(0, offset)];
@@ -193,14 +200,16 @@ export const neonNightsConfig = game(
 export const frozenKingdomConfig = game(
   "frozen-kingdom", "Frozen Kingdom", "medium",
   reelStrips([
-    "AAKQJAAWSQKBAJAKQASWJAKA", "KAAQJAKSAWQBAAKQJAWASKQA", "QAAKSWAJAAKBQJASAAKWQJAA",
-    "JAAKQASJAWKBAAQJAKWASAKA", "AAJKWAAQSKBJAAQKSAJAWAKA",
-  ]),
-  scalePaytable(frequentWins, 6.3),
+    "AAKQJAAWWSQKBAJAKQASWJAKA", "KAAQJAKSAWWQBAAKQJAWASKQA", "QAAKSWWAJAAKBQJASAAKWQJAA",
+    "JAAKQASJAWWKBAAQJAKWASAKA", "AAJKWWAAQSKBJAAQKSAJAWAKA",
+  ], 0, ["W"]),
+  scalePaytable(frequentWins, 4.56),
   {
+    stackedWild: { symbol: "W", minimumSize: 2 },
     stickyWild: { symbol: "W", maxSticky: 15 },
     freeSpins: { scatterSymbol: "S", awards: { 3: 5, 4: 8, 5: 12 }, maxTotal: 50, winMultiplier: 1 },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const jungleTempleConfig = game(

@@ -114,6 +114,7 @@ export class SlotEngine {
     if (winMultiplier > 1) events.push({ type: "multiplier.applied", data: { source: "free_spin", multiplier: winMultiplier } });
     const upgraded = this.upgradeSymbols(input, events);
     const revealed = this.revealMystery(upgraded, rng, events);
+    this.recordStackedWilds(revealed, events);
     const grid = this.expandWilds(revealed, events);
     const wins = this.evaluateWins(grid, bet, true, events, winMultiplier);
     const round = this.round(phase, index, grid, wins, events);
@@ -129,6 +130,7 @@ export class SlotEngine {
       current = this.refill(current, cells, rng);
       current = this.upgradeSymbols(current, cascadeEvents);
       current = this.revealMystery(current, rng, cascadeEvents);
+      this.recordStackedWilds(current, cascadeEvents);
       current = this.expandWilds(current, cascadeEvents);
       const cascadeFeature = this.config.features!.cascades!;
       const cascadeMultiplier = Math.min(
@@ -236,6 +238,23 @@ export class SlotEngine {
       if (symbol) { grid[reelIndex] = Array(this.config.rows).fill(symbol) as string[]; events.push({ type: "wild.expanded", data: { reel: reelIndex, symbol } }); }
     });
     return grid;
+  }
+
+  private recordStackedWilds(input: readonly (readonly string[])[], events: EngineEvent[]): void {
+    const feature = this.config.features?.stackedWild;
+    if (!feature) return;
+    for (let reel = 0; reel < input.length; reel++) {
+      let row = 0;
+      while (row < input[reel]!.length) {
+        if (input[reel]![row] !== feature.symbol) { row++; continue; }
+        const startRow = row;
+        while (row < input[reel]!.length && input[reel]![row] === feature.symbol) row++;
+        const size = row - startRow;
+        if (size >= feature.minimumSize) {
+          events.push({ type: "wild.stacked", data: { reel, startRow, size, symbol: feature.symbol } });
+        }
+      }
+    }
   }
 
   private applyStickyWild(input: readonly (readonly string[])[], stickyCells: Set<string>, events: EngineEvent[]): string[][] {
