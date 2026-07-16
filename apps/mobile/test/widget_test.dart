@@ -223,6 +223,33 @@ void main() {
     expect(find.text('-1.000'), findsOneWidget);
   });
 
+  testWidgets('Check & Win exchanges a complete mark card through the API', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    CheckWinClaimView? received;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CheckWinSheet(
+            api: _CheckWinApi(),
+            onClaimed: (claim) => received = claim,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('check-win-sheet')), findsOneWidget);
+    expect(find.text('5/5 MARKIERUNGEN'), findsOneWidget);
+    expect(find.text('100.000 COINS  +  1 SAMMELMARKE'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'BELOHNUNG HOLEN'));
+    await tester.pumpAndSettle();
+    expect(received?.coinBalance, 250000);
+    expect(find.text('0/5 MARKIERUNGEN'), findsOneWidget);
+    expect(find.text('WEITER GEWINNEN'), findsOneWidget);
+  });
+
   testWidgets('VIP badge opens the progression sheet', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(const AuroraApp());
@@ -466,4 +493,24 @@ class _RewardApi extends CasinoApi {
 
   @override
   Future<WheelView> wheel() async => wheelStatus;
+}
+
+class _CheckWinApi extends CasinoApi {
+  @override
+  Future<CheckWinStatusView> checkWinStatus() async => const CheckWinStatusView(
+    marks: 5,
+    requiredMarks: 5,
+    claimable: true,
+    rewardCoins: 100000,
+    rewardStamps: 1,
+  );
+
+  @override
+  Future<CheckWinClaimView> claimCheckWin() async => const CheckWinClaimView(
+    coins: 100000,
+    stamps: 1,
+    coinBalance: 250000,
+    markBalance: 0,
+    stampBalance: 3,
+  );
 }

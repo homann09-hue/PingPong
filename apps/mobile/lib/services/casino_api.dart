@@ -198,6 +198,33 @@ class WalletTransactionView {
   final DateTime createdAt;
 }
 
+/// Server-owned progress and reward terms for the Check-&-Win exchange.
+class CheckWinStatusView {
+  const CheckWinStatusView({
+    required this.marks,
+    required this.requiredMarks,
+    required this.claimable,
+    required this.rewardCoins,
+    required this.rewardStamps,
+  });
+
+  final int marks, requiredMarks, rewardCoins, rewardStamps;
+  final bool claimable;
+}
+
+/// Result of one idempotent Check-&-Win exchange.
+class CheckWinClaimView {
+  const CheckWinClaimView({
+    required this.coins,
+    required this.stamps,
+    required this.coinBalance,
+    required this.markBalance,
+    required this.stampBalance,
+  });
+
+  final int coins, stamps, coinBalance, markBalance, stampBalance;
+}
+
 class ShopOfferView {
   const ShopOfferView({
     required this.id,
@@ -894,6 +921,39 @@ class CasinoApi {
           );
         })
         .toList(growable: false);
+  }
+
+  Future<CheckWinStatusView> checkWinStatus() async {
+    final response = await _client.get(Uri.parse('$base/v1/economy/check-win'));
+    if (response.statusCode != 200) {
+      throw StateError('Check & Win konnte nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return CheckWinStatusView(
+      marks: data['marks'] as int,
+      requiredMarks: data['requiredMarks'] as int,
+      claimable: data['claimable'] as bool,
+      rewardCoins: data['rewardCoins'] as int,
+      rewardStamps: data['rewardStamps'] as int,
+    );
+  }
+
+  Future<CheckWinClaimView> claimCheckWin() async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/economy/check-win/claim'),
+      headers: {'idempotency-key': _uuid()},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Check-&-Win-Belohnung konnte nicht eingelöst werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return CheckWinClaimView(
+      coins: data['coins'] as int,
+      stamps: data['stamps'] as int,
+      coinBalance: data['coinBalance'] as int,
+      markBalance: data['markBalance'] as int,
+      stampBalance: data['stampBalance'] as int,
+    );
   }
 
   Future<List<ShopOfferView>> shopOffers() async {

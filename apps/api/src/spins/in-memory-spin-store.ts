@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -8,6 +8,7 @@ import { activeTournamentDefinition, demoTournamentLeaders, tournamentPoints, to
 import { applyProgressiveAward, jackpotContribution, jackpotDefinitions, triggeredJackpotTier, type JackpotPoolView, type JackpotTier } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
 import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
+import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -29,6 +30,7 @@ export class InMemorySpinStore implements SpinStore {
     jackpotDefinitions.map((definition) => [definition.tier, definition.seedAmount]),
   );
   private readonly shopReplays = new Map<string, ShopPurchase>();
+  private readonly checkWinReplays = new Map<string, CheckWinClaim>();
   private readonly limitedShopPurchases = new Set<string>();
   private readonly storePurchases = new Map<string, StorePurchaseSettlement & { readonly playerId: string }>();
   private readonly limitedStorePurchases = new Set<string>();
@@ -119,6 +121,40 @@ export class InMemorySpinStore implements SpinStore {
 
   public async listWalletTransactions(playerId: string, limit: number): Promise<readonly WalletTransaction[]> {
     return this.ledger.filter((entry) => entry.playerId === playerId).slice(-limit).reverse();
+  }
+
+  public async getCheckWinStatus(playerId: string): Promise<CheckWinStatus> {
+    return checkWinStatus(this.economy.get(playerId)?.check_win_mark ?? 0);
+  }
+
+  public async claimCheckWin(playerId: string, idempotencyKey: string): Promise<CheckWinClaim> {
+    const replayKey = `${playerId}:${idempotencyKey}`;
+    const replay = this.checkWinReplays.get(replayKey);
+    if (replay) return { ...replay, replayed: true };
+    const wallet = { ...this.economy.get(playerId) };
+    const markBefore = wallet.check_win_mark ?? 0;
+    if (markBefore < checkWinReward.requiredMarks) throw new CheckWinNotClaimableError();
+    const stampBefore = wallet.stamp ?? 0;
+    const coinBefore = this.balances.get(playerId) ?? this.defaultBalance;
+    const claim: CheckWinClaim = {
+      claimId: randomUUID(),
+      marksSpent: checkWinReward.requiredMarks,
+      coins: checkWinReward.rewardCoins,
+      stamps: checkWinReward.rewardStamps,
+      coinBalance: coinBefore + checkWinReward.rewardCoins,
+      markBalance: markBefore - checkWinReward.requiredMarks,
+      stampBalance: stampBefore + checkWinReward.rewardStamps,
+      replayed: false,
+    };
+    wallet.check_win_mark = claim.markBalance;
+    wallet.stamp = claim.stampBalance;
+    this.economy.set(playerId, wallet);
+    this.balances.set(playerId, claim.coinBalance);
+    this.record(playerId, -claim.marksSpent, "check_win_exchange", "check_win", `${idempotencyKey}:marks`, markBefore, claim.markBalance, "check_win_mark");
+    this.record(playerId, claim.coins, "check_win_reward", "check_win", `${idempotencyKey}:coins`, coinBefore, claim.coinBalance);
+    this.record(playerId, claim.stamps, "check_win_reward", "check_win", `${idempotencyKey}:stamps`, stampBefore, claim.stampBalance, "stamp");
+    this.checkWinReplays.set(replayKey, claim);
+    return claim;
   }
 
   public async getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus> {

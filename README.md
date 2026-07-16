@@ -153,6 +153,8 @@ unique database constraint. Apply
 Apply `infra/postgres/024_multi_currency_economy.sql` to add the centrally
 ledgered loyalty, high-roller, clan, league, mission, collectible, and booster
 balances to existing player wallets.
+Apply `infra/postgres/026_check_win_rewards.sql` to persist idempotent
+Check-&-Win exchanges and their reward-version audit data.
 
 The wallet API publishes a stable thirteen-balance economy snapshot: Coins,
 Gems, LP, VIP points, High-Roller points, Clan points, League points, Mission
@@ -163,6 +165,10 @@ If the selected wager exceeds the Coin balance, the slot blocks the request and
 offers an explicit route to free timed bonuses or the play-money shop.
 Tapping any currency in the lobby HUD opens the authenticated wallet center,
 which renders all thirteen balances and the newest immutable ledger movements.
+Every winning spin adds one Check-&-Win mark. Five marks can be exchanged once
+for 100,000 play-money Coins and one Stamp through the Boost Center. The server
+consumes marks and grants both rewards in one transaction; request replay cannot
+duplicate value.
 
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan

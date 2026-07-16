@@ -753,6 +753,30 @@ describe("spin API", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().code).toBe("INVALID_REQUEST");
   });
+  it("publishes Check-&-Win status and rejects unsafe or premature claims", async () => {
+    const checkWinApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(1_000),
+    });
+    const status = await checkWinApp.inject({
+      method: "GET", url: "/v1/economy/check-win", headers: { authorization: "Bearer valid" },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toEqual({ marks: 0, requiredMarks: 5, claimable: false,
+      rewardCoins: 100_000, rewardStamps: 1 });
+    const unsafe = await checkWinApp.inject({
+      method: "POST", url: "/v1/economy/check-win/claim", headers: { authorization: "Bearer valid" },
+    });
+    expect(unsafe.statusCode).toBe(400);
+    expect(unsafe.json().code).toBe("INVALID_IDEMPOTENCY_KEY");
+    const premature = await checkWinApp.inject({
+      method: "POST", url: "/v1/economy/check-win/claim",
+      headers: { authorization: "Bearer valid", "idempotency-key": randomUUID() },
+    });
+    expect(premature.statusCode).toBe(409);
+    expect(premature.json().code).toBe("CHECK_WIN_NOT_CLAIMABLE");
+    await checkWinApp.close();
+  });
   it("uses server time and rejects a second timed daily reward", async () => {
     const timedApp = buildApp({
       authenticator: { authenticate: async () => playerId }, spinStore: new InMemorySpinStore(1_000),

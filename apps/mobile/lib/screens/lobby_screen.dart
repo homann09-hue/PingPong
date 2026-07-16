@@ -70,6 +70,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   TimedRewardView? hourlyReward;
   TimedRewardView? dailyReward;
   WheelView? rewardWheel;
+  CheckWinStatusView? checkWinStatus;
   List<Map<String, dynamic>> tournamentLeaders = const [];
   int tab = 0;
   bool rewardBusy = false;
@@ -98,6 +99,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       if (mounted) setState(() => lobbyNow = DateTime.now().toUtc());
     });
     _loadProfile();
+    _loadCheckWin();
     _loadShopOffers();
     storeUpdates = storeBridge.updates.listen(_handleStorePurchaseUpdate);
     unawaited(_loadPlatformStore());
@@ -329,6 +331,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  Future<void> _loadCheckWin() async {
+    try {
+      final loaded = await api.checkWinStatus();
+      if (mounted) setState(() => checkWinStatus = loaded);
+    } on StateError {
+      // The boost remains unavailable until its authoritative status responds.
+    }
+  }
+
   Future<void> _loadProfile() async {
     try {
       final profile = await api.profile();
@@ -512,6 +523,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   Future<void> _refreshLobby() async {
     await Future.wait([
       _loadProfile(),
+      _loadCheckWin(),
       _loadShopOffers(),
       _loadSocial(),
       _loadLiveOps(),
@@ -662,6 +674,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       if (result['openShop'] == 1) tab = 4;
     });
     await _loadProfile();
+    await _loadCheckWin();
     if (mounted && result['openRewards'] == 1) await _openRewardCenter();
   }
 
@@ -933,6 +946,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
       subtitle: 'Aktive Fortschritts- und Belohnungssysteme',
       actions: [
         _HubAction(
+          icon: Icons.check_circle_outline,
+          title: 'Check & Win',
+          detail: checkWinStatus == null
+              ? 'Status wird geladen'
+              : '${checkWinStatus!.marks}/${checkWinStatus!.requiredMarks} Gewinnmarkierungen',
+          badge: checkWinStatus?.claimable == true ? 1 : 0,
+          onTap: () => unawaited(_openCheckWin()),
+        ),
+        _HubAction(
           icon: Icons.workspace_premium_outlined,
           title: '$vipTier VIP',
           detail: '$vipPoints Punkte · nächste Stufe bei $vipNextTier',
@@ -954,6 +976,32 @@ class _LobbyScreenState extends State<LobbyScreen> {
       ],
     ),
   );
+
+  Future<void> _openCheckWin() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CheckWinSheet(
+        api: api,
+        onClaimed: (claim) {
+          if (!mounted) return;
+          setState(() {
+            balance = claim.coinBalance;
+            checkWinStatus = CheckWinStatusView(
+              marks: claim.markBalance,
+              requiredMarks: checkWinStatus?.requiredMarks ?? 5,
+              claimable:
+                  claim.markBalance >= (checkWinStatus?.requiredMarks ?? 5),
+              rewardCoins: checkWinStatus?.rewardCoins ?? 100000,
+              rewardStamps: checkWinStatus?.rewardStamps ?? 1,
+            );
+          });
+        },
+      ),
+    );
+    await _loadCheckWin();
+  }
 
   void _openLobbySettings() => unawaited(
     _openHubSheet(

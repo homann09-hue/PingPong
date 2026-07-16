@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SpinResult } from "@aurora/slot-engine";
 import { activeShopOffers } from "../shop/shop-catalog.js";
 import { PostgresSpinStore } from "./postgres-spin-store.js";
-import { InsufficientGemsError, RewardNotAvailableError, ShopOfferLimitReachedError } from "./spin-store.js";
+import { CheckWinNotClaimableError, InsufficientGemsError, RewardNotAvailableError, ShopOfferLimitReachedError } from "./spin-store.js";
 import { storeProducts } from "../monetization/store-products.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -18,6 +18,7 @@ databaseSuite("PostgresSpinStore integration", () => {
   const shopPlayerId = randomUUID();
   const concurrentShopPlayerId = randomUUID();
   const storePlayerId = randomUUID();
+  const checkWinPlayerId = randomUUID();
   const slotId = `integration-${randomUUID()}`;
   const missionId = `integration-mission-${randomUUID()}`;
 
@@ -87,12 +88,16 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/024_multi_currency_economy.sql", import.meta.url), "utf8",
     );
     await pool.query(multiCurrencyMigration);
-    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4)", [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId]);
+    const checkWinMigration = await readFile(
+      new URL("../../../../infra/postgres/026_check_win_rewards.sql", import.meta.url), "utf8",
+    );
+    await pool.query(checkWinMigration);
+    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5)", [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId]);
     await pool.query(
       `INSERT INTO wallets (player_id, currency, balance) VALUES
         ($1,'coin',100),($1,'gem',0),($2,'coin',1000),($2,'gem',320),($3,'coin',1000),($3,'gem',320),
-        ($4,'coin',1000),($4,'gem',320)`,
-      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId],
+        ($4,'coin',1000),($4,'gem',320),($5,'coin',1000),($5,'gem',0),($5,'check_win_mark',5),($5,'stamp',0)`,
+      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId],
     );
     await pool.query(
       "INSERT INTO slot_config_versions (slot_id, version, config, config_sha256, published_at) VALUES ($1,1,'{}',$2,now())",
@@ -261,6 +266,27 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(concurrent.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     const rejected = concurrent.find((result) => result.status === "rejected");
     expect(rejected?.status === "rejected" ? rejected.reason : null).toBeInstanceOf(ShopOfferLimitReachedError);
+  });
+
+  it("exchanges Check-&-Win marks atomically and replays the same reward", async () => {
+    expect(await store.getCheckWinStatus(checkWinPlayerId)).toMatchObject({ marks: 5, claimable: true });
+    const key = randomUUID();
+    const first = await store.claimCheckWin(checkWinPlayerId, key);
+    const replay = await store.claimCheckWin(checkWinPlayerId, key);
+    expect(first).toMatchObject({ marksSpent: 5, coins: 100_000, stamps: 1, coinBalance: 101_000,
+      markBalance: 0, stampBalance: 1, replayed: false });
+    expect(replay).toEqual({ ...first, replayed: true });
+    await expect(store.claimCheckWin(checkWinPlayerId, randomUUID()))
+      .rejects.toBeInstanceOf(CheckWinNotClaimableError);
+    const ledger = await pool.query<{ currency: string; amount: string }>(
+      "SELECT currency,amount FROM wallet_ledger WHERE player_id=$1 AND source='check_win' ORDER BY currency",
+      [checkWinPlayerId],
+    );
+    expect(ledger.rows).toEqual([
+      { currency: "check_win_mark", amount: "-5" },
+      { currency: "coin", amount: "100000" },
+      { currency: "stamp", amount: "1" },
+    ]);
   });
 
   it("grants and refunds a verified provider transaction idempotently without storing its token", async () => {

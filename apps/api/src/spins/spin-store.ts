@@ -4,6 +4,7 @@ import type { ShopOffer } from "../shop/shop-catalog.js";
 import type { StoreProduct } from "../monetization/store-products.js";
 import type { VerifiedStoreTransaction } from "../monetization/receipt-verifier.js";
 import type { EconomyBalance, WalletCurrency } from "../economy/currencies.js";
+import type { CheckWinClaim, CheckWinStatus } from "../economy/check-win.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -144,6 +145,8 @@ export interface SpinStore {
   claimReward(playerId: string, rewardId: string, coins: number): Promise<RewardClaim>;
   getProfile(playerId: string): Promise<PlayerProfile>;
   listWalletTransactions(playerId: string, limit: number): Promise<readonly WalletTransaction[]>;
+  getCheckWinStatus(playerId: string): Promise<CheckWinStatus>;
+  claimCheckWin(playerId: string, idempotencyKey: string): Promise<CheckWinClaim>;
   getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus>;
   claimTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardClaim>;
   getWheelStatus(playerId: string, now: Date): Promise<WheelStatus>;
@@ -169,6 +172,7 @@ export class WheelNotAvailableError extends Error {}
 export class MissionNotClaimableError extends Error {}
 export class EventMilestoneNotClaimableError extends Error {}
 export class InsufficientGemsError extends Error {}
+export class CheckWinNotClaimableError extends Error {}
 export class ShopOfferLimitReachedError extends Error {}
 export class StoreTransactionConflictError extends Error {}
 export class StoreProductLimitReachedError extends Error {}

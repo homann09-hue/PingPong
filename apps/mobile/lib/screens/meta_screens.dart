@@ -220,8 +220,187 @@ String _transactionLabel(String source) => switch (source) {
   'shop' => 'Shop',
   'store_purchase' => 'Paket gekauft',
   'store_refund' => 'Kauf storniert',
+  'check_win' => 'Check & Win',
   _ => 'Wallet-Buchung',
 };
+
+/// Interactive server-backed Check-&-Win collection and exchange surface.
+class CheckWinSheet extends StatefulWidget {
+  const CheckWinSheet({super.key, required this.api, this.onClaimed});
+
+  final CasinoApi api;
+  final ValueChanged<CheckWinClaimView>? onClaimed;
+
+  @override
+  State<CheckWinSheet> createState() => _CheckWinSheetState();
+}
+
+class _CheckWinSheetState extends State<CheckWinSheet> {
+  CheckWinStatusView? status;
+  bool busy = false;
+  bool failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    if (mounted) setState(() => failed = false);
+    try {
+      final loaded = await widget.api.checkWinStatus();
+      if (mounted) setState(() => status = loaded);
+    } on StateError {
+      if (mounted) setState(() => failed = true);
+    }
+  }
+
+  Future<void> _claim() async {
+    if (busy || status?.claimable != true) return;
+    setState(() => busy = true);
+    try {
+      final claim = await widget.api.claimCheckWin();
+      if (!mounted) return;
+      setState(() {
+        status = CheckWinStatusView(
+          marks: claim.markBalance,
+          requiredMarks: status!.requiredMarks,
+          claimable: claim.markBalance >= status!.requiredMarks,
+          rewardCoins: status!.rewardCoins,
+          rewardStamps: status!.rewardStamps,
+        );
+      });
+      widget.onClaimed?.call(claim);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '+${_walletNumber(claim.coins)} COINS  •  +${claim.stamps} SAMMELMARKE',
+          ),
+          backgroundColor: const Color(0xff6b2bd9),
+        ),
+      );
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Belohnung konnte nicht eingelöst werden.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = status;
+    return SafeArea(
+      child: Container(
+        key: const Key('check-win-sheet'),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xff421261), Color(0xff16082f)],
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(top: BorderSide(color: Color(0xffffcf3a), width: 2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(
+              child: SizedBox(
+                width: 44,
+                child: Divider(thickness: 4, color: Colors.white38),
+              ),
+            ),
+            const Icon(Icons.check_circle, size: 58, color: Color(0xffffcf3a)),
+            const Text(
+              'CHECK & WIN',
+              textAlign: TextAlign.center,
+              style: MetaStyle.hero,
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Sammle eine Markierung bei jedem Gewinnspin. Eine volle Karte ergibt eine garantierte Spielgeld-Belohnung.',
+              textAlign: TextAlign.center,
+              style: MetaStyle.caption,
+            ),
+            const SizedBox(height: 20),
+            if (failed)
+              FilledButton(onPressed: _load, child: const Text('ERNEUT LADEN'))
+            else if (current == null)
+              const Center(child: CircularProgressIndicator())
+            else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var index = 0; index < current.requiredMarks; index++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        index < current.marks
+                            ? Icons.check_circle
+                            : Icons.circle_outlined,
+                        size: 34,
+                        color: index < current.marks
+                            ? const Color(0xff6dffb2)
+                            : Colors.white38,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              LinearProgressIndicator(
+                value: (current.marks / current.requiredMarks)
+                    .clamp(0, 1)
+                    .toDouble(),
+                minHeight: 10,
+                borderRadius: BorderRadius.circular(8),
+                backgroundColor: Colors.black45,
+                color: const Color(0xff6dffb2),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${current.marks}/${current.requiredMarks} MARKIERUNGEN',
+                textAlign: TextAlign.center,
+                style: MetaStyle.title,
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: MetaStyle.card(const Color(0xffffcf3a)),
+                child: Text(
+                  '${_walletNumber(current.rewardCoins)} COINS  +  ${current.rewardStamps} SAMMELMARKE',
+                  textAlign: TextAlign.center,
+                  style: MetaStyle.reward,
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: current.claimable && !busy ? _claim : null,
+                icon: busy
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.redeem),
+                label: Text(
+                  current.claimable ? 'BELOHNUNG HOLEN' : 'WEITER GEWINNEN',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class NotificationSettingsSheet extends StatefulWidget {
   const NotificationSettingsSheet({super.key, required this.initial});

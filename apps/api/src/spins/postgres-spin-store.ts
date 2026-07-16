@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { SpinResult } from "@aurora/slot-engine";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -10,10 +10,15 @@ import { activeTournamentDefinition, tournamentPoints, tournamentWindow } from "
 import { applyProgressiveAward, jackpotContribution, jackpotDefinitions, triggeredJackpotTier, type JackpotPoolView, type JackpotTier } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
 import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
+import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
 interface PlayerRow { level: number; xp: string; vip_points: string }
+interface CheckWinClaimRow {
+  id: string; marks_spent: string; coins_granted: string; stamps_granted: string;
+  coin_balance_after: string; mark_balance_after: string; stamp_balance_after: string;
+}
 interface WalletTransactionRow {
   id: string;
   currency: WalletCurrency;
@@ -551,6 +556,87 @@ export class PostgresSpinStore implements SpinStore {
     });
   }
 
+  public async getCheckWinStatus(playerId: string): Promise<CheckWinStatus> {
+    const result = await this.pool.query<WalletRow>(
+      "SELECT balance FROM wallets WHERE player_id=$1 AND currency='check_win_mark'",
+      [playerId],
+    );
+    return checkWinStatus(result.rows[0] ? this.safeInteger(result.rows[0].balance, "Check-&-Win marks") : 0);
+  }
+
+  public async claimCheckWin(playerId: string, idempotencyKey: string): Promise<CheckWinClaim> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const coin = await client.query<WalletRow>(
+        "SELECT balance FROM wallets WHERE player_id=$1 AND currency='coin' FOR UPDATE",
+        [playerId],
+      );
+      if (!coin.rows[0]) throw new Error("Player coin wallet does not exist");
+      const replay = await client.query<CheckWinClaimRow>(
+        `SELECT id,marks_spent,coins_granted,stamps_granted,coin_balance_after,mark_balance_after,stamp_balance_after
+           FROM check_win_claims WHERE player_id=$1 AND idempotency_key=$2`,
+        [playerId, idempotencyKey],
+      );
+      if (replay.rows[0]) {
+        await client.query("COMMIT");
+        return this.checkWinClaim(replay.rows[0], true);
+      }
+      const marks = await client.query<WalletRow>(
+        "SELECT balance FROM wallets WHERE player_id=$1 AND currency='check_win_mark' FOR UPDATE",
+        [playerId],
+      );
+      const markBefore = marks.rows[0] ? this.safeInteger(marks.rows[0].balance, "Check-&-Win marks") : 0;
+      if (markBefore < checkWinReward.requiredMarks) throw new CheckWinNotClaimableError();
+      await client.query(
+        "INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'stamp',0) ON CONFLICT (player_id,currency) DO NOTHING",
+        [playerId],
+      );
+      const stamp = await client.query<WalletRow>(
+        "SELECT balance FROM wallets WHERE player_id=$1 AND currency='stamp' FOR UPDATE",
+        [playerId],
+      );
+      const coinBefore = this.safeInteger(coin.rows[0].balance, "Check-&-Win coin balance");
+      const stampBefore = this.safeInteger(stamp.rows[0]!.balance, "Check-&-Win stamp balance");
+      const claim: CheckWinClaim = {
+        claimId: randomUUID(), marksSpent: checkWinReward.requiredMarks,
+        coins: checkWinReward.rewardCoins, stamps: checkWinReward.rewardStamps,
+        coinBalance: coinBefore + checkWinReward.rewardCoins,
+        markBalance: markBefore - checkWinReward.requiredMarks,
+        stampBalance: stampBefore + checkWinReward.rewardStamps, replayed: false,
+      };
+      await client.query(
+        `UPDATE wallets SET balance=CASE currency
+           WHEN 'coin' THEN $1::bigint WHEN 'check_win_mark' THEN $2::bigint ELSE $3::bigint END,
+           version=version+1 WHERE player_id=$4 AND currency IN ('coin','check_win_mark','stamp')`,
+        [claim.coinBalance, claim.markBalance, claim.stampBalance, playerId],
+      );
+      await client.query(
+        `INSERT INTO check_win_claims
+          (id,player_id,idempotency_key,reward_version,marks_spent,coins_granted,stamps_granted,
+           coin_balance_after,mark_balance_after,stamp_balance_after)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [claim.claimId, playerId, idempotencyKey, checkWinReward.version, claim.marksSpent, claim.coins,
+          claim.stamps, claim.coinBalance, claim.markBalance, claim.stampBalance],
+      );
+      const metadata = { rewardVersion: checkWinReward.version };
+      await this.ledger(client, { playerId, currency: "check_win_mark", amount: -claim.marksSpent,
+        reason: "check_win_exchange", source: "check_win", referenceId: claim.claimId,
+        idempotencyKey: `${idempotencyKey}:marks`, balanceBefore: markBefore, balanceAfter: claim.markBalance, metadata });
+      await this.ledger(client, { playerId, currency: "coin", amount: claim.coins,
+        reason: "check_win_reward", source: "check_win", referenceId: claim.claimId,
+        idempotencyKey: `${idempotencyKey}:coins`, balanceBefore: coinBefore, balanceAfter: claim.coinBalance, metadata });
+      await this.ledger(client, { playerId, currency: "stamp", amount: claim.stamps,
+        reason: "check_win_reward", source: "check_win", referenceId: claim.claimId,
+        idempotencyKey: `${idempotencyKey}:stamps`, balanceBefore: stampBefore, balanceAfter: claim.stampBalance, metadata });
+      await client.query("COMMIT");
+      return claim;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
+
   public async getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus> {
     return rewardStatus(type, await this.timedState(this.pool, playerId, type), now);
   }
@@ -839,6 +925,19 @@ export class PostgresSpinStore implements SpinStore {
       transactionId: row.transaction_id, coins: this.safeInteger(row.coins_granted, "Store coins"),
       gems: this.safeInteger(row.gems_granted, "Store gems"), coinBalance: this.safeInteger(row.coin_balance_after, "Store coin balance"),
       gemBalance: this.safeInteger(row.gem_balance_after, "Store gem balance"), replayed };
+  }
+
+  private checkWinClaim(row: CheckWinClaimRow, replayed: boolean): CheckWinClaim {
+    return {
+      claimId: row.id,
+      marksSpent: this.safeInteger(row.marks_spent, "Check-&-Win marks spent"),
+      coins: this.safeInteger(row.coins_granted, "Check-&-Win coins"),
+      stamps: this.safeInteger(row.stamps_granted, "Check-&-Win stamps"),
+      coinBalance: this.safeInteger(row.coin_balance_after, "Check-&-Win coin balance"),
+      markBalance: this.safeInteger(row.mark_balance_after, "Check-&-Win mark balance"),
+      stampBalance: this.safeInteger(row.stamp_balance_after, "Check-&-Win stamp balance"),
+      replayed,
+    };
   }
 
   private async ledger(client: PoolClient, entry: {

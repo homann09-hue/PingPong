@@ -9,7 +9,7 @@ import { SlotEngine, auroraConfig, classicConfig, themedConfigs, type SlotConfig
 import type { Authenticator } from "./auth.js";
 import type { IdentityService } from "./identity/identity-service.js";
 import type { SpinStore } from "./spins/spin-store.js";
-import { EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
+import { CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
 import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
@@ -839,6 +839,27 @@ export function buildApp(dependencies: AppDependencies) {
     if (!query.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: query.error.issues });
     const transactions = await dependencies.spinStore.listWalletTransactions(playerId, query.data.limit);
     return { transactions };
+  });
+  app.get("/v1/economy/check-win", async (request, reply) => {
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return dependencies.spinStore.getCheckWinStatus(playerId);
+  });
+  app.post("/v1/economy/check-win/claim", async (request, reply) => {
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const keyResult = idempotencyKey.safeParse(request.headers["idempotency-key"]);
+    if (!keyResult.success) return reply.code(400).send({ code: "INVALID_IDEMPOTENCY_KEY" });
+    const rate = authRateLimiter.consume(`check-win:${playerId}`, 10, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    try {
+      return await dependencies.spinStore.claimCheckWin(playerId, keyResult.data);
+    } catch (error) {
+      if (error instanceof CheckWinNotClaimableError) {
+        return reply.code(409).send({ code: "CHECK_WIN_NOT_CLAIMABLE" });
+      }
+      throw error;
+    }
   });
   for (const type of ["hourly", "daily"] as const) {
     app.get(`/v1/rewards/${type}`, async (request, reply) => {
