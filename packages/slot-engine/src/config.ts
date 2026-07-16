@@ -221,6 +221,15 @@ export function parseSlotConfig(input: unknown): SlotConfig {
     if (new Set(counts).size !== counts.length || new Set(names).size !== names.length) {
       throw new Error("Jackpot tiers require unique names and trigger counts");
     }
+    if (counts.some((count) => count > config.reels.length * config.rows)) {
+      throw new Error("Jackpot trigger counts must fit the configured grid");
+    }
+    if (jackpot.tiers.some((tier, index) => index > 0 && (
+      tier.minimumCount <= jackpot.tiers[index - 1]!.minimumCount ||
+      tier.multiplier <= jackpot.tiers[index - 1]!.multiplier
+    ))) {
+      throw new Error("Jackpot tiers must increase by trigger count and multiplier");
+    }
   }
   const cascades = config.features?.cascades;
   if (cascades?.multiplierStep && cascades.maxMultiplier !== undefined && cascades.maxMultiplier < 1 + cascades.multiplierStep) {

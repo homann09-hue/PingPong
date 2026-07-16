@@ -212,7 +212,7 @@ export class PostgresSpinStore implements SpinStore {
 
   public async getJackpots(): Promise<readonly JackpotPoolView[]> {
     const result = await this.pool.query<{ tier: JackpotTier; pool_amount: string; seed_amount: string }>(
-      "SELECT tier, pool_amount, seed_amount FROM progressive_jackpots ORDER BY CASE tier WHEN 'MINI' THEN 1 WHEN 'MINOR' THEN 2 ELSE 3 END",
+      "SELECT tier, pool_amount, seed_amount FROM progressive_jackpots ORDER BY CASE tier WHEN 'MINI' THEN 1 WHEN 'MINOR' THEN 2 WHEN 'MAJOR' THEN 3 ELSE 4 END",
     );
     return result.rows.map((row) => ({
       tier: row.tier,

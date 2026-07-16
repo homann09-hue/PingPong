@@ -1,17 +1,19 @@
 import type { SpinResult } from "@aurora/slot-engine";
 
-export type JackpotTier = "MINI" | "MINOR" | "GRAND";
+export type JackpotTier = "MINI" | "MINOR" | "MAJOR" | "GRAND";
 export interface JackpotPoolView { readonly tier: JackpotTier; readonly amount: number; readonly seedAmount: number }
 
 export const jackpotDefinitions: readonly JackpotPoolView[] = [
   { tier: "MINI", amount: 500_000, seedAmount: 500_000 },
   { tier: "MINOR", amount: 5_000_000, seedAmount: 5_000_000 },
+  { tier: "MAJOR", amount: 15_000_000, seedAmount: 15_000_000 },
   { tier: "GRAND", amount: 50_000_000, seedAmount: 50_000_000 },
 ];
 
 const contributionBasisPoints: Readonly<Record<JackpotTier, number>> = {
   MINI: 100,
   MINOR: 50,
+  MAJOR: 35,
   GRAND: 25,
 };
 
@@ -24,7 +26,7 @@ export function triggeredJackpotTier(spin: SpinResult): JackpotTier | null {
     for (const event of round.events) {
       if (event.type !== "bonus.awarded" || event.data.mode !== "jackpot") continue;
       const tier = event.data.tier;
-      if (tier === "MINI" || tier === "MINOR" || tier === "GRAND") return tier;
+      if (tier === "MINI" || tier === "MINOR" || tier === "MAJOR" || tier === "GRAND") return tier;
     }
   }
   return null;

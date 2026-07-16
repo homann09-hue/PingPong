@@ -103,9 +103,11 @@ cap; each application emits a typed `multiplier.applied` event.
 Local jackpots are immutable game configuration: scatter symbol, unique tier,
 minimum trigger count, and bet multiplier. The engine selects the highest
 eligible tier, settles it as its own bonus round, and emits tier and scatter
-count for presentation and audit. The client derives meter values from the same
-published multipliers but never decides or credits a jackpot. A shared progressive
-pool is intentionally separate future economy infrastructure.
+count for presentation and audit. The client never decides or credits a jackpot.
+Server settlement locks the shared MINI, MINOR, MAJOR and GRAND pools in the same
+transaction as wallet settlement, replaces only the engine placeholder award,
+resets a won pool to its seed and records the progressive amount in the audited
+spin result.
 
 Bonus Buy is allow-listed per immutable game configuration. The server derives
 the wallet debit from the configured multiplier, rejects unsupported games, and

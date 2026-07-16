@@ -534,6 +534,7 @@ class _SlotScreenState extends State<SlotScreen> {
     children: [
       for (final p in [
         ('GRAND', _fmt(jackpotPools['GRAND'] ?? 50000000)),
+        ('MAJOR', _fmt(jackpotPools['MAJOR'] ?? 15000000)),
         ('MINOR', _fmt(jackpotPools['MINOR'] ?? 5000000)),
         ('MINI', _fmt(jackpotPools['MINI'] ?? 500000)),
       ])

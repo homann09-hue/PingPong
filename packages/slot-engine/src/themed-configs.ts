@@ -1,4 +1,5 @@
 import { parseSlotConfig } from "./config.js";
+import type { FeatureConfig } from "./types.js";
 
 type Volatility = "low" | "medium" | "high" | "very_high";
 type Paytable = Readonly<Record<"A" | "K" | "Q" | "J" | "W" | "X" | "Y" | "Z" | "T", readonly [number, number, number]>>;
@@ -76,7 +77,7 @@ function game(
   volatility: Volatility,
   reels: string[][],
   paytable: Paytable,
-  features: object,
+  features: FeatureConfig,
   release: { readonly version?: number; readonly mathModelVersion?: string } = {},
 ) {
   return parseSlotConfig({
@@ -98,7 +99,7 @@ function game(
     ],
     features: {
       ...features,
-      jackpots: {
+      jackpots: features.jackpots ?? {
         scatterSymbol: "B",
         tiers: [
           { name: "MINI", minimumCount: 3, multiplier: 5 },
@@ -222,8 +223,18 @@ export const vegasGoldConfig = game(
     holdAndWinBonus: {
       scatterSymbol: "B", minimumCount: 3, spotRange: [6, 12], multipliers: [1, 2, 3, 5, 10, 20],
     },
+    jackpots: {
+      scatterSymbol: "B",
+      tiers: [
+        { name: "MINI", minimumCount: 3, multiplier: 5 },
+        { name: "MINOR", minimumCount: 4, multiplier: 25 },
+        { name: "MAJOR", minimumCount: 5, multiplier: 100 },
+        { name: "GRAND", minimumCount: 6, multiplier: 500 },
+      ],
+    },
     bonusBuy: { costMultiplier: 50 },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const themedConfigs = [

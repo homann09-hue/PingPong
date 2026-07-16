@@ -2,8 +2,8 @@
 
 ## Outcome
 
-The MINI, MINOR and GRAND values shown by a slot are now real progressive
-server pools. Settled wagers grow all three pools and configured jackpot bonus
+The MINI, MINOR, MAJOR and GRAND values shown by a slot are real progressive
+server pools. Settled wagers grow all four pools and configured jackpot bonus
 results award the current pool instead of a client-side or static placeholder.
 
 ## Settlement model
@@ -26,6 +26,7 @@ results award the current pool instead of a client-side or static placeholder.
 | --- | ---: | ---: |
 | MINI | 500,000 | 1.00% |
 | MINOR | 5,000,000 | 0.50% |
+| MAJOR | 15,000,000 | 0.35% |
 | GRAND | 50,000,000 | 0.25% |
 
 Low play-money wagers contribute at least one coin per tier so the local meter
@@ -40,7 +41,8 @@ always demonstrates progression.
 
 ## Rollout
 
-Apply `infra/postgres/012_progressive_jackpots.sql` before deploying this API.
+Apply `infra/postgres/012_progressive_jackpots.sql` and then
+`infra/postgres/025_major_progressive_jackpot.sql` before deploying this API.
 
 ## Verification
 

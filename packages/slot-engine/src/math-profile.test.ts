@@ -26,8 +26,8 @@ describe("published theme math profiles", () => {
       varianceByProfile.set(config.math.volatility, profileVariances);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeGreaterThan(0.75);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeLessThan(1.15);
-      if (config.id === "candy-carnival") {
-        expect(Math.abs(sampledRtp - config.math.targetRtp), "candy-carnival calibrated RTP").toBeLessThan(0.02);
+      if (config.id === "candy-carnival" || config.id === "vegas-gold") {
+        expect(Math.abs(sampledRtp - config.math.targetRtp), `${config.id} calibrated RTP`).toBeLessThan(0.02);
       }
       expect(
         Math.abs(sampledHitFrequency - config.math.expectedHitFrequency),
@@ -50,6 +50,14 @@ describe("published theme math profiles", () => {
       version: 3,
       math: { mathModelVersion: "3.0.0" },
     });
-    expect(themedConfigs.filter((config) => config.id !== "candy-carnival").every((config) => config.version === 2)).toBe(true);
+    expect(themedConfigs.find((config) => config.id === "vegas-gold")).toMatchObject({
+      version: 3,
+      math: { mathModelVersion: "3.0.0" },
+    });
+    expect(
+      themedConfigs
+        .filter((config) => config.id !== "candy-carnival" && config.id !== "vegas-gold")
+        .every((config) => config.version === 2),
+    ).toBe(true);
   });
 });

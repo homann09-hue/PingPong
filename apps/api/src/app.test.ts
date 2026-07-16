@@ -415,7 +415,10 @@ describe("spin API", () => {
       headers: { "idempotency-key": randomUUID(), authorization: "Bearer valid" }, payload: { bet: 100 },
     });
     expect(spin.statusCode).toBe(200);
-    expect(spin.json().jackpots).toHaveLength(3);
+    expect(spin.json().jackpots).toHaveLength(4);
+    expect(spin.json().jackpots.map((pool: { tier: string }) => pool.tier)).toEqual([
+      "MINI", "MINOR", "MAJOR", "GRAND",
+    ]);
     expect(spin.json().jackpots[0].amount).toBeGreaterThan(before.json().jackpots[0].amount);
     await jackpotApp.close();
   });
@@ -640,6 +643,8 @@ describe("spin API", () => {
       mathModelVersion: "3.0.0",
       evaluation: { type: "ways", minimumReels: 3, betDivisor: 62, ways: 243 },
     });
+    const vegas = await app.inject({ method: "GET", url: "/v1/slots/vegas-gold/paytable" });
+    expect(vegas.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

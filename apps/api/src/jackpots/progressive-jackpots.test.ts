@@ -23,9 +23,24 @@ describe("progressive jackpots", () => {
     expect(awarded.rounds[1]?.events[0]?.data.progressiveAmount).toBe(750_000);
   });
 
+  it("recognizes MAJOR as a settleable progressive tier", () => {
+    const majorSpin: SpinResult = {
+      ...jackpotSpin,
+      rounds: jackpotSpin.rounds.map((round) => ({
+        ...round,
+        events: round.events.map((event) => event.type === "bonus.awarded"
+          ? { ...event, data: { ...event.data, tier: "MAJOR" } }
+          : event),
+      })),
+    };
+    expect(triggeredJackpotTier(majorSpin)).toBe("MAJOR");
+    expect(applyProgressiveAward(majorSpin, "MAJOR", 15_500_000).totalWin).toBe(15_500_010);
+  });
+
   it("allocates deterministic wager contributions to every tier", () => {
     expect(jackpotContribution("MINI", 10_000)).toBe(100);
     expect(jackpotContribution("MINOR", 10_000)).toBe(50);
+    expect(jackpotContribution("MAJOR", 10_000)).toBe(35);
     expect(jackpotContribution("GRAND", 10_000)).toBe(25);
   });
 });

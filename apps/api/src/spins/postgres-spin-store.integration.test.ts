@@ -67,6 +67,10 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/012_progressive_jackpots.sql", import.meta.url), "utf8",
     );
     await pool.query(jackpotMigration);
+    const majorJackpotMigration = await readFile(
+      new URL("../../../../infra/postgres/025_major_progressive_jackpot.sql", import.meta.url), "utf8",
+    );
+    await pool.query(majorJackpotMigration);
     const shopMigration = await readFile(
       new URL("../../../../infra/postgres/013_shop_purchases.sql", import.meta.url), "utf8",
     );

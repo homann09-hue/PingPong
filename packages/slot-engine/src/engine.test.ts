@@ -282,6 +282,34 @@ describe("configuration-driven layouts", () => {
     });
     expect(result.totalWin).toBe(5_020);
   });
+
+  it("selects MAJOR between the lower tiers and GRAND", () => {
+    const config = parseSlotConfig({
+      id: "major-jackpot-test", version: 1, name: "Major Jackpot Test", rows: 1,
+      reels: [["S"], ["S"], ["S"], ["S"], ["S"], ["A"]], paylines: [[0,0,0,0,0,0]],
+      symbols: {
+        A: { kind: "regular", payouts: {} },
+        S: { kind: "scatter", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        jackpots: {
+          scatterSymbol: "S",
+          tiers: [
+            { name: "MINI", minimumCount: 3, multiplier: 5 },
+            { name: "MINOR", minimumCount: 4, multiplier: 25 },
+            { name: "MAJOR", minimumCount: 5, multiplier: 100 },
+            { name: "GRAND", minimumCount: 6, multiplier: 500 },
+          ],
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 11n });
+    expect(result.rounds.at(-1)?.events[0]).toEqual({
+      type: "bonus.awarded",
+      data: { amount: 1_000, multiplier: 100, mode: "jackpot", tier: "MAJOR", scatterCount: 5 },
+    });
+  });
 });
 
 describe("SlotEngine", () => {
