@@ -829,7 +829,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     const profile = await dependencies.spinStore.getProfile(playerId);
     return {
-      balances: [{ currency: "coin", balance: profile.coinBalance }],
+      balances: profile.balances,
     };
   });
   app.get("/v1/wallet/transactions", async (request, reply) => {

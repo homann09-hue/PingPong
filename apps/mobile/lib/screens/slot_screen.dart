@@ -93,6 +93,7 @@ class _SlotScreenState extends State<SlotScreen> {
     if (spinning || balance < wager) {
       if (balance < wager) {
         setState(() => error = 'Nicht genug Coins für diesen Einsatz.');
+        await _showInsufficientCoins(wager);
       }
       return null;
     }
@@ -191,6 +192,40 @@ class _SlotScreenState extends State<SlotScreen> {
     } finally {
       if (mounted) setState(() => spinning = false);
     }
+  }
+
+  Future<void> _showInsufficientCoins(int wager) async {
+    final destination = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('MEHR COINS BENÖTIGT'),
+        content: Text(
+          'Für diesen Spin fehlen ${_fmt(wager - balance)} Coins. Nutze kostenlose Boni oder öffne den Shop.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'rewards'),
+            child: const Text('BONUS-CENTER'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'shop'),
+            child: const Text('SHOP ÖFFNEN'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || destination == null) return;
+    Navigator.pop(context, {
+      'balance': balance,
+      'level': level,
+      'xp': xp,
+      'spins': spins,
+      'totalWon': totalWon,
+      'totalFreeSpins': totalFreeSpins,
+      'vipPoints': vipPoints,
+      if (destination == 'shop') 'openShop': 1,
+      if (destination == 'rewards') 'openRewards': 1,
+    });
   }
 
   Future<void> _startAutoplay(int count) async {

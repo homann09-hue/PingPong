@@ -3,6 +3,7 @@ import type { JackpotPoolView } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
 import type { StoreProduct } from "../monetization/store-products.js";
 import type { VerifiedStoreTransaction } from "../monetization/receipt-verifier.js";
+import type { EconomyBalance, WalletCurrency } from "../economy/currencies.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -31,6 +32,7 @@ export interface PlayerProgression {
 export interface PlayerProfile {
   readonly coinBalance: number;
   readonly gemBalance: number;
+  readonly balances: readonly EconomyBalance[];
   readonly progression: PlayerProgression;
   readonly claimedRewards: readonly string[];
 }
@@ -71,7 +73,7 @@ export interface RewardClaim {
 
 export interface WalletTransaction {
   readonly id: string;
-  readonly currency: "coin" | "gem";
+  readonly currency: WalletCurrency;
   readonly amount: number;
   readonly direction: "credit" | "debit";
   readonly reason: string;

@@ -9,13 +9,14 @@ import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/liv
 import { activeTournamentDefinition, tournamentPoints, tournamentWindow } from "../tournaments/tournaments.js";
 import { applyProgressiveAward, jackpotContribution, jackpotDefinitions, triggeredJackpotTier, type JackpotPoolView, type JackpotTier } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
+import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
 interface PlayerRow { level: number; xp: string; vip_points: string }
 interface WalletTransactionRow {
   id: string;
-  currency: "coin" | "gem";
+  currency: WalletCurrency;
   amount: string;
   reason: string;
   source: string;
@@ -130,6 +131,25 @@ export class PostgresSpinStore implements SpinStore {
       }
       await client.query("UPDATE wallets SET balance = $1, version = version + 1 WHERE player_id = $2 AND currency = 'coin'", [balanceAfter, command.playerId]);
       await client.query("UPDATE players SET level = $1, xp = $2, vip_points = $3 WHERE id = $4", [progression.level, progression.xp, progression.vipPoints, command.playerId]);
+      for (const [currency, amount] of Object.entries(spinEconomyDeltas({
+        bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
+      })) as [SpinEconomyCurrency, number][]) {
+        if (amount <= 0) continue;
+        const updated = await client.query<{ balance: string }>(
+          `INSERT INTO wallets (player_id,currency,balance) VALUES ($1,$2,$3)
+           ON CONFLICT (player_id,currency) DO UPDATE
+             SET balance=wallets.balance+EXCLUDED.balance,version=wallets.version+1
+           RETURNING balance`,
+          [command.playerId, currency, amount],
+        );
+        const after = this.safeInteger(updated.rows[0]!.balance, `${currency} balance`);
+        await this.ledger(client, {
+          playerId: command.playerId, currency, amount, reason: "spin_progression", source: "slot",
+          referenceId: spinId, idempotencyKey: `${command.idempotencyKey}:${currency}`,
+          balanceBefore: after - amount, balanceAfter: after,
+          metadata: { slotId: command.slotId, configVersion: command.configVersion },
+        });
+      }
       await client.query(
         `INSERT INTO mission_progress (player_id, mission_id, period_key, progress, completed_at)
          SELECT $1, id, CASE cadence WHEN 'weekly' THEN date_trunc('week', now() AT TIME ZONE 'UTC')::date
@@ -479,16 +499,26 @@ export class PostgresSpinStore implements SpinStore {
     const row = result.rows[0];
     if (!row) throw new Error("Player profile does not exist");
     const previous = row.progression_after;
+    const walletRows = await this.pool.query<{ currency: WalletCurrency; balance: string }>(
+      "SELECT currency,balance FROM wallets WHERE player_id=$1", [playerId],
+    );
+    const walletValues = Object.fromEntries(
+      walletRows.rows.map((wallet) => [wallet.currency, this.safeInteger(wallet.balance, `${wallet.currency} balance`)]),
+    ) as Partial<Record<WalletCurrency, number>>;
+    const coinBalance = Number(row.balance);
+    const gemBalance = Number(row.gem_balance);
+    const vipPoints = Number(row.vip_points);
     return {
-      coinBalance: Number(row.balance),
-      gemBalance: Number(row.gem_balance),
+      coinBalance,
+      gemBalance,
+      balances: economyBalances({ ...walletValues, coin: coinBalance, gem: gemBalance, vip_point: vipPoints }),
       progression: {
         level: row.level,
         xp: Number(row.xp),
         spins: previous?.spins ?? 0,
         totalWon: previous?.totalWon ?? 0,
         freeSpins: previous?.freeSpins ?? 0,
-        vipPoints: Number(row.vip_points),
+        vipPoints,
       },
       claimedRewards: row.claimed_rewards,
     };
@@ -813,7 +843,7 @@ export class PostgresSpinStore implements SpinStore {
 
   private async ledger(client: PoolClient, entry: {
     readonly playerId: string;
-    readonly currency?: "coin" | "gem";
+    readonly currency?: WalletCurrency;
     readonly amount: number;
     readonly reason: string;
     readonly source: string;

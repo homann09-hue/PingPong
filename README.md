@@ -150,6 +150,17 @@ unique database constraint. Apply
 `infra/postgres/007_bonus_wheels.sql` and
 `infra/postgres/008_missions.sql` and
 `infra/postgres/009_mission_tiers.sql` when upgrading an existing database.
+Apply `infra/postgres/024_multi_currency_economy.sql` to add the centrally
+ledgered loyalty, high-roller, clan, league, mission, collectible, and booster
+balances to existing player wallets.
+
+The wallet API publishes a stable thirteen-balance economy snapshot: Coins,
+Gems, LP, VIP points, High-Roller points, Clan points, League points, Mission
+points, Lotsa Cash, Stamps, Check-&-Win marks, Boosters, and Oinky Coupons.
+Settled spins atomically award wager-scaled progression currencies; scarce
+collectibles remain zero until an explicit event or reward grants them.
+If the selected wager exceeds the Coin balance, the slot blocks the request and
+offers an explicit route to free timed bonuses or the play-money shop.
 
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan

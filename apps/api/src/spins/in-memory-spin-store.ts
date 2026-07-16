@@ -7,6 +7,7 @@ import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/liv
 import { activeTournamentDefinition, demoTournamentLeaders, tournamentPoints, tournamentWindow } from "../tournaments/tournaments.js";
 import { applyProgressiveAward, jackpotContribution, jackpotDefinitions, triggeredJackpotTier, type JackpotPoolView, type JackpotTier } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
+import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -19,6 +20,7 @@ export class InMemorySpinStore implements SpinStore {
   private readonly wheelEntitlements = new Map<string, number>();
   private readonly wheelReplays = new Map<string, WheelSpinResult>();
   private readonly gemBalances = new Map<string, number>();
+  private readonly economy = new Map<string, Partial<Record<SpinEconomyCurrency, number>>>();
   private readonly missionProgress = new Map<string, { progress: number; claimed: boolean }>();
   private readonly eventProgress = new Map<string, number>();
   private readonly eventClaims = new Set<string>();
@@ -82,6 +84,16 @@ export class InMemorySpinStore implements SpinStore {
     }
     this.balances.set(command.playerId, settled.coinBalance);
     this.progression.set(command.playerId, progression);
+    const economy = this.economy.get(command.playerId) ?? {};
+    for (const [currency, amount] of Object.entries(spinEconomyDeltas({
+      bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
+    })) as [SpinEconomyCurrency, number][]) {
+      if (amount <= 0) continue;
+      const before = economy[currency] ?? 0;
+      economy[currency] = before + amount;
+      this.record(command.playerId, amount, "spin_progression", "slot", `${command.idempotencyKey}:${currency}`, before, before + amount, currency);
+    }
+    this.economy.set(command.playerId, economy);
     this.replay.set(key, settled);
     this.advanceMissions(command.playerId, command.bet, spin.totalWin, spin.freeSpinsPlayed, new Date());
     this.advanceEvents(command.playerId, command.bet, spin.totalWin, spin.freeSpinsPlayed, new Date());
@@ -316,12 +328,19 @@ export class InMemorySpinStore implements SpinStore {
   }
 
   public async getProfile(playerId: string): Promise<PlayerProfile> {
+    const coinBalance = this.balances.get(playerId) ?? this.defaultBalance;
+    const gemBalance = this.gemBalances.get(playerId) ?? 320;
+    const progression = this.progression.get(playerId) ?? {
+      level: 12, xp: 625, spins: 0, totalWon: 0, freeSpins: 0, vipPoints: 2_450,
+    };
     return {
-      coinBalance: this.balances.get(playerId) ?? this.defaultBalance,
-      gemBalance: this.gemBalances.get(playerId) ?? 320,
-      progression: this.progression.get(playerId) ?? {
-        level: 12, xp: 625, spins: 0, totalWon: 0, freeSpins: 0, vipPoints: 2_450,
-      },
+      coinBalance,
+      gemBalance,
+      balances: economyBalances({
+        coin: coinBalance, gem: gemBalance, vip_point: progression.vipPoints,
+        ...this.economy.get(playerId),
+      }),
+      progression,
       claimedRewards: [...this.claimedRewards]
         .filter((key) => key.startsWith(`${playerId}:`))
         .map((key) => key.slice(playerId.length + 1)),
@@ -349,7 +368,7 @@ export class InMemorySpinStore implements SpinStore {
     idempotencyKey: string,
     balanceBefore: number,
     balanceAfter: number,
-    currency: "coin" | "gem" = "coin",
+    currency: WalletCurrency = "coin",
   ): void {
     this.ledger.push({
       playerId,

@@ -146,6 +146,7 @@ class ProfileResponse {
     required this.vipTier,
     required this.vipTierStart,
     required this.vipNextTier,
+    required this.economyBalances,
     required this.claimedRewards,
     required this.achievements,
     required this.tournamentRank,
@@ -160,6 +161,7 @@ class ProfileResponse {
   final String playerId;
   final int balance, gems, level, xp, spins, totalWon, freeSpins;
   final int vipPoints, vipTierStart, vipNextTier;
+  final Map<String, int> economyBalances;
   final String vipTier;
   final Set<String> claimedRewards;
   final List<AchievementView> achievements;
@@ -791,6 +793,11 @@ class CasinoApi {
       vipTier: vip['tier'] as String,
       vipTierStart: vip['tierStart'] as int,
       vipNextTier: vip['nextTierPoints'] as int,
+      economyBalances: {
+        for (final entry
+            in (data['balances'] as List).cast<Map<String, dynamic>>())
+          entry['currency'] as String: entry['balance'] as int,
+      },
       claimedRewards: (data['claimedRewards'] as List).cast<String>().toSet(),
       achievements: (data['achievements'] as List).map((value) {
         final item = value as Map<String, dynamic>;

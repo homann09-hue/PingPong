@@ -83,6 +83,10 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/019_native_store_semantics.sql", import.meta.url), "utf8",
     );
     await pool.query(nativeStoreMigration);
+    const multiCurrencyMigration = await readFile(
+      new URL("../../../../infra/postgres/024_multi_currency_economy.sql", import.meta.url), "utf8",
+    );
+    await pool.query(multiCurrencyMigration);
     await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4)", [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId]);
     await pool.query(
       `INSERT INTO wallets (player_id, currency, balance) VALUES
@@ -135,7 +139,7 @@ databaseSuite("PostgresSpinStore integration", () => {
       idempotency_key: string;
     }>(
       `SELECT amount, source, balance_before, balance_after, idempotency_key
-         FROM wallet_ledger WHERE player_id=$1 ORDER BY balance_before DESC`,
+         FROM wallet_ledger WHERE player_id=$1 AND currency='coin' ORDER BY balance_before DESC`,
       [playerId],
     );
     const outbox = await pool.query<{ count: string }>("SELECT count(*) FROM outbox_events WHERE payload->>'playerId'=$1", [playerId]);
@@ -146,6 +150,11 @@ databaseSuite("PostgresSpinStore integration", () => {
       "SELECT count(*) FROM spin_events WHERE spin_id IN (SELECT id FROM spins WHERE player_id=$1)", [playerId],
     );
     expect(wallet.rows[0]?.balance).toBe("95");
+    expect((await store.getProfile(playerId)).balances).toEqual(expect.arrayContaining([
+      { currency: "loyalty_point", balance: 1 },
+      { currency: "mission_point", balance: 1 },
+      { currency: "vip_point", balance: 1 },
+    ]));
     expect(ledger.rows).toEqual([
       expect.objectContaining({
         amount: "-10", source: "slot", balance_before: "100", balance_after: "90",

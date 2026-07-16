@@ -7,12 +7,13 @@ class TopHud extends StatelessWidget {
     required this.level,
     required this.xp,
     this.gems = 320,
+    this.loyaltyPoints = 0,
     this.vipTier = 'GOLD',
     this.onVipTap,
     this.onNotificationsTap,
     this.onShopTap,
   });
-  final int balance, level, xp, gems;
+  final int balance, level, xp, gems, loyaltyPoints;
   final String vipTier;
   final VoidCallback? onVipTap;
   final VoidCallback? onNotificationsTap;
@@ -28,7 +29,7 @@ class TopHud extends StatelessWidget {
     child: FittedBox(
       fit: BoxFit.scaleDown,
       child: SizedBox(
-        width: 450,
+        width: 550,
         height: 58,
         child: Row(
           children: [
@@ -106,6 +107,12 @@ class TopHud extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             _currency(Icons.diamond, _fmt(gems), const Color(0xff42e3ff)),
+            const SizedBox(width: 5),
+            _currency(
+              Icons.workspace_premium,
+              '${_fmt(loyaltyPoints)} LP',
+              const Color(0xffff8bd8),
+            ),
             IconButton(
               onPressed: onShopTap,
               tooltip: 'Coins kaufen',

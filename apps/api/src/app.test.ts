@@ -729,8 +729,20 @@ describe("spin API", () => {
     });
     expect(wallet.statusCode).toBe(200);
     expect(history.statusCode).toBe(200);
-    const transactions = history.json().transactions as Array<{ amount: number; balanceBefore: number; balanceAfter: number }>;
+    const balances = new Map(
+      (wallet.json().balances as Array<{ currency: string; balance: number }>)
+        .map((entry) => [entry.currency, entry.balance]),
+    );
+    expect(balances.size).toBe(13);
+    expect(balances.get("coin")).toBeTypeOf("number");
+    expect(balances.get("gem")).toBe(320);
+    expect(balances.get("vip_point")).toBeGreaterThan(0);
+    expect(balances.get("loyalty_point")).toBe(1);
+    expect(balances.get("mission_point")).toBe(1);
+    expect(balances.get("booster")).toBe(0);
+    const transactions = history.json().transactions as Array<{ currency: string; amount: number; balanceBefore: number; balanceAfter: number }>;
     expect(transactions.filter((entry) => entry.amount === -10)).toHaveLength(1);
+    expect(transactions.filter((entry) => entry.currency === "loyalty_point")).toHaveLength(1);
     expect(transactions.every((entry) => entry.balanceAfter === entry.balanceBefore + entry.amount)).toBe(true);
     await walletApp.close();
   });

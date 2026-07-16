@@ -44,6 +44,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   int totalWon = 0;
   int totalFreeSpins = 0;
   int vipPoints = 2450;
+  int loyaltyPoints = 0;
   int vipTierStart = 1000;
   int vipNextTier = 3000;
   int tournamentRank = 6;
@@ -346,6 +347,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         totalWon = profile.totalWon;
         totalFreeSpins = profile.freeSpins;
         vipPoints = profile.vipPoints;
+        loyaltyPoints = profile.economyBalances['loyalty_point'] ?? 0;
         vipTier = profile.vipTier;
         vipTierStart = profile.vipTierStart;
         vipNextTier = profile.vipNextTier;
@@ -656,8 +658,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
       totalWon = result['totalWon'] ?? totalWon;
       totalFreeSpins = result['totalFreeSpins'] ?? totalFreeSpins;
       vipPoints = result['vipPoints'] ?? vipPoints;
+      if (result['openShop'] == 1) tab = 4;
     });
     await _loadProfile();
+    if (mounted && result['openRewards'] == 1) await _openRewardCenter();
   }
 
   Future<void> _claimReward(String rewardId) async {
@@ -719,6 +723,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               level: level,
               xp: xp,
               gems: gems,
+              loyaltyPoints: loyaltyPoints,
               vipTier: vipTier,
               onVipTap: _showVip,
               onNotificationsTap: _openNotificationSettings,
