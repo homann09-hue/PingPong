@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { SlotConfig } from "./types.js";
 
 const symbolSchema = z.object({
-  kind: z.enum(["regular", "wild", "scatter", "mystery", "coin"]),
+  kind: z.enum(["regular", "wild", "scatter", "mystery", "coin", "multiplier"]),
   payouts: z.record(z.coerce.number().int().positive(), z.number().int().nonnegative()),
 });
 
@@ -53,6 +53,14 @@ const schema = z.object({
       symbol: z.string(),
       multiplier: z.number().int().min(2).max(10),
       maxTotalMultiplier: z.number().int().min(2).max(1_000),
+    }).optional(),
+    multiplierSymbols: z.object({
+      symbols: z.array(z.object({
+        symbol: z.string(),
+        multiplier: z.number().int().min(2).max(100),
+      })).min(1).max(20),
+      combination: z.enum(["add", "multiply"]),
+      maxTotalMultiplier: z.number().int().min(2).max(10_000),
     }).optional(),
     respins: z.object({
       triggerSymbol: z.string(),
@@ -188,6 +196,19 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   const multiplierWild = config.features?.wildMultiplier?.symbol;
   if (multiplierWild && config.symbols[multiplierWild]?.kind !== "wild") {
     throw new Error("Wild multiplier feature must reference a wild symbol");
+  }
+  const multiplierSymbols = config.features?.multiplierSymbols;
+  if (multiplierSymbols) {
+    const configured = multiplierSymbols.symbols.map((entry) => entry.symbol);
+    if (new Set(configured).size !== configured.length) {
+      throw new Error("Multiplier symbols must be unique");
+    }
+    if (multiplierSymbols.symbols.some((entry) => config.symbols[entry.symbol]?.kind !== "multiplier")) {
+      throw new Error("Multiplier feature must reference multiplier symbols");
+    }
+    if (multiplierSymbols.maxTotalMultiplier < Math.max(...multiplierSymbols.symbols.map((entry) => entry.multiplier))) {
+      throw new Error("Multiplier symbol cap must include every configured value");
+    }
   }
   const respinTrigger = config.features?.respins?.triggerSymbol;
   if (respinTrigger && !config.symbols[respinTrigger]) {

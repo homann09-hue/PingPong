@@ -26,7 +26,7 @@ describe("published theme math profiles", () => {
       varianceByProfile.set(config.math.volatility, profileVariances);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeGreaterThan(0.75);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeLessThan(1.15);
-      if (["candy-carnival", "pirate-bay", "frozen-kingdom", "jungle-temple", "vegas-gold"].includes(config.id)) {
+      if (["candy-carnival", "pirate-bay", "neon-nights", "frozen-kingdom", "jungle-temple", "vegas-gold"].includes(config.id)) {
         expect(Math.abs(sampledRtp - config.math.targetRtp), `${config.id} calibrated RTP`).toBeLessThan(0.02);
       }
       expect(
@@ -66,9 +66,13 @@ describe("published theme math profiles", () => {
       version: 3,
       math: { mathModelVersion: "3.0.0" },
     });
+    expect(themedConfigs.find((config) => config.id === "neon-nights")).toMatchObject({
+      version: 3,
+      math: { mathModelVersion: "3.0.0" },
+    });
     expect(
       themedConfigs
-        .filter((config) => !["candy-carnival", "pirate-bay", "frozen-kingdom", "jungle-temple", "vegas-gold"].includes(config.id))
+        .filter((config) => !["candy-carnival", "pirate-bay", "neon-nights", "frozen-kingdom", "jungle-temple", "vegas-gold"].includes(config.id))
         .every((config) => config.version === 2),
     ).toBe(true);
   });

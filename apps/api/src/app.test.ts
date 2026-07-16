@@ -655,6 +655,11 @@ describe("spin API", () => {
     expect(jungle.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
     const frozen = await app.inject({ method: "GET", url: "/v1/slots/frozen-kingdom/paytable" });
     expect(frozen.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
+    const neon = await app.inject({ method: "GET", url: "/v1/slots/neon-nights/paytable" });
+    expect(neon.json()).toMatchObject({
+      version: 3, mathModelVersion: "3.0.0",
+      symbols: { M: { kind: "multiplier", payouts: {} } },
+    });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

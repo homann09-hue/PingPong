@@ -312,18 +312,44 @@ export class SlotEngine {
     const wins: Win[] = this.config.features?.ways
       ? this.evaluateWays(grid, bet, events, roundMultiplier)
       : this.evaluateLines(grid, bet, events, roundMultiplier);
-    if (!includeScatter) return wins;
-    for (const [symbol, definition] of Object.entries(this.config.symbols)) {
-      if (definition.kind !== "scatter") continue;
-      const cells = grid.flatMap((reel, reelIndex) => reel.flatMap((value, row) => value === symbol ? [[reelIndex, row] as [number, number]] : []));
-      const multiplier = definition.payouts[cells.length] ?? 0;
-      if (cells.length > 0) events.push({ type: "scatter.hit", data: { symbol, count: cells.length } });
-      if (multiplier > 0) wins.push({
-        kind: "scatter", symbol, count: cells.length,
-        amount: multiplier * bet * roundMultiplier, cells,
-      } satisfies ScatterWin);
+    if (includeScatter) {
+      for (const [symbol, definition] of Object.entries(this.config.symbols)) {
+        if (definition.kind !== "scatter") continue;
+        const cells = grid.flatMap((reel, reelIndex) => reel.flatMap((value, row) => value === symbol ? [[reelIndex, row] as [number, number]] : []));
+        const multiplier = definition.payouts[cells.length] ?? 0;
+        if (cells.length > 0) events.push({ type: "scatter.hit", data: { symbol, count: cells.length } });
+        if (multiplier > 0) wins.push({
+          kind: "scatter", symbol, count: cells.length,
+          amount: multiplier * bet * roundMultiplier, cells,
+        } satisfies ScatterWin);
+      }
     }
-    return wins;
+    return this.applyMultiplierSymbols(grid, wins, events);
+  }
+
+  private applyMultiplierSymbols(
+    grid: readonly (readonly string[])[], wins: readonly Win[], events: EngineEvent[],
+  ): Win[] {
+    const feature = this.config.features?.multiplierSymbols;
+    if (!feature || wins.length === 0) return [...wins];
+    const values = new Map(feature.symbols.map((entry) => [entry.symbol, entry.multiplier]));
+    const visible = grid.flatMap((reel, reelIndex) => reel.flatMap((symbol, row) =>
+      values.has(symbol) ? [{ reel: reelIndex, row, value: values.get(symbol)! }] : [],
+    ));
+    if (visible.length === 0) return [...wins];
+    const combined = feature.combination === "add"
+      ? visible.reduce((sum, entry) => sum + entry.value, 0)
+      : visible.reduce((product, entry) => Math.min(feature.maxTotalMultiplier, product * entry.value), 1);
+    const multiplier = Math.min(feature.maxTotalMultiplier, combined);
+    events.push({
+      type: "multiplier.applied",
+      data: {
+        source: "multiplier_symbols", combination: feature.combination,
+        count: visible.length, multiplier,
+        positions: visible.map((entry) => `${entry.reel}:${entry.row}=${entry.value}`).join(","),
+      },
+    });
+    return wins.map((win) => ({ ...win, amount: win.amount * multiplier }));
   }
 
   private evaluateLines(

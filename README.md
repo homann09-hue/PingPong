@@ -64,6 +64,9 @@ bonus symbols land, before the server evaluates the upgraded grid.
 Frozen Kingdom v3 uses contiguous wild blocks embedded directly in all five
 reel strips. Visible stacks are reported by the engine and highlighted by the
 client before sticky-wild persistence continues through free spins.
+Neon Nights v3 adds visible ×2 symbols that combine additively up to ×8 and
+multiply the complete authoritative round win. The engine returns their exact
+positions and applied factor for client animation and settlement audit.
 
 All eight games use a server-authoritative local jackpot ladder. Three, four,
 or five scatters award MINI (5×), MINOR (25×), or GRAND (500×) respectively.

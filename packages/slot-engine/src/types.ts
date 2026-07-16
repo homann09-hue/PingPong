@@ -46,6 +46,14 @@ export interface FeatureConfig {
     readonly multiplier: number;
     readonly maxTotalMultiplier: number;
   };
+  readonly multiplierSymbols?: {
+    readonly symbols: readonly {
+      readonly symbol: string;
+      readonly multiplier: number;
+    }[];
+    readonly combination: "add" | "multiply";
+    readonly maxTotalMultiplier: number;
+  };
   readonly respins?: {
     readonly triggerSymbol: string;
     readonly minimumCount: number;
@@ -114,7 +122,7 @@ export interface FeatureConfig {
 }
 
 export interface SymbolDefinition {
-  readonly kind: "regular" | "wild" | "scatter" | "mystery" | "coin";
+  readonly kind: "regular" | "wild" | "scatter" | "mystery" | "coin" | "multiplier";
   readonly payouts: Readonly<Record<number, number>>;
 }
 

@@ -29,7 +29,7 @@ const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "dragon-peak": 0.32,
   "candy-carnival": 0.538,
   "pirate-bay": 0.299,
-  "neon-nights": 0.50,
+  "neon-nights": 0.485,
   "frozen-kingdom": 0.467,
   "jungle-temple": 0.323,
   "vegas-gold": 0.52,
@@ -41,6 +41,11 @@ function scalePaytable(paytable: Paytable, factor: number): Paytable {
     payouts.map((value) => Math.max(1, Math.round(value * factor))),
   ])) as unknown as Paytable;
 }
+
+const neonMultiplierPaytable: Paytable = {
+  ...scalePaytable(balanced, 2.5),
+  X: [2, 10, 30],
+};
 
 function reelStrips(
   patterns: readonly [string, string, string, string, string],
@@ -61,7 +66,7 @@ function reelStrips(
   });
 }
 
-function symbols(paytable: Paytable, includeCoin = false) {
+function symbols(paytable: Paytable, includeCoin = false, includeMultiplier = false) {
   const payout = (values: readonly [number, number, number]) => ({ 3: values[0], 4: values[1], 5: values[2] });
   return {
     A: { kind: "regular" as const, payouts: payout(paytable.A) },
@@ -76,6 +81,7 @@ function symbols(paytable: Paytable, includeCoin = false) {
     S: { kind: "scatter" as const, payouts: { 3: 2, 4: 8, 5: 30 } },
     B: { kind: "scatter" as const, payouts: {} },
     ...(includeCoin ? { C: { kind: "coin" as const, payouts: {} } } : {}),
+    ...(includeMultiplier ? { M: { kind: "multiplier" as const, payouts: {} } } : {}),
   };
 }
 
@@ -90,7 +96,11 @@ function game(
 ) {
   return parseSlotConfig({
     id, name, version: release.version ?? 2, rows: 3, reels, paylines: lines,
-    symbols: symbols(paytable, reels.some((strip) => strip.includes("C"))),
+    symbols: symbols(
+      paytable,
+      reels.some((strip) => strip.includes("C")),
+      reels.some((strip) => strip.includes("M")),
+    ),
     bet: { min: 100, max: 10_000, steps: [100, 200, 500, 1_000, 2_000, 5_000, 10_000] },
     math: {
       targetRtp: 0.94,
@@ -187,14 +197,18 @@ export const pirateBayConfig = game(
 export const neonNightsConfig = game(
   "neon-nights", "Neon Nights", "low",
   reelStrips([
-    "AKQJAWKQASJBQJAKSAQWKJAA", "KQAJKSAWQJKBQAJKAWQSAJQK", "QAJKSAQJWKBAKQJASAWKQJAA",
-    "JAKQWJAKQASBQJAKSAQWKJAA", "AQJKSAQWJABKQJAKWSAJKQAA",
+    "AKQJAWKQASJBQJAMKSAQWKJAA", "KQAJKSAWQJKBQAJKAMWQSAJQK", "QAJKSAQJWKBAKQJMASAWKQJAA",
+    "JAKQWJAKQASBQJAKMSAQWKJAA", "AQJKSAQWJABKQJAKWMSAJKQAA",
   ]),
-  scalePaytable(balanced, 2.85),
+  neonMultiplierPaytable,
   {
     walkingWild: { symbol: "W", direction: "right", maxSteps: 4 },
+    multiplierSymbols: {
+      symbols: [{ symbol: "M", multiplier: 2 }], combination: "add", maxTotalMultiplier: 8,
+    },
     freeSpins: { scatterSymbol: "S", awards: { 3: 8, 4: 14, 5: 22 }, maxTotal: 100, winMultiplier: 2 },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const frozenKingdomConfig = game(

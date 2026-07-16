@@ -671,6 +671,37 @@ class _SlotScreenState extends State<SlotScreen> {
                 size: 48,
                 shadows: [Shadow(color: Colors.white, blurRadius: 8)],
               )
+            else if (symbol == 'M')
+              Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const RadialGradient(
+                    colors: [
+                      Color(0xffffffff),
+                      Color(0xffff35dc),
+                      Color(0xff4815a9),
+                    ],
+                  ),
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0xffff35dc),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  '×2',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                  ),
+                ),
+              )
             else if (assetPath != null)
               Image.asset(
                 assetPath,

@@ -291,6 +291,49 @@ describe("configuration-driven layouts", () => {
     });
   });
 
+  it("combines and caps visible multiplier symbols on the complete round win", () => {
+    const config = parseSlotConfig({
+      id: "multiplier-symbol-test", version: 1, name: "Multiplier Symbol Test", rows: 1,
+      reels: [["A"], ["A"], ["A"], ["M"], ["M"]], paylines: [[0, 0, 0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 1 } },
+        M: { kind: "multiplier", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        multiplierSymbols: {
+          symbols: [{ symbol: "M", multiplier: 2 }],
+          combination: "add", maxTotalMultiplier: 3,
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 13n });
+    expect(result.totalWin).toBe(30);
+    expect(result.wins[0]?.amount).toBe(30);
+    expect(result.rounds[0]!.events).toContainEqual({
+      type: "multiplier.applied",
+      data: {
+        source: "multiplier_symbols", combination: "add", count: 2, multiplier: 3,
+        positions: "3:0=2,4:0=2",
+      },
+    });
+  });
+
+  it("rejects multiplier features that reference regular symbols", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-multiplier-symbol", version: 1, name: "Invalid Multiplier Symbol", rows: 1,
+      reels: [["A"], ["A"], ["A"]], paylines: [[0, 0, 0]],
+      symbols: { A: { kind: "regular", payouts: {} } },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        multiplierSymbols: {
+          symbols: [{ symbol: "A", multiplier: 2 }],
+          combination: "multiply", maxTotalMultiplier: 4,
+        },
+      },
+    })).toThrow("must reference multiplier symbols");
+  });
+
   it("treats the wager as total bet across all enabled paylines", () => {
     const config = parseSlotConfig({
       id: "total-bet-test", version: 1, name: "Total Bet Test", rows: 1,

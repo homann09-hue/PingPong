@@ -620,6 +620,15 @@ class CasinoApi {
           winningCells.add('$reel:$row');
         }
       }
+      for (final event in multiplierEvents.where((event) {
+        final data = event['data'] as Map<String, dynamic>;
+        return data['source'] == 'multiplier_symbols';
+      })) {
+        final data = event['data'] as Map<String, dynamic>;
+        for (final encoded in (data['positions'] as String).split(',')) {
+          winningCells.add(encoded.split('=').first);
+        }
+      }
       final lineWins = wins.where((win) => win['kind'] == 'line').toList();
       final waysWins = wins.where((win) => win['kind'] == 'ways').toList();
       final scatterWins = wins
@@ -668,6 +677,8 @@ class CasinoApi {
             ? switch (multiplierData?['source']) {
                 'cascade' => 'CASCADE ×${multiplierData?['multiplier']}',
                 'free_spin' => 'FREE SPINS ×${multiplierData?['multiplier']}',
+                'multiplier_symbols' =>
+                  'SYMBOL MULTIPLIER ×${multiplierData?['multiplier']}',
                 _ => 'WILD MULTIPLIER ×${multiplierData?['multiplier']}',
               }
             : eventTypes.contains('respin.started')
