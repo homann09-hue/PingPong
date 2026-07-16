@@ -266,9 +266,18 @@ class _SeasonalHero extends StatelessWidget {
                             color: Color(0xffffd24a),
                           ),
                           const SizedBox(width: 5),
-                          Text(
-                            _remaining(campaign?.endsAt ?? event?.endsAt, now),
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          Expanded(
+                            child: Text(
+                              _remaining(
+                                campaign?.endsAt ?? event?.endsAt,
+                                now,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           const Text(
@@ -528,7 +537,9 @@ class _SlotCoverCard extends StatelessWidget {
                     if (game.isNew)
                       const _Pill(label: 'NEW', color: Color(0xffff3e74)),
                     const Spacer(),
-                    _Pill(label: game.category, color: game.primary),
+                    Flexible(
+                      child: _Pill(label: game.category, color: game.primary),
+                    ),
                   ],
                 ),
               ),
@@ -801,6 +812,7 @@ class _Pill extends StatelessWidget {
     child: Text(
       label,
       maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: const TextStyle(
         color: Colors.black,
         fontSize: 8,

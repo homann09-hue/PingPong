@@ -620,6 +620,12 @@ class CasinoApi {
       final layoutData = layoutEvents.isEmpty
           ? null
           : layoutEvents.last['data'] as Map<String, dynamic>;
+      final mysteryEvents = events.where(
+        (event) => event['type'] == 'mystery.revealed',
+      );
+      final mysteryData = mysteryEvents.isEmpty
+          ? null
+          : mysteryEvents.last['data'] as Map<String, dynamic>;
       final wins = (round['wins'] as List).cast<Map<String, dynamic>>();
       final winningCells = <String>{};
       for (final win in wins) {
@@ -646,6 +652,11 @@ class CasinoApi {
         final data = event['data'] as Map<String, dynamic>;
         for (final encoded in (data['positions'] as String).split(',')) {
           winningCells.add(encoded.split('=').first);
+        }
+      }
+      if (mysteryData != null) {
+        for (final encoded in (mysteryData['positions'] as String).split(',')) {
+          winningCells.add(encoded);
         }
       }
       final lineWins = wins.where((win) => win['kind'] == 'line').toList();
@@ -687,7 +698,7 @@ class CasinoApi {
             : eventTypes.contains('wild.stuck')
             ? 'STICKY WILDS'
             : eventTypes.contains('mystery.revealed')
-            ? 'MYSTERY REVEAL'
+            ? 'MYSTERY → ${mysteryData?['target']} • ${mysteryData?['count']} SYMBOLE'
             : upgradeLabel != null
             ? upgradeLabel
             : eventTypes.contains('free_spins.modified')

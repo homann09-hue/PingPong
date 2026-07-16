@@ -663,6 +663,11 @@ describe("spin API", () => {
       version: 3, mathModelVersion: "3.0.0",
       symbols: { M: { kind: "multiplier", payouts: {} } },
     });
+    const pharaoh = await app.inject({ method: "GET", url: "/v1/slots/pharaoh-oasis/paytable" });
+    expect(pharaoh.json()).toMatchObject({
+      version: 3, mathModelVersion: "3.0.0",
+      symbols: { R: { kind: "mystery", payouts: {} } },
+    });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

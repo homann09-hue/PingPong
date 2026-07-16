@@ -593,7 +593,8 @@ describe("configurable evaluation and feature modifiers", () => {
     expect(result.grid).toEqual([["A"], ["A"], ["A"]]);
     expect(result.totalWin).toBe(40);
     expect(result.rounds[0]!.events).toContainEqual({
-      type: "mystery.revealed", data: { symbol: "M", target: "A", count: 3 },
+      type: "mystery.revealed",
+      data: { symbol: "M", target: "A", count: 3, positions: "0:0,1:0,2:0" },
     });
   });
 

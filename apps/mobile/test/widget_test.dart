@@ -98,6 +98,7 @@ void main() {
           body: ClubScreen(
             overview: overview,
             messages: const [],
+            members: const [],
             hasOlderMessages: false,
             busy: false,
             onAddFriend: (_) async {},
@@ -109,6 +110,10 @@ void main() {
             onAcceptClanInvitation: (_) async {},
             onPostClanMessage: (_) async {},
             onRemoveClanMessage: (_) async {},
+            onReportClanMessage: (_, _, _) async {},
+            onUpdateClanMemberRole: (_, _) async {},
+            onRemoveClanMember: (_) async {},
+            onTransferClanOwnership: (_) async {},
             onLoadOlderMessages: () async {},
           ),
         ),

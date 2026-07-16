@@ -66,7 +66,12 @@ function reelStrips(
   });
 }
 
-function symbols(paytable: Paytable, includeCoin = false, includeMultiplier = false) {
+function symbols(
+  paytable: Paytable,
+  includeCoin = false,
+  includeMultiplier = false,
+  includeMystery = false,
+) {
   const payout = (values: readonly [number, number, number]) => ({ 3: values[0], 4: values[1], 5: values[2] });
   return {
     A: { kind: "regular" as const, payouts: payout(paytable.A) },
@@ -82,6 +87,7 @@ function symbols(paytable: Paytable, includeCoin = false, includeMultiplier = fa
     B: { kind: "scatter" as const, payouts: {} },
     ...(includeCoin ? { C: { kind: "coin" as const, payouts: {} } } : {}),
     ...(includeMultiplier ? { M: { kind: "multiplier" as const, payouts: {} } } : {}),
+    ...(includeMystery ? { R: { kind: "mystery" as const, payouts: {} } } : {}),
   };
 }
 
@@ -100,6 +106,7 @@ function game(
       paytable,
       reels.some((strip) => strip.includes("C")),
       reels.some((strip) => strip.includes("M")),
+      reels.some((strip) => strip.includes("R")),
     ),
     bet: { min: 100, max: 10_000, steps: [100, 200, 500, 1_000, 2_000, 5_000, 10_000] },
     math: {
@@ -134,14 +141,16 @@ function game(
 export const pharaohOasisConfig = game(
   "pharaoh-oasis", "Pharaoh Oasis", "high",
   reelStrips([
-    "AKQJASQKAWJABKQJASKQAJKS", "KQAJKSWQAKJABQKSAJQKAWJQ", "QAKSJWAQKJABAKQJSAQKJAWQ",
-    "JKQAWJSKABQAJKSAQJWKAKA", "AJKQSAQWKBJAKQSAJQKAWKJQ",
+    "AKQJASQKAWJABKQJASKQAJKSR", "KQAJKSRWQAKJABQKSAJQKAWJQ", "QAKSJWAQKJABAKQJSAQKJARWQ",
+    "JKQAWJSKABQAJKSAQJWRKAKA", "AJKQSAQWKBJAKQSAJQKARWKJQ",
   ]),
-  scalePaytable(balanced, 2.7),
+  scalePaytable(balanced, 2.86),
   {
     expandingWild: { symbols: ["W"] }, respins: { triggerSymbol: "B", minimumCount: 3, count: 2 },
+    mysteryReveal: { symbol: "R", targets: ["A", "K", "Q", "J"] },
     freeSpins: { scatterSymbol: "S", awards: { 3: 8, 4: 12, 5: 20 }, maxTotal: 100, winMultiplier: 2 },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const dragonPeakConfig = game(

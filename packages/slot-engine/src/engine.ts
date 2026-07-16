@@ -198,7 +198,15 @@ export class SlotEngine {
     if (cells.length === 0) return grid;
     const target = feature.targets[rng.nextInt(feature.targets.length)]!;
     for (const [reel, row] of cells) grid[reel]![row] = target;
-    events.push({ type: "mystery.revealed", data: { symbol: feature.symbol, target, count: cells.length } });
+    events.push({
+      type: "mystery.revealed",
+      data: {
+        symbol: feature.symbol,
+        target,
+        count: cells.length,
+        positions: cells.map(([reel, row]) => `${reel}:${row}`).join(","),
+      },
+    });
     return grid;
   }
 

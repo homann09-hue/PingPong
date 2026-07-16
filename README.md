@@ -55,7 +55,10 @@ Gold a deterministic hold-and-win sequence with persistent coin positions,
 three visible respin lives, reset-on-hit behavior and server-assigned values.
 Neon Nights now walks wilds across deterministic respin rounds, Frozen Kingdom
 retains sticky wild positions through its free-spin sequence, and Pharaoh Oasis
-awards two bounded scatter-triggered respins.
+awards two bounded scatter-triggered respins. Pharaoh Oasis v3 also reveals
+every visible mystery symbol as one server-selected A, K, Q, or J symbol before
+win evaluation. The response carries the exact transformed cells for animation
+and settlement audit.
 Dragon Peak applies a capped 2× multiplier for every winning wild on a payline
 (up to 32×). Candy Carnival now uses the advertised sticky-wild state throughout
 its free-spin sequence instead of an expanding-wild approximation.
@@ -97,7 +100,7 @@ Direct game links are available for visual and gameplay QA:
 
 ## Slot math model
 
-The eight themes now publish math version 2. Each uses 20 paylines and treats
+The eight themes publish independently versioned math models. Each uses 20 paylines and treats
 the wallet debit as total bet, not bet per line. The evaluator divides total
 bet across active lines, pays leading and all-wild combinations, supports
 optional both-ways evaluation, and keeps scatter awards based on total bet.
