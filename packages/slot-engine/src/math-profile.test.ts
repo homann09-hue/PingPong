@@ -26,7 +26,7 @@ describe("published theme math profiles", () => {
       varianceByProfile.set(config.math.volatility, profileVariances);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeGreaterThan(0.75);
       expect(sampledRtp, `${config.id} sampled RTP`).toBeLessThan(1.15);
-      if (config.id === "candy-carnival" || config.id === "vegas-gold") {
+      if (["candy-carnival", "pirate-bay", "vegas-gold"].includes(config.id)) {
         expect(Math.abs(sampledRtp - config.math.targetRtp), `${config.id} calibrated RTP`).toBeLessThan(0.02);
       }
       expect(
@@ -54,9 +54,13 @@ describe("published theme math profiles", () => {
       version: 3,
       math: { mathModelVersion: "3.0.0" },
     });
+    expect(themedConfigs.find((config) => config.id === "pirate-bay")).toMatchObject({
+      version: 3,
+      math: { mathModelVersion: "3.0.0" },
+    });
     expect(
       themedConfigs
-        .filter((config) => config.id !== "candy-carnival" && config.id !== "vegas-gold")
+        .filter((config) => !["candy-carnival", "pirate-bay", "vegas-gold"].includes(config.id))
         .every((config) => config.version === 2),
     ).toBe(true);
   });

@@ -645,6 +645,12 @@ describe("spin API", () => {
     });
     const vegas = await app.inject({ method: "GET", url: "/v1/slots/vegas-gold/paytable" });
     expect(vegas.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
+    const pirate = await app.inject({ method: "GET", url: "/v1/slots/pirate-bay/paytable" });
+    expect(pirate.json()).toMatchObject({
+      version: 3,
+      mathModelVersion: "3.0.0",
+      symbols: { C: { kind: "coin", payouts: {} } },
+    });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

@@ -65,6 +65,12 @@ export interface FeatureConfig {
     readonly symbol: string;
     readonly targets: readonly string[];
   };
+  readonly coinCollect?: {
+    readonly coinSymbol: string;
+    readonly collectorSymbol: string;
+    readonly minimumCoins: number;
+    readonly multipliers: readonly number[];
+  };
   readonly cascades?: {
     readonly maxSteps: number;
     readonly multiplierStep?: number;
@@ -99,7 +105,7 @@ export interface FeatureConfig {
 }
 
 export interface SymbolDefinition {
-  readonly kind: "regular" | "wild" | "scatter" | "mystery";
+  readonly kind: "regular" | "wild" | "scatter" | "mystery" | "coin";
   readonly payouts: Readonly<Record<number, number>>;
 }
 

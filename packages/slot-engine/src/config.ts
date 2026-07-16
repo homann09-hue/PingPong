@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { SlotConfig } from "./types.js";
 
 const symbolSchema = z.object({
-  kind: z.enum(["regular", "wild", "scatter", "mystery"]),
+  kind: z.enum(["regular", "wild", "scatter", "mystery", "coin"]),
   payouts: z.record(z.coerce.number().int().positive(), z.number().int().nonnegative()),
 });
 
@@ -69,6 +69,12 @@ const schema = z.object({
     mysteryReveal: z.object({
       symbol: z.string(),
       targets: z.array(z.string()).min(1).max(20),
+    }).optional(),
+    coinCollect: z.object({
+      coinSymbol: z.string(),
+      collectorSymbol: z.string(),
+      minimumCoins: z.number().int().min(1).max(60),
+      multipliers: z.array(z.number().int().positive()).min(1).max(100),
     }).optional(),
     cascades: z.object({
       maxSteps: z.number().int().min(1).max(100),
@@ -183,6 +189,18 @@ export function parseSlotConfig(input: unknown): SlotConfig {
     }
     if (mystery.targets.some((symbol) => !symbols.has(symbol) || symbol === mystery.symbol)) {
       throw new Error("Mystery reveal targets must reference other configured symbols");
+    }
+  }
+  const coinCollect = config.features?.coinCollect;
+  if (coinCollect) {
+    if (config.symbols[coinCollect.coinSymbol]?.kind !== "coin") {
+      throw new Error("Coin collect must reference a coin symbol");
+    }
+    if (!symbols.has(coinCollect.collectorSymbol) || coinCollect.collectorSymbol === coinCollect.coinSymbol) {
+      throw new Error("Coin collect must reference a distinct configured collector symbol");
+    }
+    if (coinCollect.minimumCoins > config.reels.length * config.rows) {
+      throw new Error("Coin collect minimum must fit the configured grid");
     }
   }
   const bonusScatter = config.features?.pickBonus?.scatterSymbol;

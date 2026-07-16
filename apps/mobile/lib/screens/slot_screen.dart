@@ -358,6 +358,12 @@ class _SlotScreenState extends State<SlotScreen> {
         initialSpots: round.bonusInitialSpots,
         steps: round.bonusRespinSteps,
       ),
+      'coin_collect' => _CoinCollectDialog(
+        reward: round.win,
+        multiplier: round.bonusMultiplier ?? 1,
+        coins: round.bonusCoins,
+        color: widget.game.primary,
+      ),
       'jackpot' => _JackpotDialog(
         reward: round.win,
         tier: round.bonusTier ?? 'MINI',
@@ -658,7 +664,14 @@ class _SlotScreenState extends State<SlotScreen> {
           fit: StackFit.expand,
           alignment: Alignment.center,
           children: [
-            if (assetPath != null)
+            if (symbol == 'C')
+              const Icon(
+                Icons.monetization_on_rounded,
+                color: Color(0xffffc928),
+                size: 48,
+                shadows: [Shadow(color: Colors.white, blurRadius: 8)],
+              )
+            else if (assetPath != null)
               Image.asset(
                 assetPath,
                 fit: BoxFit.contain,
@@ -952,6 +965,102 @@ class _PaytableRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CoinCollectDialog extends StatelessWidget {
+  const _CoinCollectDialog({
+    required this.reward,
+    required this.multiplier,
+    required this.coins,
+    required this.color,
+  });
+
+  final int reward, multiplier;
+  final List<HoldAndWinSpotView> coins;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    backgroundColor: Colors.transparent,
+    child: Container(
+      constraints: const BoxConstraints(maxWidth: 430),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xff402000), Color(0xff140515)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color, width: 3),
+        boxShadow: [BoxShadow(color: color, blurRadius: 32, spreadRadius: 3)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.monetization_on_rounded,
+            color: Color(0xffffd438),
+            size: 58,
+          ),
+          const Text(
+            'COIN COLLECT',
+            style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final coin in coins)
+                Container(
+                  width: 54,
+                  height: 54,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const RadialGradient(
+                      colors: [Color(0xfffff4a8), Color(0xffffa000)],
+                    ),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Text(
+                    '×${coin.multiplier}',
+                    style: const TextStyle(
+                      color: Color(0xff5b2500),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${coins.length} COINS  •  TOTAL ×$multiplier',
+            style: TextStyle(color: color, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: reward),
+            duration: const Duration(milliseconds: 900),
+            builder: (_, value, _) => Text(
+              value.toString().replaceAllMapped(
+                RegExp(r'\B(?=(\d{3})+(?!\d))'),
+                (_) => '.',
+              ),
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('EINSAMMELN'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _JackpotDialog extends StatefulWidget {

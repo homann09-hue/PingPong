@@ -20,6 +20,7 @@ class SpinRoundView {
     required this.bonusBoardSize,
     required this.bonusInitialSpots,
     required this.bonusRespinSteps,
+    required this.bonusCoins,
     required this.featureLabel,
     required this.winningCells,
     required this.winLabel,
@@ -36,6 +37,7 @@ class SpinRoundView {
   final int? bonusBoardSize;
   final List<HoldAndWinSpotView> bonusInitialSpots;
   final List<HoldAndWinStepView> bonusRespinSteps;
+  final List<HoldAndWinSpotView> bonusCoins;
   final String? featureLabel;
   final Set<String> winningCells;
   final String? winLabel;
@@ -627,6 +629,7 @@ class CasinoApi {
         bonusRespinSteps: _holdAndWinSteps(
           bonusData?['respinSteps'] as String?,
         ),
+        bonusCoins: _holdAndWinSpots(bonusData?['coins'] as String?),
         featureLabel: eventTypes.contains('max_win.reached')
             ? 'MAX WIN'
             : eventTypes.contains('wild.walked')

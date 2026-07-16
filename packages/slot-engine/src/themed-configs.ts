@@ -28,7 +28,7 @@ const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "pharaoh-oasis": 0.39,
   "dragon-peak": 0.32,
   "candy-carnival": 0.538,
-  "pirate-bay": 0.32,
+  "pirate-bay": 0.299,
   "neon-nights": 0.50,
   "frozen-kingdom": 0.44,
   "jungle-temple": 0.32,
@@ -54,7 +54,7 @@ function reelStrips(patterns: readonly [string, string, string, string, string],
   });
 }
 
-function symbols(paytable: Paytable) {
+function symbols(paytable: Paytable, includeCoin = false) {
   const payout = (values: readonly [number, number, number]) => ({ 3: values[0], 4: values[1], 5: values[2] });
   return {
     A: { kind: "regular" as const, payouts: payout(paytable.A) },
@@ -68,6 +68,7 @@ function symbols(paytable: Paytable) {
     T: { kind: "regular" as const, payouts: payout(paytable.T) },
     S: { kind: "scatter" as const, payouts: { 3: 2, 4: 8, 5: 30 } },
     B: { kind: "scatter" as const, payouts: {} },
+    ...(includeCoin ? { C: { kind: "coin" as const, payouts: {} } } : {}),
   };
 }
 
@@ -81,7 +82,8 @@ function game(
   release: { readonly version?: number; readonly mathModelVersion?: string } = {},
 ) {
   return parseSlotConfig({
-    id, name, version: release.version ?? 2, rows: 3, reels, paylines: lines, symbols: symbols(paytable),
+    id, name, version: release.version ?? 2, rows: 3, reels, paylines: lines,
+    symbols: symbols(paytable, reels.some((strip) => strip.includes("C"))),
     bet: { min: 100, max: 10_000, steps: [100, 200, 500, 1_000, 2_000, 5_000, 10_000] },
     math: {
       targetRtp: 0.94,
@@ -158,16 +160,21 @@ export const candyCarnivalConfig = game(
 export const pirateBayConfig = game(
   "pirate-bay", "Pirate Bay", "high",
   reelStrips([
-    "AKQJAKSAQJKBWAKQJASQKJAA", "KQAJKQWJAKSBQAJKSAQJAKQJ", "QAJKSAQJAKBWQKJASAKQJQAA",
-    "JAKQJAWKQJSBAQJAKSAQKJAA", "AQJKSAKQJABWQJAKQSAJKQAA",
+    "AKQJCKSAQJKBWAKQJACQKJAA", "KQAJKCWJAKSBQAJKSAQJACKJ", "QAJKSCQJAKBWQKJASACKJQAA",
+    "JAKQJAWKCJSBAQJAKSAQKJAC", "AQJKSAKQJACWQJAKQSAJKCAA",
   ]),
-  scalePaytable(highVariance, 6.5),
+  scalePaytable(highVariance, 9.1),
   {
     cascades: { maxSteps: 8, multiplierStep: 1, maxMultiplier: 8 },
     freeSpins: { scatterSymbol: "S", awards: { 3: 7, 4: 12, 5: 18 }, maxTotal: 90, winMultiplier: 3 },
     pickBonus: { scatterSymbol: "B", minimumCount: 3, multipliers: [5, 8, 12, 20] },
+    coinCollect: {
+      coinSymbol: "C", collectorSymbol: "W", minimumCoins: 3,
+      multipliers: [1, 1, 1, 2, 2, 3, 5],
+    },
     bonusBuy: { costMultiplier: 50 },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const neonNightsConfig = game(

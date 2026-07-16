@@ -111,6 +111,63 @@ describe("configuration-driven layouts", () => {
     expect(replay).toEqual(result);
   });
 
+  it("collects deterministic values from every visible coin", () => {
+    const config = parseSlotConfig({
+      id: "coin-collect-test", version: 1, name: "Coin Collect Test", rows: 1,
+      reels: [["C"], ["C"], ["C"], ["W"]], paylines: [[0,0,0,0]],
+      symbols: {
+        C: { kind: "coin", payouts: {} },
+        W: { kind: "wild", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "medium", expectedHitFrequency: 1 },
+      features: {
+        coinCollect: {
+          coinSymbol: "C", collectorSymbol: "W", minimumCoins: 3, multipliers: [2],
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 31n });
+    const collect = result.rounds.find((round) => round.events[0]?.data.mode === "coin_collect");
+    expect(collect?.totalWin).toBe(60);
+    expect(collect?.events[0]).toEqual({
+      type: "bonus.awarded",
+      data: {
+        amount: 60, multiplier: 6, mode: "coin_collect",
+        coinCount: 3, collectorCount: 1, coins: "0=2,1=2,2=2",
+      },
+    });
+    expect(new SlotEngine(config).spin({ bet: 10, seed: 31n })).toEqual(result);
+  });
+
+  it("collects coins that land during a free-spin round", () => {
+    const config = parseSlotConfig({
+      id: "free-spin-coin-collect", version: 1, name: "Free Spin Coin Collect", rows: 1,
+      reels: [["S"], ["S"], ["S"], ["S"]], paylines: [[0,0,0,0]],
+      symbols: {
+        C: { kind: "coin", payouts: {} },
+        S: { kind: "scatter", payouts: {} },
+        W: { kind: "wild", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "medium", expectedHitFrequency: 1 },
+      features: {
+        freeSpins: {
+          scatterSymbol: "S", awards: { 4: 1 }, maxTotal: 1,
+          reelStrips: [["C"], ["C"], ["C"], ["W"]],
+        },
+        coinCollect: {
+          coinSymbol: "C", collectorSymbol: "W", minimumCoins: 3, multipliers: [3],
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 37n });
+    const collect = result.rounds.find((round) => round.events[0]?.data.mode === "coin_collect");
+    expect(result.freeSpinsPlayed).toBe(1);
+    expect(collect?.totalWin).toBe(90);
+    expect(collect?.events[0]?.data).toMatchObject({
+      mode: "coin_collect", coinCount: 3, collectorCount: 1, multiplier: 9,
+    });
+  });
+
   it("rejects hold-and-win spot ranges that cannot fit the grid", () => {
     expect(() => parseSlotConfig({
       id: "invalid-hold", version: 1, name: "Invalid Hold", rows: 1,

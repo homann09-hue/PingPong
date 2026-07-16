@@ -21,6 +21,7 @@ export class SlotEngine {
 
     const base = this.playPrimary("base", 0, baseGrid, request.bet, rng, rounds);
     this.playConfiguredBonus(base.grid, request.bet, rng, rounds, request.bonusBuy === true);
+    this.playCoinCollect(base.grid, request.bet, rng, rounds);
     this.playJackpot(base.grid, request.bet, rounds);
     this.playRespins(base.grid, request.bet, rng, rounds);
     freeSpinsRemaining += this.freeSpinAward(base.grid);
@@ -36,6 +37,7 @@ export class SlotEngine {
       const freeGrid = this.applyStickyWild(modifiedGrid, stickyCells, stickyEvents);
       const freeMultiplier = this.config.features?.freeSpins?.winMultiplier ?? 1;
       const round = this.playPrimary("free_spin", freeSpinsPlayed, freeGrid, request.bet, rng, rounds, stickyEvents, freeMultiplier);
+      this.playCoinCollect(round.grid, request.bet, rng, rounds);
       const retrigger = this.freeSpinAward(round.grid);
       const accepted = Math.min(retrigger, maximum - freeSpinsPlayed - freeSpinsRemaining);
       if (accepted > 0) { freeSpinsRemaining += accepted; round.events.push(this.awardEvent(accepted)); }
@@ -480,6 +482,30 @@ export class SlotEngine {
       boardSize,
       initialSpots: encode(initial),
       respinSteps: encodedSteps,
+    });
+  }
+
+  private playCoinCollect(
+    grid: readonly (readonly string[])[], bet: number, rng: DeterministicRng, rounds: SpinRound[],
+  ): void {
+    const feature = this.config.features?.coinCollect;
+    if (!feature) return;
+    const collectorCount = grid.flat().filter((symbol) => symbol === feature.collectorSymbol).length;
+    if (collectorCount === 0) return;
+    const positions = grid.flatMap((reel, reelIndex) => reel.flatMap((symbol, row) =>
+      symbol === feature.coinSymbol ? [reelIndex * this.config.rows + row] : [],
+    ));
+    if (positions.length < feature.minimumCoins) return;
+    const coins = positions.map((position) => ({
+      position,
+      multiplier: feature.multipliers[rng.nextInt(feature.multipliers.length)]!,
+    }));
+    const multiplier = coins.reduce((sum, coin) => sum + coin.multiplier, 0);
+    const encoded = coins.map((coin) => `${coin.position}=${coin.multiplier}`).join(",");
+    this.pushBonusRound(grid, multiplier * bet, multiplier, "coin_collect", rounds, {
+      coinCount: coins.length,
+      collectorCount,
+      coins: encoded,
     });
   }
 
