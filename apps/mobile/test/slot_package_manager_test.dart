@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('slot packages honor bundled, current and stale versions', () async {
     final manager = SlotPackageManager(
-      persistence: _SlotPackagePersistence({'pirate-bay': 3, 'neon-nights': 1}),
+      persistence: _SlotPackagePersistence({'pirate-bay': 4, 'neon-nights': 1}),
     );
     await manager.initialize(games);
 

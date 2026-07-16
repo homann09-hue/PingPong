@@ -104,6 +104,8 @@ export interface FeatureConfig {
   readonly pickBonus?: {
     readonly scatterSymbol: string;
     readonly minimumCount: number;
+    readonly picks: number;
+    readonly boardSize: number;
     readonly multipliers: readonly number[];
   };
   readonly wheelBonus?: {

@@ -54,8 +54,9 @@ describe("published theme math profiles", () => {
       math: { mathModelVersion: "3.0.0" },
     });
     expect(themedConfigs.find((config) => config.id === "pirate-bay")).toMatchObject({
-      version: 3,
-      math: { mathModelVersion: "3.0.0" },
+      version: 4,
+      math: { mathModelVersion: "4.0.0" },
+      features: { pickBonus: { picks: 3, boardSize: 9 }, bonusBuy: { costMultiplier: 32 } },
     });
     expect(themedConfigs.find((config) => config.id === "jungle-temple")).toMatchObject({
       version: 4,
@@ -81,4 +82,20 @@ describe("published theme math profiles", () => {
     });
     expect(themedConfigs.every((config) => config.version >= 3)).toBe(true);
   });
+
+  it("keeps the Pirate Bay bonus buy inside its release RTP guardrail", () => {
+    const config = themedConfigs.find((candidate) => candidate.id === "pirate-bay")!;
+    const engine = new SlotEngine(config);
+    const samples = 100_000;
+    const bet = 100;
+    const costMultiplier = config.features?.bonusBuy?.costMultiplier;
+    if (!costMultiplier) throw new Error("Pirate Bay bonus buy is not configured");
+    let returned = 0;
+    for (let seed = 0n; seed < BigInt(samples); seed++) {
+      returned += engine.spin({ bet, seed, bonusBuy: true }).totalWin;
+    }
+    const sampledRtp = returned / (samples * bet * costMultiplier);
+    expect(sampledRtp).toBeGreaterThan(0.9);
+    expect(sampledRtp).toBeLessThan(0.98);
+  }, 10_000);
 });

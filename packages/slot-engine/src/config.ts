@@ -114,6 +114,8 @@ const schema = z.object({
     pickBonus: z.object({
       scatterSymbol: z.string(),
       minimumCount: z.number().int().min(1).max(12),
+      picks: z.number().int().min(1).max(12),
+      boardSize: z.number().int().min(1).max(24),
       multipliers: z.array(z.number().int().positive()).min(1).max(100),
     }).optional(),
     wheelBonus: z.object({
@@ -321,6 +323,10 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   const bonusScatter = config.features?.pickBonus?.scatterSymbol;
   if (bonusScatter && config.symbols[bonusScatter]?.kind !== "scatter") {
     throw new Error("Pick bonus must reference a scatter symbol");
+  }
+  const pickBonus = config.features?.pickBonus;
+  if (pickBonus && pickBonus.picks > pickBonus.boardSize) {
+    throw new Error("Pick count must fit the configured bonus board");
   }
   const wheelScatter = config.features?.wheelBonus?.scatterSymbol;
   if (wheelScatter && config.symbols[wheelScatter]?.kind !== "scatter") {

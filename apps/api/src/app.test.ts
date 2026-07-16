@@ -651,8 +651,8 @@ describe("spin API", () => {
     expect(vegas.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
     const pirate = await app.inject({ method: "GET", url: "/v1/slots/pirate-bay/paytable" });
     expect(pirate.json()).toMatchObject({
-      version: 3,
-      mathModelVersion: "3.0.0",
+      version: 4,
+      mathModelVersion: "4.0.0",
       symbols: { C: { kind: "coin", payouts: {} } },
     });
     const jungle = await app.inject({ method: "GET", url: "/v1/slots/jungle-temple/paytable" });

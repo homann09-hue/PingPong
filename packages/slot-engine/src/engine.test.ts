@@ -131,13 +131,30 @@ describe("configuration-driven layouts", () => {
       reels: [["S"], ["S"], ["S"]], paylines: [[0,0,0]],
       symbols: { S: { kind: "scatter", payouts: { 3: 2 } } },
       math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
-      features: { pickBonus: { scatterSymbol: "S", minimumCount: 3, multipliers: [7] } },
+      features: {
+        pickBonus: { scatterSymbol: "S", minimumCount: 3, picks: 2, boardSize: 6, multipliers: [7] },
+      },
     });
     const result = new SlotEngine(config).spin({ bet: 5, seed: 1n });
     const bonus = result.rounds.find((round) => round.phase === "bonus");
-    expect(bonus?.totalWin).toBe(35);
-    expect(bonus?.events[0]).toEqual({ type: "bonus.awarded", data: { amount: 35, multiplier: 7, mode: "pick" } });
-    expect(result.totalWin).toBe(45);
+    expect(bonus?.totalWin).toBe(70);
+    expect(bonus?.events[0]).toEqual({
+      type: "bonus.awarded",
+      data: { amount: 70, multiplier: 14, mode: "pick", picks: "7,7", boardSize: 6 },
+    });
+    expect(result.totalWin).toBe(80);
+  });
+
+  it("rejects pick boards that cannot fit every configured reveal", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-pick-board", version: 1, name: "Invalid Pick Board", rows: 1,
+      reels: [["S"], ["S"], ["S"]], paylines: [[0, 0, 0]],
+      symbols: { S: { kind: "scatter", payouts: {} } },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        pickBonus: { scatterSymbol: "S", minimumCount: 3, picks: 4, boardSize: 3, multipliers: [2] },
+      },
+    })).toThrow("Pick count must fit");
   });
 
   it("settles wheel bonuses with a reproducible segment", () => {

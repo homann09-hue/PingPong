@@ -350,8 +350,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('BUY BONUS  5.000'), findsOneWidget);
-    await tester.tap(find.text('BUY BONUS  5.000'));
+    expect(find.text('BUY BONUS  3.200'), findsOneWidget);
+    await tester.tap(find.text('BUY BONUS  3.200'));
     await tester.pumpAndSettle();
     expect(find.text('BONUS KAUFEN?'), findsOneWidget);
     expect(find.text('BONUS STARTEN'), findsOneWidget);

@@ -18,6 +18,7 @@ class SpinRoundView {
     required this.bonusSpots,
     required this.bonusSegment,
     required this.bonusBoardSize,
+    required this.bonusPickMultipliers,
     required this.bonusInitialSpots,
     required this.bonusRespinSteps,
     required this.bonusCoins,
@@ -35,6 +36,7 @@ class SpinRoundView {
   final String? bonusTier;
   final int? bonusSpots, bonusSegment;
   final int? bonusBoardSize;
+  final List<int> bonusPickMultipliers;
   final List<HoldAndWinSpotView> bonusInitialSpots;
   final List<HoldAndWinStepView> bonusRespinSteps;
   final List<HoldAndWinSpotView> bonusCoins;
@@ -697,6 +699,7 @@ class CasinoApi {
         bonusSpots: bonusData?['spots'] as int?,
         bonusSegment: bonusData?['segment'] as int?,
         bonusBoardSize: bonusData?['boardSize'] as int?,
+        bonusPickMultipliers: _integerList(bonusData?['picks'] as String?),
         bonusInitialSpots: _holdAndWinSpots(
           bonusData?['initialSpots'] as String?,
         ),
@@ -1513,6 +1516,11 @@ class CasinoApi {
 
   static List<List<String>> _grid(Object? value) =>
       (value as List).map((reel) => (reel as List).cast<String>()).toList();
+
+  static List<int> _integerList(String? value) {
+    if (value == null || value.isEmpty) return const [];
+    return value.split(',').map(int.parse).toList(growable: false);
+  }
 
   static List<HoldAndWinSpotView> _holdAndWinSpots(String? value) {
     if (value == null || value.isEmpty) return const [];

@@ -50,7 +50,7 @@ Each theme now ships with its own background, reel treatment, jackpot values,
 and six optimized transparent symbols (48 bespoke symbols total). Spin results
 are animated round by round so base wins, cascades, and awarded free spins are
 visible instead of being collapsed into one final result. Pirate Bay contains a
-server-authoritative treasure-pick bonus, Jungle Temple a wheel bonus, and Vegas
+server-authoritative three-pick treasure board, Jungle Temple a wheel bonus, and Vegas
 Gold a deterministic hold-and-win sequence with persistent coin positions,
 three visible respin lives, reset-on-hit behavior and server-assigned values.
 Neon Nights now walks wilds across deterministic respin rounds, Frozen Kingdom
@@ -85,7 +85,7 @@ The in-game meters show the exact payout for the selected bet, and jackpot wins
 are returned as auditable bonus rounds with their tier and scatter count.
 
 Pirate Bay, Jungle Temple, and Vegas Gold expose a play-money-only Bonus Buy.
-The API validates eligibility, charges the configured 50× wager atomically, and
+The API validates eligibility, charges the configured 32× or 50× wager atomically, and
 forces the selected server-authoritative bonus state. The result records base
 bet, actual wallet debit, and purchase mode for replay and audit.
 

@@ -531,12 +531,19 @@ export class SlotEngine {
     return multiplier;
   }
 
-  private playPickBonus(grid: readonly (readonly string[])[], bet: number, rng: DeterministicRng, rounds: SpinRound[]): void {
+  private playPickBonus(
+    grid: readonly (readonly string[])[], bet: number, rng: DeterministicRng,
+    rounds: SpinRound[], force = false,
+  ): void {
     const feature = this.config.features?.pickBonus;
     if (!feature) return;
     const count = grid.flat().filter((symbol) => symbol === feature.scatterSymbol).length;
-    if (count < feature.minimumCount) return;
-    const multiplier = feature.multipliers[rng.nextInt(feature.multipliers.length)]!;
+    if (!force && count < feature.minimumCount) return;
+    const picks = Array.from(
+      { length: feature.picks },
+      () => feature.multipliers[rng.nextInt(feature.multipliers.length)]!,
+    );
+    const multiplier = picks.reduce((sum, value) => sum + value, 0);
     const amount = multiplier * bet;
     rounds.push({
       phase: "bonus",
@@ -544,19 +551,16 @@ export class SlotEngine {
       grid: grid.map((reel) => [...reel]),
       wins: [],
       totalWin: amount,
-      events: [{ type: "bonus.awarded", data: { amount, multiplier, mode: "pick" } }],
+      events: [{
+        type: "bonus.awarded",
+        data: { amount, multiplier, mode: "pick", picks: picks.join(","), boardSize: feature.boardSize },
+      }],
     });
   }
 
   private playConfiguredBonus(grid: readonly (readonly string[])[], bet: number, rng: DeterministicRng, rounds: SpinRound[], force = false): void {
     if (this.config.features?.pickBonus) {
-      if (force) {
-        const feature = this.config.features.pickBonus;
-        const multiplier = feature.multipliers[rng.nextInt(feature.multipliers.length)]!;
-        this.pushBonusRound(grid, multiplier * bet, multiplier, "pick", rounds, {});
-      } else {
-        this.playPickBonus(grid, bet, rng, rounds);
-      }
+      this.playPickBonus(grid, bet, rng, rounds, force);
       return;
     }
     const wheel = this.config.features?.wheelBonus;

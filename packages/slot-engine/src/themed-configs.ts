@@ -204,14 +204,17 @@ export const pirateBayConfig = game(
   {
     cascades: { maxSteps: 8, multiplierStep: 1, maxMultiplier: 8 },
     freeSpins: { scatterSymbol: "S", awards: { 3: 7, 4: 12, 5: 18 }, maxTotal: 90, winMultiplier: 3 },
-    pickBonus: { scatterSymbol: "B", minimumCount: 3, multipliers: [5, 8, 12, 20] },
+    pickBonus: {
+      scatterSymbol: "B", minimumCount: 3, picks: 3, boardSize: 9,
+      multipliers: [3, 5, 8, 12, 20],
+    },
     coinCollect: {
       coinSymbol: "C", collectorSymbol: "W", minimumCoins: 3,
       multipliers: [1, 1, 1, 2, 2, 3, 5],
     },
-    bonusBuy: { costMultiplier: 50 },
+    bonusBuy: { costMultiplier: 32 },
   },
-  { version: 3, mathModelVersion: "3.0.0" },
+  { version: 4, mathModelVersion: "4.0.0" },
 );
 
 export const neonNightsConfig = game(

@@ -372,6 +372,8 @@ class _SlotScreenState extends State<SlotScreen> {
       _ => _TreasurePickDialog(
         reward: round.win,
         multiplier: round.bonusMultiplier ?? 1,
+        picks: round.bonusPickMultipliers,
+        boardSize: round.bonusBoardSize ?? 3,
       ),
     };
     return showDialog<void>(
@@ -1198,16 +1200,30 @@ class _JackpotDialogState extends State<_JackpotDialog> {
 }
 
 class _TreasurePickDialog extends StatefulWidget {
-  const _TreasurePickDialog({required this.reward, required this.multiplier});
+  const _TreasurePickDialog({
+    required this.reward,
+    required this.multiplier,
+    required this.picks,
+    required this.boardSize,
+  });
 
   final int reward, multiplier;
+  final List<int> picks;
+  final int boardSize;
 
   @override
   State<_TreasurePickDialog> createState() => _TreasurePickDialogState();
 }
 
 class _TreasurePickDialogState extends State<_TreasurePickDialog> {
-  int? selected;
+  final Map<int, int> revealed = {};
+
+  bool get complete => revealed.length >= widget.picks.length;
+
+  void reveal(int position) {
+    if (complete || revealed.containsKey(position)) return;
+    setState(() => revealed[position] = widget.picks[revealed.length]);
+  }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -1221,45 +1237,57 @@ class _TreasurePickDialogState extends State<_TreasurePickDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          selected == null
-              ? 'Wähle eine Schatztruhe'
+          revealed.isEmpty
+              ? 'Öffne ${widget.picks.length} Schatztruhen'
+              : !complete
+              ? '${widget.picks.length - revealed.length} PICKS VERBLEIBEN'
               : 'x${widget.multiplier}  •  ${_format(widget.reward)} COINS',
         ),
         const SizedBox(height: 14),
-        Row(
-          children: List.generate(3, (index) {
-            final revealed = selected == index;
-            return Expanded(
-              child: GestureDetector(
-                onTap: selected == null
-                    ? () => setState(() => selected = index)
-                    : null,
-                child: AnimatedScale(
-                  duration: const Duration(milliseconds: 260),
-                  scale: revealed ? 1.12 : 1,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ColorFiltered(
-                        colorFilter: revealed
-                            ? const ColorFilter.mode(
-                                Colors.transparent,
-                                BlendMode.dst,
-                              )
-                            : const ColorFilter.mode(
-                                Color(0xff152b55),
-                                BlendMode.modulate,
-                              ),
-                        child: Image.asset('assets/symbols/pirate/scatter.png'),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 3,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          children: List.generate(widget.boardSize, (index) {
+            final value = revealed[index];
+            return GestureDetector(
+              onTap: value == null && !complete ? () => reveal(index) : null,
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 260),
+                scale: value != null ? 1.08 : 1,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    ColorFiltered(
+                      colorFilter: value != null
+                          ? const ColorFilter.mode(
+                              Colors.transparent,
+                              BlendMode.dst,
+                            )
+                          : const ColorFilter.mode(
+                              Color(0xff152b55),
+                              BlendMode.modulate,
+                            ),
+                      child: Image.asset('assets/symbols/pirate/scatter.png'),
+                    ),
+                    if (value == null)
+                      const Icon(
+                        Icons.lock,
+                        color: Color(0xffffd45c),
+                        size: 28,
                       ),
-                      if (!revealed)
-                        const Icon(
-                          Icons.lock,
+                    if (value != null)
+                      Text(
+                        '×$value',
+                        style: const TextStyle(
                           color: Color(0xffffd45c),
-                          size: 28,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             );
@@ -1270,7 +1298,7 @@ class _TreasurePickDialogState extends State<_TreasurePickDialog> {
     actionsAlignment: MainAxisAlignment.center,
     actions: [
       FilledButton(
-        onPressed: selected == null ? null : () => Navigator.pop(context),
+        onPressed: complete ? () => Navigator.pop(context) : null,
         child: const Text('COINS EINSAMMELN'),
       ),
     ],
