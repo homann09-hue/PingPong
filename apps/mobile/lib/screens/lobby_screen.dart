@@ -73,6 +73,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<Map<String, dynamic>> tournamentLeaders = const [];
   int tab = 0;
   bool rewardBusy = false;
+  bool walletBusy = false;
   bool socialBusy = false;
   String? shopBusyOfferId;
   String? storeBusyProductId;
@@ -725,6 +726,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               gems: gems,
               loyaltyPoints: loyaltyPoints,
               vipTier: vipTier,
+              onWalletTap: walletBusy ? null : _openWallet,
               onVipTap: _showVip,
               onNotificationsTap: _openNotificationSettings,
               onShopTap: () => setState(() => tab = 4),
@@ -840,6 +842,41 @@ class _LobbyScreenState extends State<LobbyScreen> {
       nextTier: vipNextTier,
     ),
   );
+
+  Future<void> _openWallet() async {
+    if (walletBusy) return;
+    setState(() => walletBusy = true);
+    try {
+      final results = await Future.wait<Object>([
+        api.wallet(),
+        api.walletTransactions(),
+      ]);
+      if (!mounted) return;
+      final balances = results[0] as List<WalletBalanceView>;
+      final transactions = results[1] as List<WalletTransactionView>;
+      final refreshedLoyalty = {
+        for (final balance in balances) balance.currency: balance.balance,
+      }['loyalty_point'];
+      if (refreshedLoyalty != null) {
+        setState(() => loyaltyPoints = refreshedLoyalty);
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) =>
+            WalletSheet(balances: balances, transactions: transactions),
+      );
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Wallet konnte nicht geladen werden.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => walletBusy = false);
+    }
+  }
 
   void _openInbox() {
     final missionRewards = missions
@@ -1004,6 +1041,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
     ),
   );
 
+  // Kept as the alternate map presentation while LobbyHub is the active layout.
+  // ignore: unused_element
   Widget _worldJourney() => SingleChildScrollView(
     child: SizedBox(
       height: 2100,

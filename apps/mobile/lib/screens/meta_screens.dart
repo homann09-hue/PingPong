@@ -9,6 +9,220 @@ typedef ShopPurchaseCallback = Future<void> Function(ShopOfferView offer);
 typedef StorePurchaseCallback =
     Future<void> Function(PurchasableStoreProductView product);
 
+/// Presents every economy balance and the latest immutable wallet movements.
+class WalletSheet extends StatelessWidget {
+  const WalletSheet({
+    super.key,
+    required this.balances,
+    required this.transactions,
+  });
+
+  final List<WalletBalanceView> balances;
+  final List<WalletTransactionView> transactions;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Container(
+      key: const Key('wallet-sheet'),
+      constraints: const BoxConstraints(maxHeight: 720),
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+      decoration: const BoxDecoration(
+        color: Color(0xff180a35),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        border: Border(top: BorderSide(color: Color(0xffffc52f), width: 2)),
+      ),
+      child: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: SizedBox(
+                    width: 44,
+                    child: Divider(thickness: 4, color: Colors.white38),
+                  ),
+                ),
+                Text('MEIN WALLET', style: MetaStyle.hero),
+                SizedBox(height: 3),
+                Text(
+                  'Alle virtuellen Währungen dieses Kontos. Kein Echtgeld und keine Auszahlung.',
+                  style: MetaStyle.caption,
+                ),
+                SizedBox(height: 14),
+              ],
+            ),
+          ),
+          SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _WalletBalanceCard(balance: balances[index]),
+              childCount: balances.length,
+            ),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisExtent: 72,
+              crossAxisSpacing: 9,
+              mainAxisSpacing: 9,
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(top: 20, bottom: 8),
+              child: Text('LETZTE BUCHUNGEN', style: MetaStyle.title),
+            ),
+          ),
+          if (transactions.isEmpty)
+            const SliverToBoxAdapter(
+              child: Text(
+                'Noch keine Buchungen vorhanden.',
+                style: MetaStyle.caption,
+              ),
+            )
+          else
+            SliverList.separated(
+              itemCount: transactions.length,
+              separatorBuilder: (_, _) => const Divider(color: Colors.white12),
+              itemBuilder: (context, index) =>
+                  _WalletTransactionRow(transaction: transactions[index]),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _WalletBalanceCard extends StatelessWidget {
+  const _WalletBalanceCard({required this.balance});
+  final WalletBalanceView balance;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xff2b1450),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: _currencyColor(balance.currency).withValues(alpha: .55),
+      ),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          _currencyIcon(balance.currency),
+          color: _currencyColor(balance.currency),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _currencyLabel(balance.currency),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: MetaStyle.caption,
+              ),
+              Text(_walletNumber(balance.balance), style: MetaStyle.reward),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _WalletTransactionRow extends StatelessWidget {
+  const _WalletTransactionRow({required this.transaction});
+  final WalletTransactionView transaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final credit = transaction.amount >= 0;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: (credit ? Colors.greenAccent : Colors.redAccent)
+            .withValues(alpha: .14),
+        child: Icon(
+          credit ? Icons.add : Icons.remove,
+          color: credit ? Colors.greenAccent : Colors.redAccent,
+        ),
+      ),
+      title: Text(
+        _transactionLabel(transaction.source),
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text(
+        '${_currencyLabel(transaction.currency)} • Stand ${_walletNumber(transaction.balanceAfter)}',
+        style: MetaStyle.caption,
+      ),
+      trailing: Text(
+        '${credit ? '+' : ''}${_walletNumber(transaction.amount)}',
+        style: TextStyle(
+          color: credit ? Colors.greenAccent : Colors.redAccent,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+String _walletNumber(int value) => value.toString().replaceAllMapped(
+  RegExp(r'\B(?=(\d{3})+(?!\d))'),
+  (_) => '.',
+);
+
+String _currencyLabel(String currency) => switch (currency) {
+  'coin' => 'Coins',
+  'gem' => 'Diamanten',
+  'loyalty_point' => 'Loyalty Points',
+  'vip_point' => 'VIP-Punkte',
+  'high_roller_point' => 'High-Roller-Punkte',
+  'clan_point' => 'Clan-Punkte',
+  'league_point' => 'Fireball-Punkte',
+  'mission_point' => 'Missionspunkte',
+  'lotsa_cash' => 'Lotsa Cash',
+  'stamp' => 'Sammelmarken',
+  'check_win_mark' => 'Check & Win',
+  'booster' => 'Booster',
+  'oinky_coupon' => 'Oinky-Coupons',
+  _ => currency,
+};
+
+IconData _currencyIcon(String currency) => switch (currency) {
+  'coin' => Icons.monetization_on,
+  'gem' => Icons.diamond,
+  'vip_point' || 'loyalty_point' => Icons.workspace_premium,
+  'clan_point' => Icons.groups,
+  'league_point' => Icons.local_fire_department,
+  'mission_point' => Icons.flag,
+  'stamp' || 'check_win_mark' => Icons.check_circle,
+  'booster' => Icons.bolt,
+  'oinky_coupon' => Icons.confirmation_number,
+  _ => Icons.stars,
+};
+
+Color _currencyColor(String currency) => switch (currency) {
+  'coin' => const Color(0xffffcf3a),
+  'gem' => const Color(0xff42e3ff),
+  'league_point' => const Color(0xffff6b42),
+  'clan_point' => const Color(0xff68f0b1),
+  _ => const Color(0xffff8bd8),
+};
+
+String _transactionLabel(String source) => switch (source) {
+  'spin' => 'Slot-Spin',
+  'reward' || 'timed_reward' => 'Belohnung',
+  'bonus_wheel' => 'Bonusrad',
+  'mission' => 'Mission',
+  'shop' => 'Shop',
+  'store_purchase' => 'Paket gekauft',
+  'store_refund' => 'Kauf storniert',
+  _ => 'Wallet-Buchung',
+};
+
 class NotificationSettingsSheet extends StatefulWidget {
   const NotificationSettingsSheet({super.key, required this.initial});
   final PushPreferencesView initial;

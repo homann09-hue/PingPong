@@ -172,6 +172,32 @@ class ProfileResponse {
   final List<Map<String, dynamic>> leaders;
 }
 
+/// A single server-authoritative balance in the player's shared economy.
+class WalletBalanceView {
+  const WalletBalanceView({required this.currency, required this.balance});
+
+  final String currency;
+  final int balance;
+}
+
+/// An immutable wallet ledger entry returned by the audit API.
+class WalletTransactionView {
+  const WalletTransactionView({
+    required this.id,
+    required this.currency,
+    required this.amount,
+    required this.direction,
+    required this.reason,
+    required this.source,
+    required this.balanceAfter,
+    required this.createdAt,
+  });
+
+  final String id, currency, direction, reason, source;
+  final int amount, balanceAfter;
+  final DateTime createdAt;
+}
+
 class ShopOfferView {
   const ShopOfferView({
     required this.id,
@@ -719,6 +745,8 @@ class CasinoApi {
             ? 'STICKY WILDS'
             : eventTypes.contains('mystery.revealed')
             ? 'MYSTERY → ${mysteryData?['target']} • ${mysteryData?['count']} SYMBOLE'
+            // The explicit branch keeps the feature-priority chain readable.
+            // ignore: prefer_if_null_operators
             : upgradeLabel != null
             ? upgradeLabel
             : eventTypes.contains('free_spins.modified')
@@ -820,6 +848,52 @@ class CasinoApi {
       tournamentEntrants: tournament['entrants'] as int,
       leaders: (tournament['leaders'] as List).cast<Map<String, dynamic>>(),
     );
+  }
+
+  /// Loads the complete shared wallet in the stable order defined by the API.
+  Future<List<WalletBalanceView>> wallet() async {
+    final response = await _client.get(Uri.parse('$base/v1/wallet'));
+    if (response.statusCode != 200) {
+      throw StateError('Wallet konnte nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['balances'] as List)
+        .map((value) {
+          final balance = value as Map<String, dynamic>;
+          return WalletBalanceView(
+            currency: balance['currency'] as String,
+            balance: balance['balance'] as int,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  /// Loads the newest immutable wallet movements for account transparency.
+  Future<List<WalletTransactionView>> walletTransactions({
+    int limit = 50,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$base/v1/wallet/transactions?limit=$limit'),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Wallet-Verlauf konnte nicht geladen werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['transactions'] as List)
+        .map((value) {
+          final transaction = value as Map<String, dynamic>;
+          return WalletTransactionView(
+            id: transaction['id'] as String,
+            currency: transaction['currency'] as String,
+            amount: transaction['amount'] as int,
+            direction: transaction['direction'] as String,
+            reason: transaction['reason'] as String,
+            source: transaction['source'] as String,
+            balanceAfter: transaction['balanceAfter'] as int,
+            createdAt: DateTime.parse(transaction['createdAt'] as String),
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<List<ShopOfferView>> shopOffers() async {

@@ -393,8 +393,9 @@ class _QuickActions extends StatelessWidget {
   }
 
   String _rewardCaption() {
-    if (dailyReward?.claimable == true || hourlyReward?.claimable == true)
+    if (dailyReward?.claimable == true || hourlyReward?.claimable == true) {
       return 'Claim now';
+    }
     final next = hourlyReward?.availableAt;
     if (next == null) return 'Daily reward';
     return _countdown(next, now);
@@ -826,8 +827,9 @@ String _remaining(DateTime? end, DateTime now) {
   if (end == null) return '6d 12h remaining';
   final duration = end.toUtc().difference(now.toUtc());
   if (duration.isNegative) return 'Ending now';
-  if (duration.inDays > 0)
+  if (duration.inDays > 0) {
     return '${duration.inDays}d ${duration.inHours.remainder(24)}h remaining';
+  }
   return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m remaining';
 }
 

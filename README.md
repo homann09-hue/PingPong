@@ -161,6 +161,8 @@ Settled spins atomically award wager-scaled progression currencies; scarce
 collectibles remain zero until an explicit event or reward grants them.
 If the selected wager exceeds the Coin balance, the slot blocks the request and
 offers an explicit route to free timed bonuses or the play-money shop.
+Tapping any currency in the lobby HUD opens the authenticated wallet center,
+which renders all thirteen balances and the newest immutable ledger movements.
 
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan

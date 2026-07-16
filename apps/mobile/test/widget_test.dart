@@ -184,6 +184,45 @@ void main() {
     expect(purchased?.id, 'daily-fortune');
   });
 
+  testWidgets('wallet sheet renders economy balances and ledger movements', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: WalletSheet(
+            balances: const [
+              WalletBalanceView(currency: 'coin', balance: 8450000),
+              WalletBalanceView(currency: 'gem', balance: 320),
+              WalletBalanceView(currency: 'league_point', balance: 42),
+            ],
+            transactions: [
+              WalletTransactionView(
+                id: 'ledger-1',
+                currency: 'coin',
+                amount: -1000,
+                direction: 'debit',
+                reason: 'spin_wager',
+                source: 'spin',
+                balanceAfter: 8450000,
+                createdAt: DateTime.utc(2026, 7, 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('wallet-sheet')), findsOneWidget);
+    expect(find.text('MEIN WALLET'), findsOneWidget);
+    expect(find.text('Coins'), findsOneWidget);
+    expect(find.text('Diamanten'), findsOneWidget);
+    expect(find.text('Fireball-Punkte'), findsOneWidget);
+    expect(find.text('Slot-Spin'), findsOneWidget);
+    expect(find.text('-1.000'), findsOneWidget);
+  });
+
   testWidgets('VIP badge opens the progression sheet', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(const AuroraApp());

@@ -34,3 +34,6 @@ reward flows must credit them through explicit ledger entries.
   version review rather than an ad-hoc UI counter.
 - Insufficient Coin balance never starts a spin; Flutter routes the player to
   the bonus center or play-money shop instead.
+- The lobby wallet center reads balances and audit history from `/v1/wallet`
+  and `/v1/wallet/transactions`; it never derives authoritative balances from
+  locally cached spin animations.

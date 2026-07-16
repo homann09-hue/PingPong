@@ -9,12 +9,14 @@ class TopHud extends StatelessWidget {
     this.gems = 320,
     this.loyaltyPoints = 0,
     this.vipTier = 'GOLD',
+    this.onWalletTap,
     this.onVipTap,
     this.onNotificationsTap,
     this.onShopTap,
   });
   final int balance, level, xp, gems, loyaltyPoints;
   final String vipTier;
+  final VoidCallback? onWalletTap;
   final VoidCallback? onVipTap;
   final VoidCallback? onNotificationsTap;
   final VoidCallback? onShopTap;
@@ -104,14 +106,21 @@ class TopHud extends StatelessWidget {
               Icons.monetization_on,
               _fmt(balance),
               const Color(0xffffcf3a),
+              onWalletTap,
             ),
             const SizedBox(width: 5),
-            _currency(Icons.diamond, _fmt(gems), const Color(0xff42e3ff)),
+            _currency(
+              Icons.diamond,
+              _fmt(gems),
+              const Color(0xff42e3ff),
+              onWalletTap,
+            ),
             const SizedBox(width: 5),
             _currency(
               Icons.workspace_premium,
               '${_fmt(loyaltyPoints)} LP',
               const Color(0xffff8bd8),
+              onWalletTap,
             ),
             IconButton(
               onPressed: onShopTap,
@@ -164,22 +173,34 @@ class TopHud extends StatelessWidget {
       ),
     ),
   );
-  static Widget _currency(IconData i, String value, Color c) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.black45,
+  static Widget _currency(
+    IconData i,
+    String value,
+    Color c,
+    VoidCallback? onTap,
+  ) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: c.withValues(alpha: .55)),
-    ),
-    child: Row(
-      children: [
-        Icon(i, size: 17, color: c),
-        const SizedBox(width: 3),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black45,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: c.withValues(alpha: .55)),
         ),
-      ],
+        child: Row(
+          children: [
+            Icon(i, size: 17, color: c),
+            const SizedBox(width: 3),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
     ),
   );
   static String _fmt(int v) => v.toString().replaceAllMapped(
