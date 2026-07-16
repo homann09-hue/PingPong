@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// Immutable catalog metadata used to present and launch one slot theme.
 class GameDefinition {
   const GameDefinition({
     required this.id,
@@ -11,12 +12,21 @@ class GameDefinition {
     required this.features,
     required this.primary,
     required this.secondary,
+    required this.category,
+    required this.packageVersion,
+    required this.packageSizeMb,
+    this.bundled = false,
+    this.isNew = false,
+    this.featured = false,
     this.bonusBuyMultiplier,
   });
 
   final String id, name, asset, symbolSet, jackpot, features;
   final int unlockLevel;
+  final int packageVersion, packageSizeMb;
   final int? bonusBuyMultiplier;
+  final String category;
+  final bool bundled, isNew, featured;
   final Color primary, secondary;
 }
 
@@ -31,6 +41,11 @@ const games = [
     features: 'EXPANDING WILDS • 2× FREE SPINS • RESPINS',
     primary: Color(0xffffb52c),
     secondary: Color(0xff6b2bd9),
+    category: 'ANCIENT',
+    packageVersion: 2,
+    packageSizeMb: 18,
+    bundled: true,
+    featured: true,
   ),
   GameDefinition(
     id: 'dragon-peak',
@@ -42,6 +57,11 @@ const games = [
     features: 'CASCADES UP TO 10× • DRAGON WILD MULTIPLIER',
     primary: Color(0xffff5b25),
     secondary: Color(0xff821411),
+    category: 'ADVENTURE',
+    packageVersion: 2,
+    packageSizeMb: 21,
+    bundled: true,
+    featured: true,
   ),
   GameDefinition(
     id: 'candy-carnival',
@@ -53,6 +73,10 @@ const games = [
     features: 'STICKY WILDS • 3 CASCADES • 5 FREE SPINS',
     primary: Color(0xffff4fc3),
     secondary: Color(0xff7b2cff),
+    category: 'CASCADE',
+    packageVersion: 2,
+    packageSizeMb: 17,
+    bundled: true,
   ),
   GameDefinition(
     id: 'pirate-bay',
@@ -64,6 +88,11 @@ const games = [
     features: '3× FREE SPIN WINS • TREASURE PICK BONUS',
     primary: Color(0xff24a9df),
     secondary: Color(0xff073f8c),
+    category: 'BONUS GAMES',
+    packageVersion: 2,
+    packageSizeMb: 24,
+    isNew: true,
+    featured: true,
     bonusBuyMultiplier: 50,
   ),
   GameDefinition(
@@ -76,6 +105,10 @@ const games = [
     features: 'WALKING NEON WILDS • 8 FREE SPINS',
     primary: Color(0xffff35dc),
     secondary: Color(0xff1369ff),
+    category: 'LOW VOLATILITY',
+    packageVersion: 2,
+    packageSizeMb: 19,
+    isNew: true,
   ),
   GameDefinition(
     id: 'frozen-kingdom',
@@ -87,6 +120,9 @@ const games = [
     features: 'STICKY ICE WILDS • 5 FREE SPINS',
     primary: Color(0xff52e7ff),
     secondary: Color(0xff2453b8),
+    category: 'FREE SPINS',
+    packageVersion: 2,
+    packageSizeMb: 20,
   ),
   GameDefinition(
     id: 'jungle-temple',
@@ -94,10 +130,15 @@ const games = [
     asset: 'assets/slots/jungle_temple.png',
     symbolSet: 'jungle',
     jackpot: '105.600.000',
-    unlockLevel: 9,
+    unlockLevel: 15,
     features: 'CASCADES UP TO 12× • TEMPLE WHEEL',
     primary: Color(0xffffc82f),
     secondary: Color(0xff087a55),
+    category: 'MEGA FEATURES',
+    packageVersion: 2,
+    packageSizeMb: 25,
+    isNew: true,
+    featured: true,
     bonusBuyMultiplier: 50,
   ),
   GameDefinition(
@@ -106,10 +147,14 @@ const games = [
     asset: 'assets/slots/vegas_gold.png',
     symbolSet: 'vegas',
     jackpot: '150.000.000',
-    unlockLevel: 11,
+    unlockLevel: 20,
     features: 'BOTH WAYS PAYS • HOLD & WIN',
     primary: Color(0xffffc52f),
     secondary: Color(0xff8b101c),
+    category: 'CLASSIC VEGAS',
+    packageVersion: 2,
+    packageSizeMb: 23,
+    isNew: true,
     bonusBuyMultiplier: 50,
   ),
 ];

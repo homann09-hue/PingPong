@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import '../models/game_definition.dart';
 import '../services/casino_api.dart';
 import '../services/push_messaging_bridge.dart';
+import '../services/slot_package_manager.dart';
 import '../services/store_purchase_bridge.dart';
 import '../services/store_purchase_bridge_factory.dart';
+import '../widgets/lobby_hub.dart';
 import '../widgets/top_hud.dart';
 import 'meta_screens.dart';
 import 'slot_screen.dart';
@@ -16,6 +18,21 @@ class LobbyScreen extends StatefulWidget {
 
   @override
   State<LobbyScreen> createState() => _LobbyScreenState();
+}
+
+class _HubAction {
+  const _HubAction({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    this.badge = 0,
+  });
+
+  final IconData icon;
+  final String title, detail;
+  final VoidCallback onTap;
+  final int badge;
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
@@ -66,10 +83,18 @@ class _LobbyScreenState extends State<LobbyScreen> {
   final pushBridge = PushMessagingBridge();
   StreamSubscription<StorePurchaseUpdate>? storeUpdates;
   StreamSubscription<String>? pushTokenUpdates;
+  late final SlotPackageManager slotPackages;
+  Timer? lobbyClock;
+  DateTime lobbyNow = DateTime.now().toUtc();
 
   @override
   void initState() {
     super.initState();
+    slotPackages = SlotPackageManager()..addListener(_onSlotPackagesChanged);
+    unawaited(slotPackages.initialize(games));
+    lobbyClock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() => lobbyNow = DateTime.now().toUtc());
+    });
     _loadProfile();
     _loadShopOffers();
     storeUpdates = storeBridge.updates.listen(_handleStorePurchaseUpdate);
@@ -468,10 +493,35 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
+    lobbyClock?.cancel();
+    slotPackages.removeListener(_onSlotPackagesChanged);
+    slotPackages.dispose();
     unawaited(storeUpdates?.cancel());
     unawaited(pushTokenUpdates?.cancel());
     unawaited(storeBridge.dispose());
     super.dispose();
+  }
+
+  void _onSlotPackagesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _refreshLobby() async {
+    await Future.wait([
+      _loadProfile(),
+      _loadShopOffers(),
+      _loadSocial(),
+      _loadLiveOps(),
+      _loadMessaging(),
+    ]);
+  }
+
+  Future<void> _prepareSlot(GameDefinition game) async {
+    final ready = await slotPackages.prepare(context, game);
+    if (!mounted || ready) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Slotpaket konnte nicht geladen werden.')),
+    );
   }
 
   Future<void> _purchaseShopOffer(ShopOfferView offer) async {
@@ -672,6 +722,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               vipTier: vipTier,
               onVipTap: _showVip,
               onNotificationsTap: _openNotificationSettings,
+              onShopTap: () => setState(() => tab = 4),
             ),
             Expanded(child: _content()),
             _nav(),
@@ -748,7 +799,29 @@ class _LobbyScreenState extends State<LobbyScreen> {
       onStorePurchase: _purchaseStoreProduct,
       onRestoreStorePurchases: _restoreStorePurchases,
     ),
-    _ => _worldJourney(),
+    _ => LobbyHub(
+      level: level,
+      now: lobbyNow,
+      games: games,
+      packageManager: slotPackages,
+      missions: missions,
+      events: liveEvents,
+      shopOffers: shopOffers,
+      social: socialOverview,
+      campaign: activeCampaign,
+      hourlyReward: hourlyReward,
+      dailyReward: dailyReward,
+      wheel: rewardWheel,
+      onRefresh: _refreshLobby,
+      onPlay: (game) => unawaited(_play(game)),
+      onPrepare: (game) => unawaited(_prepareSlot(game)),
+      onNavigate: (value) => setState(() => tab = value),
+      onOpenRewards: () => unawaited(_openRewardCenter()),
+      onOpenInbox: _openInbox,
+      onOpenBoosts: _openBoosts,
+      onOpenSettings: _openLobbySettings,
+      onOpenShop: () => setState(() => tab = 4),
+    ),
   };
 
   void _showVip() => showModalBottomSheet<void>(
@@ -760,6 +833,169 @@ class _LobbyScreenState extends State<LobbyScreen> {
       points: vipPoints,
       tierStart: vipTierStart,
       nextTier: vipNextTier,
+    ),
+  );
+
+  void _openInbox() {
+    final missionRewards = missions
+        .where((mission) => mission.completed && !mission.claimed)
+        .length;
+    final friendRequests = socialOverview?.incomingRequests.length ?? 0;
+    final clanInvites = socialOverview?.incomingClanInvitations.length ?? 0;
+    unawaited(
+      _openHubSheet(
+        title: 'INBOX',
+        subtitle: 'Deine aktuellen Belohnungen und sozialen Updates',
+        actions: [
+          _HubAction(
+            icon: Icons.card_giftcard,
+            title: dailyReward?.claimable == true
+                ? 'Täglicher Bonus bereit'
+                : 'Reward Center',
+            detail: dailyReward?.claimable == true
+                ? '${_fmt(dailyReward!.nextCoins)} Coins warten auf dich.'
+                : 'Stundenbonus, Tagesbonus und Bonusrad',
+            badge: dailyReward?.claimable == true ? 1 : 0,
+            onTap: () => unawaited(_openRewardCenter()),
+          ),
+          _HubAction(
+            icon: Icons.task_alt,
+            title: 'Missionen',
+            detail: '$missionRewards Belohnungen abholbereit',
+            badge: missionRewards,
+            onTap: () => setState(() => tab = 1),
+          ),
+          _HubAction(
+            icon: Icons.group_add_outlined,
+            title: 'Freunde & Clan',
+            detail:
+                '$friendRequests Freundesanfragen · $clanInvites Clan-Einladungen',
+            badge: friendRequests + clanInvites,
+            onTap: () => setState(() => tab = 2),
+          ),
+          if (activeCampaign != null)
+            _HubAction(
+              icon: Icons.campaign_outlined,
+              title: activeCampaign!.title,
+              detail: activeCampaign!.subtitle,
+              onTap: () => setState(() => tab = 3),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _openBoosts() => unawaited(
+    _openHubSheet(
+      title: 'BOOST CENTER',
+      subtitle: 'Aktive Fortschritts- und Belohnungssysteme',
+      actions: [
+        _HubAction(
+          icon: Icons.workspace_premium_outlined,
+          title: '$vipTier VIP',
+          detail: '$vipPoints Punkte · nächste Stufe bei $vipNextTier',
+          onTap: _showVip,
+        ),
+        _HubAction(
+          icon: Icons.casino_outlined,
+          title: 'Bonusrad',
+          detail: '${rewardWheel?.availableSpins ?? 0} Spins verfügbar',
+          badge: rewardWheel?.availableSpins ?? 0,
+          onTap: () => unawaited(_openRewardCenter()),
+        ),
+        _HubAction(
+          icon: Icons.emoji_events_outlined,
+          title: 'Live Events',
+          detail: '${liveEvents.length} aktive Wettbewerbe',
+          onTap: () => setState(() => tab = 3),
+        ),
+      ],
+    ),
+  );
+
+  void _openLobbySettings() => unawaited(
+    _openHubSheet(
+      title: 'MENÜ & EINSTELLUNGEN',
+      subtitle: 'Konto, Benachrichtigungen und Spielinformationen',
+      actions: [
+        _HubAction(
+          icon: Icons.notifications_outlined,
+          title: 'Benachrichtigungen',
+          detail: pushPreferences?.enabled == true
+              ? 'Aktiv · Ruhezeiten und Kategorien verwalten'
+              : 'Deaktiviert · Einstellungen öffnen',
+          onTap: () => unawaited(_openNotificationSettings()),
+        ),
+        _HubAction(
+          icon: Icons.verified_user_outlined,
+          title: 'Spielgeld-Casino',
+          detail: 'Keine Echtgeldgewinne · serverautoritatives Spiel',
+          onTap: () {},
+        ),
+        _HubAction(
+          icon: Icons.shopping_bag_outlined,
+          title: 'Käufe verwalten',
+          detail: 'Shop öffnen oder frühere Käufe wiederherstellen',
+          onTap: () => setState(() => tab = 4),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _openHubSheet({
+    required String title,
+    required String subtitle,
+    required List<_HubAction> actions,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+      decoration: const BoxDecoration(
+        color: Color(0xff180b35),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        border: Border(top: BorderSide(color: Color(0xffffd24a), width: 2)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            ),
+            Text(subtitle, style: const TextStyle(color: Colors.white60)),
+            const SizedBox(height: 14),
+            for (final action in actions)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: const Color(0xff6b2bd9),
+                  foregroundColor: const Color(0xffffd24a),
+                  child: Icon(action.icon),
+                ),
+                title: Text(
+                  action.title,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(action.detail),
+                trailing: action.badge > 0
+                    ? Badge(
+                        label: Text('${action.badge}'),
+                        child: const Icon(Icons.chevron_right),
+                      )
+                    : const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  action.onTap();
+                },
+              ),
+          ],
+        ),
+      ),
     ),
   );
 

@@ -6,7 +6,7 @@
   "workspaces": ["apps/api", "packages/*"],
   "scripts": {
     "build": "npm run build -w @aurora/slot-engine && npm run build -w @aurora/api",
-    "build:web": "./scripts/flutterw build web --release --no-web-resources-cdn",
+    "build:web": "./scripts/flutterw build web --release --no-web-resources-cdn --no-pub --no-wasm-dry-run",
     "dev": "npm run dev -w @aurora/api",
     "play": "npm run build:web && env DEMO_MODE=true npm run dev",
     "test": "npm run build -w @aurora/slot-engine && npm run test --workspaces --if-present",

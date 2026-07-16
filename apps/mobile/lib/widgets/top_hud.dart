@@ -10,11 +10,13 @@ class TopHud extends StatelessWidget {
     this.vipTier = 'GOLD',
     this.onVipTap,
     this.onNotificationsTap,
+    this.onShopTap,
   });
   final int balance, level, xp, gems;
   final String vipTier;
   final VoidCallback? onVipTap;
   final VoidCallback? onNotificationsTap;
+  final VoidCallback? onShopTap;
   @override
   Widget build(BuildContext context) => Container(
     height: 76,
@@ -104,6 +106,12 @@ class TopHud extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             _currency(Icons.diamond, _fmt(gems), const Color(0xff42e3ff)),
+            IconButton(
+              onPressed: onShopTap,
+              tooltip: 'Coins kaufen',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.add_circle, color: Color(0xffffd75d)),
+            ),
             const SizedBox(width: 5),
             IconButton(
               onPressed: onNotificationsTap,

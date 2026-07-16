@@ -7,28 +7,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('lobby exposes progression and game journey', (tester) async {
+  testWidgets('lobby exposes central hub, progression and slot catalog', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(const AuroraApp());
     await tester.pumpAndSettle();
 
     expect(find.text('LEVEL 12'), findsOneWidget);
-    expect(find.text('WORLD FORTUNE\nTOURNAMENT'), findsOneWidget);
+    expect(find.byKey(const Key('lobby-quick-actions')), findsOneWidget);
+    expect(find.text('BONUS'), findsOneWidget);
+    expect(find.text('WHEEL'), findsOneWidget);
+    expect(find.text('MISSIONS'), findsOneWidget);
     expect(find.text('PHARAOH OASIS'), findsOneWidget);
 
     await tester.drag(
-      find.byType(SingleChildScrollView),
-      const Offset(0, -850),
+      find.byKey(const Key('lobby-hub-scroll')),
+      const Offset(0, -700),
     );
     await tester.pumpAndSettle();
     expect(find.text('PIRATE BAY'), findsOneWidget);
+    expect(find.text('DOWNLOAD 24 MB'), findsOneWidget);
 
     await tester.drag(
-      find.byType(SingleChildScrollView),
-      const Offset(0, -950),
+      find.byKey(const Key('lobby-hub-scroll')),
+      const Offset(0, -900),
     );
     await tester.pumpAndSettle();
     expect(find.text('VEGAS GOLD'), findsOneWidget);
+    expect(find.text('LEVEL 20'), findsOneWidget);
   });
 
   testWidgets('bottom navigation opens functional meta screens', (
