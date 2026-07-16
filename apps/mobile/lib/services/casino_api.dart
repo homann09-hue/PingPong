@@ -592,6 +592,15 @@ class CasinoApi {
       final multiplierData = multiplierEvents.isEmpty
           ? null
           : multiplierEvents.last['data'] as Map<String, dynamic>;
+      final upgradeEvents = events
+          .where((event) => event['type'] == 'symbol.upgraded')
+          .toList();
+      final upgradeLabel = upgradeEvents.isEmpty
+          ? null
+          : 'SYMBOL UPGRADE • ${upgradeEvents.map((event) {
+              final data = event['data'] as Map<String, dynamic>;
+              return '${data['from']}→${data['to']}';
+            }).join(' • ')}';
       final wins = (round['wins'] as List).cast<Map<String, dynamic>>();
       final winningCells = <String>{};
       for (final win in wins) {
@@ -638,6 +647,8 @@ class CasinoApi {
             ? 'STICKY WILDS'
             : eventTypes.contains('mystery.revealed')
             ? 'MYSTERY REVEAL'
+            : upgradeLabel != null
+            ? upgradeLabel
             : eventTypes.contains('free_spins.modified')
             ? 'ENHANCED FREE SPINS'
             : eventTypes.contains('multiplier.applied')

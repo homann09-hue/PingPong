@@ -65,6 +65,14 @@ export interface FeatureConfig {
     readonly symbol: string;
     readonly targets: readonly string[];
   };
+  readonly symbolUpgrade?: {
+    readonly triggerSymbol: string;
+    readonly minimumCount: number;
+    readonly upgrades: readonly {
+      readonly from: string;
+      readonly to: string;
+    }[];
+  };
   readonly coinCollect?: {
     readonly coinSymbol: string;
     readonly collectorSymbol: string;
@@ -159,7 +167,7 @@ export interface WaysWin {
 export type Win = LineWin | ScatterWin | WaysWin;
 
 export interface EngineEvent {
-  readonly type: "wild.expanded" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
+  readonly type: "wild.expanded" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "symbol.upgraded" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
   readonly data: Readonly<Record<string, number | string>>;
 }
 

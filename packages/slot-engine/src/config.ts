@@ -70,6 +70,14 @@ const schema = z.object({
       symbol: z.string(),
       targets: z.array(z.string()).min(1).max(20),
     }).optional(),
+    symbolUpgrade: z.object({
+      triggerSymbol: z.string(),
+      minimumCount: z.number().int().min(1).max(60),
+      upgrades: z.array(z.object({
+        from: z.string(),
+        to: z.string(),
+      })).min(1).max(20),
+    }).optional(),
     coinCollect: z.object({
       coinSymbol: z.string(),
       collectorSymbol: z.string(),
@@ -189,6 +197,26 @@ export function parseSlotConfig(input: unknown): SlotConfig {
     }
     if (mystery.targets.some((symbol) => !symbols.has(symbol) || symbol === mystery.symbol)) {
       throw new Error("Mystery reveal targets must reference other configured symbols");
+    }
+  }
+  const symbolUpgrade = config.features?.symbolUpgrade;
+  if (symbolUpgrade) {
+    if (!symbols.has(symbolUpgrade.triggerSymbol)) {
+      throw new Error("Symbol upgrade must reference a configured trigger symbol");
+    }
+    if (symbolUpgrade.minimumCount > config.reels.length * config.rows) {
+      throw new Error("Symbol upgrade minimum must fit the configured grid");
+    }
+    const sources = symbolUpgrade.upgrades.map((upgrade) => upgrade.from);
+    if (new Set(sources).size !== sources.length) {
+      throw new Error("Symbol upgrade sources must be unique");
+    }
+    if (symbolUpgrade.upgrades.some((upgrade) => (
+      upgrade.from === upgrade.to
+      || config.symbols[upgrade.from]?.kind !== "regular"
+      || config.symbols[upgrade.to]?.kind !== "regular"
+    ))) {
+      throw new Error("Symbol upgrades must map distinct regular symbols");
     }
   }
   const coinCollect = config.features?.coinCollect;

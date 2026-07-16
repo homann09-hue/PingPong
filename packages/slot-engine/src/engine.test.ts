@@ -442,6 +442,51 @@ describe("configurable evaluation and feature modifiers", () => {
     });
   });
 
+  it("upgrades configured symbols before authoritative win evaluation", () => {
+    const config = parseSlotConfig({
+      id: "symbol-upgrade-test", version: 1, name: "Symbol Upgrade Test", rows: 2,
+      reels: [["B", "J"], ["B", "J"], ["B", "J"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: { 3: 4 } },
+        J: { kind: "regular", payouts: { 3: 1 } },
+        B: { kind: "scatter", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        ways: { minimumReels: 3, betDivisor: 1 },
+        symbolUpgrade: {
+          triggerSymbol: "B", minimumCount: 3,
+          upgrades: [{ from: "J", to: "A" }],
+        },
+      },
+    });
+    const result = new SlotEngine(config).spin({ bet: 10, seed: 29n });
+    expect(result.grid.flat()).not.toContain("J");
+    expect(result.wins).toContainEqual(expect.objectContaining({ kind: "ways", symbol: "A", count: 3 }));
+    expect(result.rounds[0]!.events).toContainEqual({
+      type: "symbol.upgraded", data: { from: "J", to: "A", count: 3, triggerCount: 3 },
+    });
+  });
+
+  it("rejects symbol upgrades with duplicate source symbols", () => {
+    expect(() => parseSlotConfig({
+      id: "invalid-symbol-upgrade", version: 1, name: "Invalid Symbol Upgrade", rows: 1,
+      reels: [["B"], ["B"], ["B"]], paylines: [[0, 0, 0]],
+      symbols: {
+        A: { kind: "regular", payouts: {} },
+        J: { kind: "regular", payouts: {} },
+        B: { kind: "scatter", payouts: {} },
+      },
+      math: { targetRtp: 0.9, volatility: "high", expectedHitFrequency: 1 },
+      features: {
+        symbolUpgrade: {
+          triggerSymbol: "B", minimumCount: 3,
+          upgrades: [{ from: "J", to: "A" }, { from: "J", to: "A" }],
+        },
+      },
+    })).toThrow("sources must be unique");
+  });
+
   it("uses special free-spin reels and injects deterministic extra wilds", () => {
     const config = parseSlotConfig({
       id: "enhanced-free-spins", version: 1, name: "Enhanced Free Spins", rows: 1,

@@ -112,7 +112,8 @@ export class SlotEngine {
   ): SpinRound & { events: EngineEvent[] } {
     const events: EngineEvent[] = [...initialEvents];
     if (winMultiplier > 1) events.push({ type: "multiplier.applied", data: { source: "free_spin", multiplier: winMultiplier } });
-    const revealed = this.revealMystery(input, rng, events);
+    const upgraded = this.upgradeSymbols(input, events);
+    const revealed = this.revealMystery(upgraded, rng, events);
     const grid = this.expandWilds(revealed, events);
     const wins = this.evaluateWins(grid, bet, true, events, winMultiplier);
     const round = this.round(phase, index, grid, wins, events);
@@ -126,6 +127,7 @@ export class SlotEngine {
       if (cells.length === 0) break;
       const cascadeEvents: EngineEvent[] = [{ type: "cascade.started", data: { step } }];
       current = this.refill(current, cells, rng);
+      current = this.upgradeSymbols(current, cascadeEvents);
       current = this.revealMystery(current, rng, cascadeEvents);
       current = this.expandWilds(current, cascadeEvents);
       const cascadeFeature = this.config.features!.cascades!;
@@ -170,6 +172,35 @@ export class SlotEngine {
     const target = feature.targets[rng.nextInt(feature.targets.length)]!;
     for (const [reel, row] of cells) grid[reel]![row] = target;
     events.push({ type: "mystery.revealed", data: { symbol: feature.symbol, target, count: cells.length } });
+    return grid;
+  }
+
+  private upgradeSymbols(input: readonly (readonly string[])[], events: EngineEvent[]): string[][] {
+    const feature = this.config.features?.symbolUpgrade;
+    const grid = input.map((reel) => [...reel]);
+    if (!feature) return grid;
+    const triggerCount = grid.flat().filter((symbol) => symbol === feature.triggerSymbol).length;
+    if (triggerCount < feature.minimumCount) return grid;
+    const targets = new Map(feature.upgrades.map((upgrade) => [upgrade.from, upgrade.to]));
+    const counts = new Map<string, number>();
+    for (const reel of grid) {
+      for (let row = 0; row < reel.length; row++) {
+        const from = reel[row]!;
+        const to = targets.get(from);
+        if (!to) continue;
+        reel[row] = to;
+        counts.set(from, (counts.get(from) ?? 0) + 1);
+      }
+    }
+    for (const upgrade of feature.upgrades) {
+      const count = counts.get(upgrade.from) ?? 0;
+      if (count > 0) {
+        events.push({
+          type: "symbol.upgraded",
+          data: { from: upgrade.from, to: upgrade.to, count, triggerCount },
+        });
+      }
+    }
     return grid;
   }
 

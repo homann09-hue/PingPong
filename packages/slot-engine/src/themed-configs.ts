@@ -31,7 +31,7 @@ const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "pirate-bay": 0.299,
   "neon-nights": 0.50,
   "frozen-kingdom": 0.44,
-  "jungle-temple": 0.32,
+  "jungle-temple": 0.323,
   "vegas-gold": 0.52,
 };
 
@@ -213,9 +213,14 @@ export const jungleTempleConfig = game(
   {
     cascades: { maxSteps: 10, multiplierStep: 1, maxMultiplier: 12 },
     freeSpins: { scatterSymbol: "S", awards: { 3: 8, 4: 12, 5: 20 }, maxTotal: 100, winMultiplier: 3 },
+    symbolUpgrade: {
+      triggerSymbol: "B", minimumCount: 3,
+      upgrades: [{ from: "J", to: "Q" }, { from: "Q", to: "K" }, { from: "K", to: "A" }],
+    },
     wheelBonus: { scatterSymbol: "B", minimumCount: 3, multipliers: [3, 5, 8, 10, 15, 25, 50, 100] },
     bonusBuy: { costMultiplier: 50 },
   },
+  { version: 3, mathModelVersion: "3.0.0" },
 );
 
 export const vegasGoldConfig = game(

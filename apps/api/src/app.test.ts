@@ -651,6 +651,8 @@ describe("spin API", () => {
       mathModelVersion: "3.0.0",
       symbols: { C: { kind: "coin", payouts: {} } },
     });
+    const jungle = await app.inject({ method: "GET", url: "/v1/slots/jungle-temple/paytable" });
+    expect(jungle.json()).toMatchObject({ version: 3, mathModelVersion: "3.0.0" });
   });
   it("charges the configured play-money price and guarantees a purchased bonus", async () => {
     const bonusApp = buildApp({

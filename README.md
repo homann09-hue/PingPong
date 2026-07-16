@@ -59,6 +59,8 @@ awards two bounded scatter-triggered respins.
 Dragon Peak applies a capped 2× multiplier for every winning wild on a payline
 (up to 32×). Candy Carnival now uses the advertised sticky-wild state throughout
 its free-spin sequence instead of an expanding-wild approximation.
+Jungle Temple v3 promotes every visible J→Q, Q→K and K→A when three temple
+bonus symbols land, before the server evaluates the upgraded grid.
 
 All eight games use a server-authoritative local jackpot ladder. Three, four,
 or five scatters award MINI (5×), MINOR (25×), or GRAND (500×) respectively.
