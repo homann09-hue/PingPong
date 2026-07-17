@@ -22,19 +22,22 @@ Spin settlement remains the first authoritative point producer: wager-scaled
 points begin at a 1,000-Coin bet and Level Up Plus grants 1,000 additional
 points per level crossed. While membership is active, the same settlement
 transaction applies 2% Endless Cashback to losing spins and doubles League
-Points. Point-source and benefit catalogs include the wider LiveOps integration
-surface so future Space Battle, Oinky, Golden Pass, reward, booster, wheel, and
-purchase producers use stable identifiers rather than client-specific labels.
+Points. Daily Bonus, Lobby Express, standard Wheel, Booster activation, and
+virtual-shop purchases credit fixed, versioned awards inside the transaction of
+their source action. Space Battle, Oinky, and Golden Pass remain explicitly
+unavailable until their authoritative producers exist.
 
 ## Consequences
 
 - Membership cannot be extended, duplicated, or activated below threshold by
   request replay.
 - Point spending, Diamond Stamp grants, and cashback have immutable ledger legs.
+- Every live fixed source has its own replay-safe `high_roller_source` ledger
+  leg; the client displays its award and marks unavailable producers as upcoming.
 - Membership expiry does not require a cleanup job; server-time reads determine
   whether benefits are active.
 - Exclusive slot ids are classified by the API domain and advertised in lobby
   and paytable metadata. The spin endpoint remains authoritative and rejects
   inactive players even when a modified client bypasses its lobby lock.
-- `neon-nights` is the first club-exclusive game. Additional source producers
-  remain separate integrations and must call the same server-owned economy boundary.
+- `neon-nights` is the first club-exclusive game. Additional producers must call
+  the same server-owned economy boundary.

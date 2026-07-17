@@ -22,6 +22,7 @@ describe("standard bonus wheel", () => {
     const replay = await store.spinWheel(playerId, key, 0, new Date());
     expect(first).toEqual(replay);
     expect(first).toMatchObject({ segmentId: "coins-1m", rewardAmount: 1_000_000, availableSpins: 0 });
+    expect(await store.getHighRollerClub(playerId, new Date())).toMatchObject({ points: 650 });
     await expect(store.spinWheel(playerId, randomUUID(), 0, new Date())).rejects.toBeInstanceOf(WheelNotAvailableError);
   });
 });

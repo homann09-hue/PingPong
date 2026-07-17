@@ -53,6 +53,7 @@ describe("InMemorySpinStore Check-&-Win", () => {
     const activation = await store.activateBooster(playerId, activationKey);
     expect(activation).toMatchObject({ boosterBalance: 0, activeSpins: 20, replayed: false });
     expect(await store.activateBooster(playerId, activationKey)).toEqual({ ...activation, replayed: true });
+    expect(await store.getHighRollerClub(playerId, new Date())).toMatchObject({ points: 500 });
 
     const before = (await store.getProfile(playerId)).progression.xp;
     await awardWins(store, playerId, 1);

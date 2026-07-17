@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SpinResult } from "@aurora/slot-engine";
 import { InMemorySpinStore } from "./in-memory-spin-store.js";
 import { HighRollerAlreadyActiveError } from "./spin-store.js";
+import { activeShopOffers } from "../shop/shop-catalog.js";
 
 function result(totalWin: number): SpinResult {
   return {
@@ -14,6 +15,28 @@ function result(totalWin: number): SpinResult {
 }
 
 describe("InMemorySpinStore High Roller Club", () => {
+  it("credits fixed activity sources once and exposes their live availability", async () => {
+    const store = new InMemorySpinStore(100_000);
+    const playerId = randomUUID();
+    const now = new Date("2026-07-17T12:00:00.000Z");
+    await store.claimTimedReward(playerId, "daily", now);
+    await store.claimTimedReward(playerId, "hourly", now);
+    const offer = activeShopOffers(now).find((item) => item.id === "starter-fortune")!;
+    const key = randomUUID();
+    const purchase = await store.purchaseShopOffer(playerId, offer, key);
+    expect(await store.purchaseShopOffer(playerId, offer, key)).toEqual(purchase);
+
+    const club = await store.getHighRollerClub(playerId, now);
+    expect(club.points).toBe(2_850);
+    expect(club.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "daily_store_bonus", points: 750, available: true }),
+      expect.objectContaining({ id: "purchase", points: 2_000, available: true }),
+      expect.objectContaining({ id: "space_battle", points: null, available: false }),
+    ]));
+    expect((await store.listWalletTransactions(playerId, 100))
+      .filter((entry) => entry.reason === "high_roller_source")).toHaveLength(3);
+  });
+
   it("activates seven-day access once and applies member spin benefits", async () => {
     const store = new InMemorySpinStore(500_000);
     const playerId = randomUUID();

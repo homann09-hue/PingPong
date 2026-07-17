@@ -15,7 +15,7 @@ import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus
 import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
 import { loyaltyRewardOffer, loyaltyRewardsCatalog, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import { type MissionCadence, type MissionRewards } from "../missions/mission-system.js";
-import { highRollerCashback, highRollerClubRules, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus } from "../economy/high-roller-club.js";
+import { highRollerCashback, highRollerClubRules, highRollerSourcePoints, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus, type HighRollerFixedSource } from "../economy/high-roller-club.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
@@ -344,6 +344,7 @@ export class PostgresSpinStore implements SpinStore {
       await this.ledger(client, { playerId, currency: "coin", amount: offer.coins, reason: "shop_purchase",
         source: "shop", referenceId: purchase.purchaseId, idempotencyKey: `${idempotencyKey}:coins`,
         balanceBefore: coinBefore, balanceAfter: purchase.coinBalance, metadata: { offerId: offer.id } });
+      await this.grantHighRollerSource(client, playerId, "purchase", purchase.purchaseId, `shop:${idempotencyKey}`);
       await client.query("COMMIT");
       return purchase;
     } catch (error) {
@@ -810,6 +811,7 @@ export class PostgresSpinStore implements SpinStore {
         reason: "booster_activation", source: "xp_booster", referenceId: activation.actionId,
         idempotencyKey: `${idempotencyKey}:activate`, balanceBefore: boosterBefore,
         balanceAfter: activation.boosterBalance, metadata: { ruleVersion: xpBoosterRules.version } });
+      await this.grantHighRollerSource(client, playerId, "booster", activation.actionId, `booster:${idempotencyKey}`);
       await client.query("COMMIT");
       return activation;
     } catch (error) {
@@ -1011,6 +1013,8 @@ export class PostgresSpinStore implements SpinStore {
         referenceId, idempotencyKey: `timed:${claimKey}`, balanceBefore: before,
         balanceAfter: coinBalance, metadata: { type, streak: next.streak, wheelUnlocked: next.wheelUnlocked },
       });
+      await this.grantHighRollerSource(client, playerId,
+        type === "daily" ? "daily_store_bonus" : "lobby_express", referenceId, `timed:${claimKey}`);
       if (next.wheelUnlocked) {
         await client.query(
           `INSERT INTO wheel_entitlements (id, player_id, wheel_type, source_reference_id, expires_at)
@@ -1080,6 +1084,7 @@ export class PostgresSpinStore implements SpinStore {
         reason: "wheel_reward", source: "bonus_wheel", referenceId: spinId,
         idempotencyKey: `wheel:${idempotencyKey}`, balanceBefore: before, balanceAfter,
         metadata: { wheelType: "standard", wheelVersion: standardWheel.version, segmentId: segment.id } });
+      await this.grantHighRollerSource(client, playerId, "wheel", spinId, `wheel:${idempotencyKey}`);
       await client.query("COMMIT");
       const status = await this.getWheelStatus(playerId, now);
       return { spinId, type: "standard", version: standardWheel.version, segmentId: segment.id,
@@ -1347,6 +1352,35 @@ export class PostgresSpinStore implements SpinStore {
       rewardBalance: this.safeInteger(row.reward_balance_after, "Loyalty reward balance"),
       replayed,
     };
+  }
+
+  private async grantHighRollerSource(
+    client: PoolClient,
+    playerId: string,
+    source: HighRollerFixedSource,
+    referenceId: string,
+    idempotencyKey: string,
+  ): Promise<void> {
+    const amount = highRollerSourcePoints(source);
+    await client.query(
+      "INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'high_roller_point',0) ON CONFLICT (player_id,currency) DO NOTHING",
+      [playerId],
+    );
+    const wallet = await client.query<WalletRow>(
+      "SELECT balance FROM wallets WHERE player_id=$1 AND currency='high_roller_point' FOR UPDATE",
+      [playerId],
+    );
+    const before = this.safeInteger(wallet.rows[0]!.balance, "High Roller point balance");
+    const after = before + amount;
+    await client.query(
+      "UPDATE wallets SET balance=$1,version=version+1 WHERE player_id=$2 AND currency='high_roller_point'",
+      [after, playerId],
+    );
+    await this.ledger(client, {
+      playerId, currency: "high_roller_point", amount, reason: "high_roller_source",
+      source: "high_roller_club", referenceId, idempotencyKey, balanceBefore: before, balanceAfter: after,
+      metadata: { clubVersion: highRollerClubRules.version, sourceId: source },
+    });
   }
 
   private async ledger(client: PoolClient, entry: {

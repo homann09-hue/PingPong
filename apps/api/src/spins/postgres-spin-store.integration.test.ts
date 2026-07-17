@@ -241,6 +241,8 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(wheel).toMatchObject({ rewardCurrency: "gem", rewardAmount: 25, availableSpins: 0 });
     const gems = await pool.query<{ balance: string }>("SELECT balance FROM wallets WHERE player_id=$1 AND currency='gem'", [playerId]);
     expect(gems.rows[0]?.balance).toBe("25");
+    expect(await store.getHighRollerClub(playerId, new Date("2026-07-03T04:02:00.000Z")))
+      .toMatchObject({ points: 2_150 });
   });
 
   it("purchases shop offers atomically with replay, limits, and wallet ledger entries", async () => {
@@ -256,6 +258,7 @@ databaseSuite("PostgresSpinStore integration", () => {
       gemBalance: 300,
     });
     expect(replay).toEqual(first);
+    expect(await store.getHighRollerClub(shopPlayerId, new Date())).toMatchObject({ points: 2_000 });
     await expect(
       store.purchaseShopOffer(shopPlayerId, offer, randomUUID()),
     ).rejects.toBeInstanceOf(ShopOfferLimitReachedError);
@@ -322,6 +325,7 @@ databaseSuite("PostgresSpinStore integration", () => {
     const activation = await store.activateBooster(boostPlayerId, activationKey);
     expect(await store.activateBooster(boostPlayerId, activationKey)).toEqual({ ...activation, replayed: true });
     expect(activation).toMatchObject({ boosterBalance: 0, activeSpins: 20 });
+    expect(await store.getHighRollerClub(boostPlayerId, new Date())).toMatchObject({ points: 500 });
     await store.settle({ playerId: boostPlayerId, idempotencyKey: randomUUID(), slotId,
       configVersion: 1, bet: 10, seed: 42n }, () => winningSpin(slotId));
     expect((await store.getProfile(boostPlayerId)).progression.xp).toBe(20);

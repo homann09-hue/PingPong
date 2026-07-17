@@ -739,7 +739,12 @@ class _LoyaltyApi extends CasinoApi {
 
 class _HighRollerApi extends CasinoApi {
   static const sources = [
-    HighRollerSourceView(id: 'spins', label: 'Spins nach Einsatzhöhe'),
+    HighRollerSourceView(
+      id: 'spins',
+      label: 'Spins nach Einsatzhöhe',
+      points: null,
+      available: true,
+    ),
   ];
   static const benefits = [
     HighRollerBenefitView(

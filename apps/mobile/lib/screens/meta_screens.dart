@@ -1119,9 +1119,18 @@ class _HighRollerClubSheetState extends State<HighRollerClubSheet> {
                   children: [
                     for (final source in current.sources)
                       Chip(
-                        avatar: const Icon(Icons.add_circle, size: 17),
-                        label: Text(source.label),
-                        backgroundColor: const Color(0xff51216f),
+                        avatar: Icon(
+                          source.available ? Icons.add_circle : Icons.schedule,
+                          size: 17,
+                        ),
+                        label: Text(
+                          source.points == null
+                              ? '${source.label}${source.available ? '' : ' · BALD'}'
+                              : '${source.label} · +${_number(source.points!)}',
+                        ),
+                        backgroundColor: source.available
+                            ? const Color(0xff51216f)
+                            : const Color(0xff30233a),
                       ),
                   ],
                 ),

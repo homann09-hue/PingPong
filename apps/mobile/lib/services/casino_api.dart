@@ -331,8 +331,15 @@ class LoyaltyRedemptionView {
 }
 
 class HighRollerSourceView {
-  const HighRollerSourceView({required this.id, required this.label});
+  const HighRollerSourceView({
+    required this.id,
+    required this.label,
+    required this.points,
+    required this.available,
+  });
   final String id, label;
+  final int? points;
+  final bool available;
 }
 
 class HighRollerBenefitView {
@@ -2007,6 +2014,8 @@ class CasinoApi {
               return HighRollerSourceView(
                 id: source['id'] as String,
                 label: source['label'] as String,
+                points: source['points'] as int?,
+                available: source['available'] as bool,
               );
             })
             .toList(growable: false),

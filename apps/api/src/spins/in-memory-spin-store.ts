@@ -13,7 +13,7 @@ import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraf
 import { loyaltyRewardOffer, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 import { missionCatalog, missionUnlock, missionWindow, type MissionDefinition } from "../missions/mission-system.js";
-import { highRollerCashback, highRollerClubRules, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus } from "../economy/high-roller-club.js";
+import { highRollerCashback, highRollerClubRules, highRollerSourcePoints, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus, type HighRollerFixedSource } from "../economy/high-roller-club.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -43,6 +43,7 @@ export class InMemorySpinStore implements SpinStore {
   private readonly loyaltyRedemptions = new Map<string, LoyaltyRedemption>();
   private readonly highRollerActiveUntil = new Map<string, Date>();
   private readonly highRollerActivations = new Map<string, HighRollerActivation>();
+  private readonly highRollerSourceGrants = new Set<string>();
   private readonly limitedShopPurchases = new Set<string>();
   private readonly storePurchases = new Map<string, StorePurchaseSettlement & { readonly playerId: string }>();
   private readonly limitedStorePurchases = new Set<string>();
@@ -257,6 +258,7 @@ export class InMemorySpinStore implements SpinStore {
     this.economy.set(playerId, wallet);
     this.activeBoostSpins.set(playerId, activeSpins);
     this.record(playerId, -1, "booster_activation", "xp_booster", `${idempotencyKey}:activate`, boosterBefore, activation.boosterBalance, "booster");
+    this.grantHighRollerSource(playerId, "booster", `booster:${idempotencyKey}`);
     this.boosterActivationReplays.set(replayKey, activation);
     this.boosterActionKinds.set(replayKey, "activate");
     return activation;
@@ -313,6 +315,7 @@ export class InMemorySpinStore implements SpinStore {
     const coinBalance = before + next.coins;
     this.balances.set(playerId, coinBalance);
     this.record(playerId, next.coins, `${type}_reward`, "timed_reward", `${type}:${now.toISOString()}`, before, coinBalance);
+    this.grantHighRollerSource(playerId, type === "daily" ? "daily_store_bonus" : "lobby_express", `timed:${type}:${now.toISOString()}`);
     if (next.wheelUnlocked) this.wheelEntitlements.set(playerId, (this.wheelEntitlements.get(playerId) ?? 0) + 1);
     const status = await this.getTimedReward(playerId, type, now);
     return { ...status, coins: next.coins, coinBalance, wheelUnlocked: next.wheelUnlocked };
@@ -340,6 +343,7 @@ export class InMemorySpinStore implements SpinStore {
       balanceAfter, availableSpins: available - 1,
     };
     this.record(playerId, segment.amount, "wheel_reward", "bonus_wheel", `wheel:${idempotencyKey}:${now.toISOString()}`, before, balanceAfter, segment.currency);
+    this.grantHighRollerSource(playerId, "wheel", `wheel:${idempotencyKey}`);
     this.wheelReplays.set(replayKey, result);
     return result;
   }
@@ -467,6 +471,7 @@ export class InMemorySpinStore implements SpinStore {
     this.balances.set(playerId, purchase.coinBalance);
     this.record(playerId, -offer.costGems, "shop_purchase", "shop", `${idempotencyKey}:gems`, gemBefore, purchase.gemBalance, "gem");
     this.record(playerId, offer.coins, "shop_purchase", "shop", `${idempotencyKey}:coins`, coinBefore, purchase.coinBalance);
+    this.grantHighRollerSource(playerId, "purchase", `shop:${idempotencyKey}`);
     if (limitKey) this.limitedShopPurchases.add(limitKey);
     this.shopReplays.set(replayKey, purchase);
     return purchase;
@@ -556,6 +561,23 @@ export class InMemorySpinStore implements SpinStore {
   }
 
   public async close(): Promise<void> {}
+
+  private grantHighRollerSource(
+    playerId: string,
+    source: HighRollerFixedSource,
+    idempotencyKey: string,
+  ): void {
+    const grantKey = `${playerId}:${idempotencyKey}`;
+    if (this.highRollerSourceGrants.has(grantKey)) return;
+    const amount = highRollerSourcePoints(source);
+    const wallet = { ...this.economy.get(playerId) };
+    const before = wallet.high_roller_point ?? 0;
+    wallet.high_roller_point = before + amount;
+    this.economy.set(playerId, wallet);
+    this.record(playerId, amount, "high_roller_source", "high_roller_club", idempotencyKey,
+      before, before + amount, "high_roller_point");
+    this.highRollerSourceGrants.add(grantKey);
+  }
 
   private record(
     playerId: string,
