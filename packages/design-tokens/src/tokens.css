@@ -1,0 +1,47 @@
+:root {
+  color-scheme: dark;
+  --aurora-color-ink: #f8f6ff;
+  --aurora-color-muted: #aaa4c2;
+  --aurora-color-canvas: #120b2b;
+  --aurora-color-canvas-deep: #070617;
+  --aurora-color-panel: #201247;
+  --aurora-color-panel-raised: #2a175c;
+  --aurora-color-panel-glass: rgb(23 13 53 / 86%);
+  --aurora-color-purple: #7b43ff;
+  --aurora-color-purple-bright: #a676ff;
+  --aurora-color-pink: #ff4ccf;
+  --aurora-color-gold: #ffc72c;
+  --aurora-color-gold-soft: #ffe793;
+  --aurora-color-cyan: #54e5ff;
+  --aurora-color-success: #64e8a4;
+  --aurora-color-danger: #ff6689;
+  --aurora-border-soft: rgb(255 255 255 / 12%);
+  --aurora-border-gold: rgb(255 199 44 / 58%);
+  --aurora-shadow-panel: 0 18px 52px rgb(4 2 17 / 44%);
+  --aurora-shadow-glow: 0 0 30px rgb(123 67 255 / 32%);
+  --aurora-radius-sm: 10px;
+  --aurora-radius-md: 16px;
+  --aurora-radius-lg: 24px;
+  --aurora-radius-pill: 999px;
+  --aurora-space-1: 4px;
+  --aurora-space-2: 8px;
+  --aurora-space-3: 12px;
+  --aurora-space-4: 16px;
+  --aurora-space-5: 20px;
+  --aurora-space-6: 24px;
+  --aurora-space-8: 32px;
+  --aurora-space-10: 40px;
+  --aurora-space-12: 48px;
+  --aurora-motion-fast: 140ms;
+  --aurora-motion-normal: 240ms;
+  --aurora-motion-reel: 700ms;
+  --aurora-ease-out: cubic-bezier(.22, 1, .36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --aurora-motion-fast: 1ms;
+    --aurora-motion-normal: 1ms;
+    --aurora-motion-reel: 1ms;
+  }
+}

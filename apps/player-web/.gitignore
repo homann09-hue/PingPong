@@ -1,0 +1,7 @@
+.next/
+public/assets/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+.env.local
+.env*.local
