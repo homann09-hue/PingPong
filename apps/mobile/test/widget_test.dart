@@ -235,7 +235,33 @@ void main() {
             freeSpins: 0,
             claimed: const {},
             onClaim: (_) async {},
-            achievements: const [],
+            achievements: const [
+              AchievementView(
+                category: 'spins',
+                tier: 'bronze',
+                name: 'FIRST SPIN',
+                description: 'Spiele 1 Spin',
+                rewardId: 'achievement-first-spin',
+                progress: 1,
+                target: 1,
+                coins: 75000,
+                completed: true,
+                claimed: false,
+              ),
+              AchievementView(
+                category: 'spins',
+                tier: 'silver',
+                name: 'HIGH ROLLER',
+                description: 'Spiele 100 Spins',
+                rewardId: 'achievement-high-roller',
+                progress: 1,
+                target: 100,
+                coins: 500000,
+                completed: false,
+                claimed: false,
+                unlocked: false,
+              ),
+            ],
             missions: [
               _mission('daily-spins-10', 'daily', 'standard'),
               _mission('pro-spins-40', 'three_day', 'pro'),
@@ -267,7 +293,11 @@ void main() {
       expect(find.text('SUPER MISSIONS'), findsOneWidget);
       expect(find.text('WÖCHENTLICHE MISSIONSLEISTE'), findsOneWidget);
       expect(find.text('2/3 UNLOCK'), findsOneWidget);
-      expect(find.text('LOCKED'), findsOneWidget);
+      expect(find.text('LOCKED'), findsNWidgets(2));
+      expect(find.text('SPIN-MEILENSTEINE'), findsOneWidget);
+      expect(find.text('BRONZE'), findsOneWidget);
+      expect(find.text('SILVER'), findsOneWidget);
+      expect(find.text('Vorherige Stufe zuerst einsammeln'), findsOneWidget);
     },
   );
 

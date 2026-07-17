@@ -97,6 +97,8 @@ class JackpotPoolView {
 
 class AchievementView {
   const AchievementView({
+    this.category = 'journey',
+    this.tier = 'bronze',
     required this.name,
     required this.description,
     required this.rewardId,
@@ -105,11 +107,12 @@ class AchievementView {
     required this.coins,
     required this.completed,
     required this.claimed,
+    this.unlocked = true,
   });
 
-  final String name, description, rewardId;
+  final String category, tier, name, description, rewardId;
   final int progress, target, coins;
-  final bool completed, claimed;
+  final bool completed, claimed, unlocked;
 }
 
 class MissionView {
@@ -959,6 +962,8 @@ class CasinoApi {
       achievements: (data['achievements'] as List).map((value) {
         final item = value as Map<String, dynamic>;
         return AchievementView(
+          category: item['category'] as String? ?? 'journey',
+          tier: item['tier'] as String? ?? 'bronze',
           name: item['name'] as String,
           description: item['description'] as String,
           rewardId: item['rewardId'] as String,
@@ -967,6 +972,7 @@ class CasinoApi {
           coins: item['coins'] as int,
           completed: item['completed'] as bool,
           claimed: item['claimed'] as bool,
+          unlocked: item['unlocked'] as bool? ?? true,
         );
       }).toList(),
       tournamentRank: tournament['rank'] as int,

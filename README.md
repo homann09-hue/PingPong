@@ -195,6 +195,14 @@ weekly milestone rewards in the same transaction. Mission claims can grant
 Coins, Mission Points, LP, Stamps, Toolboxes, and Boosters atomically; locked,
 incomplete, or already claimed missions cannot credit the wallet.
 
+Achievements are sourced from one immutable server catalog instead of being
+assembled in the HTTP controller. Five categories (player journey, spins,
+winnings, free spins, and VIP progression) each expose Bronze, Silver, and Gold
+tiers. The API derives progress from authoritative player counters and requires
+the previous tier to be claimed before a higher reward can be credited. The
+Flutter client groups all fifteen achievements by category and renders locked
+tier progression without trusting client-supplied targets or reward amounts.
+
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan
 creation, clan discovery, membership and leave operations. PostgreSQL enforces

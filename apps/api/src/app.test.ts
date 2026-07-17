@@ -377,6 +377,30 @@ describe("spin API", () => {
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({ code: "REWARD_REQUIREMENT_NOT_MET" });
   });
+  it("claims catalog achievements once and validates their tier progression", async () => {
+    const achievementApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(1_000),
+    });
+    await achievementApp.inject({
+      method: "POST", url: "/v1/slots/classic-3x3/spins",
+      headers: { "idempotency-key": randomUUID(), authorization: "Bearer valid" }, payload: { bet: 10 },
+    });
+    const first = await achievementApp.inject({
+      method: "POST", url: "/v1/rewards/achievement-first-spin/claims", headers: { authorization: "Bearer valid" },
+    });
+    const replay = await achievementApp.inject({
+      method: "POST", url: "/v1/rewards/achievement-first-spin/claims", headers: { authorization: "Bearer valid" },
+    });
+    const silver = await achievementApp.inject({
+      method: "POST", url: "/v1/rewards/achievement-high-roller/claims", headers: { authorization: "Bearer valid" },
+    });
+    expect(first).toMatchObject({ statusCode: 200 });
+    expect(first.json()).toMatchObject({ rewardId: "achievement-first-spin", coins: 75_000 });
+    expect(replay.statusCode).toBe(409);
+    expect(silver.json()).toEqual({ code: "REWARD_REQUIREMENT_NOT_MET" });
+    await achievementApp.close();
+  });
   it("returns an authoritative VIP, achievement, and tournament profile", async () => {
     const response = await app.inject({
       method: "GET", url: "/v1/profile", headers: { authorization: "Bearer valid" },
@@ -384,7 +408,12 @@ describe("spin API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().playerId).toBe(playerId);
     expect(response.json().vip.tier).toBe("SILVER");
-    expect(response.json().achievements).toHaveLength(3);
+    expect(response.json().achievements).toHaveLength(15);
+    expect(response.json().achievements[0]).toMatchObject({
+      category: "journey", tier: "bronze", rewardId: "achievement-journey-2", unlocked: true,
+    });
+    expect(response.json().achievements.find((item: { rewardId: string }) => item.rewardId === "achievement-high-roller"))
+      .toMatchObject({ category: "spins", tier: "silver", unlocked: false });
     expect(response.json().tournament.name).toBe("WORLD FORTUNE CHAMPIONSHIP");
     expect(response.json().tournament.periodKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });

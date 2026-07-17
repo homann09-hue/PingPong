@@ -32,6 +32,7 @@ import { StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRev
 import type { EconomyAdminStore } from "./admin/economy-admin-store.js";
 import { EconomyFourEyesViolationError, EconomyGrantNotFoundError, EconomyGrantStateError, EconomyPlayerNotFoundError } from "./admin/economy-admin-store.js";
 import type { OperationsStore } from "./operations/operations-store.js";
+import { achievementById, achievementViews, canClaimAchievement } from "./achievements/achievement-system.js";
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -122,17 +123,11 @@ const rewardAmounts = new Map([
   ["spin-10", 100_000],
   ["win-50000", 150_000],
   ["free-3", 300_000],
-  ["achievement-first-spin", 75_000],
-  ["achievement-collector", 250_000],
-  ["achievement-high-roller", 500_000],
 ]);
 const rewardRequirements = new Map<string, (progression: Awaited<ReturnType<SpinStore["getProfile"]>>["progression"]) => boolean>([
   ["spin-10", (value) => value.spins >= 10],
   ["win-50000", (value) => value.totalWon >= 50_000],
   ["free-3", (value) => value.freeSpins >= 3],
-  ["achievement-first-spin", (value) => value.spins >= 1],
-  ["achievement-collector", (value) => value.totalWon >= 250_000],
-  ["achievement-high-roller", (value) => value.spins >= 100],
 ]);
 
 export interface AppDependencies {
@@ -320,11 +315,7 @@ export function buildApp(dependencies: AppDependencies) {
       playerId,
       ...profile,
       vip,
-      achievements: [
-        achievement("FIRST SPIN", "Starte deine Casino-Reise", "achievement-first-spin", progression.spins, 1, 75_000, claimed),
-        achievement("COIN COLLECTOR", "Gewinne insgesamt 250.000 Coins", "achievement-collector", progression.totalWon, 250_000, 250_000, claimed),
-        achievement("HIGH ROLLER", "Spiele 100 Spins", "achievement-high-roller", progression.spins, 100, 500_000, claimed),
-      ],
+      achievements: achievementViews(progression, claimed),
       tournament,
     };
   });
@@ -952,8 +943,15 @@ export function buildApp(dependencies: AppDependencies) {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     const { rewardId: requestedReward } = request.params as { rewardId: string };
-    const coins = rewardAmounts.get(requestedReward);
+    const achievement = achievementById(requestedReward);
+    const coins = achievement?.coins ?? rewardAmounts.get(requestedReward);
     if (!coins) return reply.code(404).send({ code: "REWARD_NOT_FOUND" });
+    if (achievement) {
+      const profile = await dependencies.spinStore.getProfile(playerId);
+      if (!canClaimAchievement(achievement, profile.progression, new Set(profile.claimedRewards))) {
+        return reply.code(409).send({ code: "REWARD_REQUIREMENT_NOT_MET" });
+      }
+    }
     const requirement = rewardRequirements.get(requestedReward);
     if (requirement) {
       const profile = await dependencies.spinStore.getProfile(playerId);
@@ -1094,8 +1092,4 @@ function vipStatus(points: number) {
   ];
   const tier = [...tiers].reverse().find((value) => points >= value.minimum) ?? tiers[0]!;
   return { tier: tier.name, points, tierStart: tier.minimum, nextTierPoints: tier.next };
-}
-
-function achievement(name: string, description: string, rewardId: string, progress: number, target: number, coins: number, claimed: Set<string>) {
-  return { name, description, rewardId, progress, target, coins, completed: progress >= target, claimed: claimed.has(rewardId) };
 }

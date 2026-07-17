@@ -1064,19 +1064,38 @@ class QuestsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text('ACHIEVEMENTS', style: MetaStyle.hero),
-        const SizedBox(height: 12),
-        for (final achievement in achievements)
-          QuestCard(
-            title: achievement.name,
-            description: achievement.description,
-            reward: _coins(achievement.coins),
-            progress: achievement.progress,
-            target: achievement.target,
-            rewardId: achievement.rewardId,
-            claimed: achievement.claimed,
-            onClaim: onClaim,
-            color: const Color(0xffa75bff),
-          ),
+        for (final category in const [
+          'journey',
+          'spins',
+          'wins',
+          'free_spins',
+          'vip',
+        ])
+          if (achievements.any((item) => item.category == category)) ...[
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(_categoryTitle(category), style: MetaStyle.title),
+            ),
+            const SizedBox(height: 8),
+            for (final achievement in achievements.where(
+              (item) => item.category == category,
+            ))
+              QuestCard(
+                title: achievement.name,
+                description: achievement.description,
+                reward: '${_coins(achievement.coins)} COINS',
+                progress: achievement.progress,
+                target: achievement.target,
+                rewardId: achievement.rewardId,
+                claimed: achievement.claimed,
+                onClaim: onClaim,
+                color: _categoryColor(category),
+                tier: achievement.tier.toUpperCase(),
+                locked: !achievement.unlocked,
+                lockedLabel: 'Vorherige Stufe zuerst einsammeln',
+              ),
+          ],
       ],
     ),
   );
@@ -1085,6 +1104,24 @@ class QuestsScreen extends StatelessWidget {
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (_) => '.',
   );
+
+  static String _categoryTitle(String category) => switch (category) {
+    'journey' => 'SPIELERREISE',
+    'spins' => 'SPIN-MEILENSTEINE',
+    'wins' => 'GEWINNE',
+    'free_spins' => 'FREISPIELE',
+    'vip' => 'VIP-STATUS',
+    _ => 'WEITERE ERFOLGE',
+  };
+
+  static Color _categoryColor(String category) => switch (category) {
+    'journey' => const Color(0xff52d8ff),
+    'spins' => const Color(0xffa75bff),
+    'wins' => const Color(0xffffd24a),
+    'free_spins' => const Color(0xff63efad),
+    'vip' => const Color(0xffff71bc),
+    _ => const Color(0xffa75bff),
+  };
 }
 
 class _MissionSection extends StatelessWidget {
@@ -1312,21 +1349,23 @@ class QuestCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(9),
-                  child: LinearProgressIndicator(
-                    value: (progress / target).clamp(0, 1),
-                    minHeight: 12,
-                    backgroundColor: Colors.black45,
-                    color: color,
-                  ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: LinearProgressIndicator(
+                  value: (progress / target).clamp(0, 1),
+                  minHeight: 12,
+                  backgroundColor: Colors.black45,
+                  color: color,
                 ),
               ),
-              const SizedBox(width: 10),
-              Text('${progress.clamp(0, target)} / $target'),
+              const SizedBox(height: 5),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text('${progress.clamp(0, target)} / $target'),
+              ),
             ],
           ),
           const SizedBox(height: 10),
