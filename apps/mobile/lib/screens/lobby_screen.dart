@@ -590,6 +590,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
         balance = purchase.coinBalance;
         gems = purchase.gemBalance;
       });
+      await _loadHighRollerClub();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('+${_fmt(purchase.coins)} COINS'),
@@ -630,7 +632,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       ),
     );
     if (result != null && mounted) setState(() => balance = result);
-    await _loadProfile();
+    await Future.wait([_loadProfile(), _loadHighRollerClub()]);
   }
 
   Future<void> _claimMission(String missionId) async {
@@ -1128,6 +1130,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       ),
     );
     await _loadBoosters();
+    await _loadHighRollerClub();
   }
 
   Future<void> _openLoyaltyRewards() async {

@@ -407,6 +407,8 @@ void main() {
     expect(find.text('20.000 / 20.000 PUNKTE'), findsOneWidget);
     expect(find.text('Endless Cashback'), findsOneWidget);
     expect(find.text('Spins nach Einsatzhöhe'), findsOneWidget);
+    expect(find.text('Täglicher Store-Bonus · +750'), findsOneWidget);
+    expect(find.text('Space Battle · BALD'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '7 TAGE AKTIVIEREN'));
     await tester.pumpAndSettle();
     expect(received?.active, isTrue);
@@ -744,6 +746,18 @@ class _HighRollerApi extends CasinoApi {
       label: 'Spins nach Einsatzhöhe',
       points: null,
       available: true,
+    ),
+    HighRollerSourceView(
+      id: 'daily_store_bonus',
+      label: 'Täglicher Store-Bonus',
+      points: 750,
+      available: true,
+    ),
+    HighRollerSourceView(
+      id: 'space_battle',
+      label: 'Space Battle',
+      points: null,
+      available: false,
     ),
   ];
   static const benefits = [
