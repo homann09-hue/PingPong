@@ -159,10 +159,14 @@ Apply `infra/postgres/027_xp_boosters.sql` to add Stamp crafting, replay-safe
 booster activation, and the finite server-counted boosted-spin state.
 Apply `infra/postgres/028_loyalty_rewards.sql` to persist replay-safe Loyalty
 Point exchanges with the exact catalog version and booked reward values.
+Apply `infra/postgres/029_mission_tracks.sql` to add three-day Pro missions,
+server-derived Super/Crazy unlocks, weekly Daily-claim milestones, Toolboxes,
+and atomic multi-currency mission rewards.
 
-The wallet API publishes a stable thirteen-balance economy snapshot: Coins,
+The wallet API publishes a stable fourteen-balance economy snapshot: Coins,
 Gems, LP, VIP points, High-Roller points, Clan points, League points, Mission
-points, Lotsa Cash, Stamps, Check-&-Win marks, Boosters, and Oinky Coupons.
+points, Lotsa Cash, Stamps, Check-&-Win marks, Boosters, Oinky Coupons, and
+Toolboxes.
 Settled spins atomically award wager-scaled progression currencies; scarce
 collectibles remain zero until an explicit event or reward grants them.
 If the selected wager exceeds the Coin balance, the slot blocks the request and
@@ -182,6 +186,14 @@ publishes a versioned Loyalty Rewards catalog where LP can be exchanged for
 fixed play-money Coin or Gem rewards. The server locks both wallets, validates
 affordability, records both ledger legs, and replays a repeated request without
 granting value twice.
+
+Mission Control now exposes four server-owned tracks. Daily Missions reset at
+00:00 UTC; Pro Missions use deterministic three-day UTC windows. Claiming all
+three standard Daily Missions unlocks the Super tier, while Crazy Missions also
+require both current Pro claims. Each standard Daily claim advances three
+weekly milestone rewards in the same transaction. Mission claims can grant
+Coins, Mission Points, LP, Stamps, Toolboxes, and Boosters atomically; locked,
+incomplete, or already claimed missions cannot credit the wallet.
 
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan

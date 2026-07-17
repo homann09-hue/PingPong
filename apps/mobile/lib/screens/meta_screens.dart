@@ -188,6 +188,7 @@ String _currencyLabel(String currency) => switch (currency) {
   'check_win_mark' => 'Check & Win',
   'booster' => 'Booster',
   'oinky_coupon' => 'Oinky-Coupons',
+  'toolbox' => 'Toolboxes',
   _ => currency,
 };
 
@@ -201,6 +202,7 @@ IconData _currencyIcon(String currency) => switch (currency) {
   'stamp' || 'check_win_mark' => Icons.check_circle,
   'booster' => Icons.bolt,
   'oinky_coupon' => Icons.confirmation_number,
+  'toolbox' => Icons.home_repair_service,
   _ => Icons.stars,
 };
 
@@ -1013,17 +1015,48 @@ class QuestsScreen extends StatelessWidget {
     child: Column(
       children: [
         _MissionSection(
-          title: 'HEUTE',
+          title: 'DAILY MISSIONS',
           subtitle: 'Neue Ziele jeden Tag um 00:00 UTC',
           missions: missions
-              .where((mission) => mission.cadence == 'daily')
+              .where(
+                (mission) =>
+                    mission.cadence == 'daily' && mission.tier == 'standard',
+              )
               .toList(),
           onClaim: onMissionClaim,
         ),
         const SizedBox(height: 14),
         _MissionSection(
-          title: 'DIESE WOCHE',
-          subtitle: 'Wochenlauf beginnt montags',
+          title: 'PRO MISSIONS',
+          subtitle: 'Anspruchsvollere Ziele · Reset alle drei Tage',
+          missions: missions.where((mission) => mission.tier == 'pro').toList(),
+          onClaim: onMissionClaim,
+        ),
+        const SizedBox(height: 14),
+        _MissionSection(
+          title: 'SUPER MISSIONS',
+          subtitle: 'Freischaltung nach drei Daily Mission Claims',
+          missions: missions
+              .where((mission) => mission.tier == 'super')
+              .toList(),
+          onClaim: onMissionClaim,
+        ),
+        const SizedBox(height: 14),
+        _MissionSection(
+          title: 'CRAZY MISSIONS',
+          subtitle: 'Nach Daily- und Pro-Fortschritt freigeschaltet',
+          missions: missions
+              .where(
+                (mission) =>
+                    mission.tier == 'crazy' && mission.cadence != 'weekly',
+              )
+              .toList(),
+          onClaim: onMissionClaim,
+        ),
+        const SizedBox(height: 14),
+        _MissionSection(
+          title: 'WÖCHENTLICHE MISSIONSLEISTE',
+          subtitle: 'Daily Claims füllen die Leiste · Reset montags',
           missions: missions
               .where((mission) => mission.cadence == 'weekly')
               .toList(),
@@ -1111,7 +1144,7 @@ class _MissionSection extends StatelessWidget {
           QuestCard(
             title: _title(mission),
             description: _description(mission),
-            reward: QuestsScreen._coins(mission.rewardCoins),
+            reward: _reward(mission),
             progress: mission.progress,
             target: mission.target,
             rewardId: mission.id,
@@ -1119,6 +1152,9 @@ class _MissionSection extends StatelessWidget {
             onClaim: onClaim,
             color: _color(mission.tier),
             tier: mission.tier.toUpperCase(),
+            locked: !mission.unlocked,
+            lockedLabel:
+                '${mission.unlockProgress}/${mission.unlockTarget} UNLOCK',
           ),
     ],
   );
@@ -1127,10 +1163,13 @@ class _MissionSection extends StatelessWidget {
     'daily-spins-10' => 'LUCKY TEN',
     'daily-wager-10000' => 'HIGH ROLLER',
     'daily-win-50000' => 'BIG WIN HUNTER',
-    'daily-free-spins-3' => 'FREE SPIN MASTER',
-    'weekly-spins-100' => 'CENTURY SPINNER',
-    'weekly-wager-250000' => 'FORTUNE MAKER',
-    'weekly-free-spins-25' => 'BONUS LEGEND',
+    'pro-spins-40' => 'PRO SPINNER',
+    'pro-wager-100000' => 'FORTUNE BUILDER',
+    'super-free-spins-3' => 'SUPER FREE SPINS',
+    'crazy-win-500000' => 'CRAZY WIN HUNTER',
+    'weekly-bar-1' => 'WEEKLY START',
+    'weekly-bar-3' => 'WEEKLY TOOLBOX',
+    'weekly-bar-7' => 'WEEKLY FINALE',
     _ => mission.translationKey.toUpperCase(),
   };
 
@@ -1141,8 +1180,27 @@ class _MissionSection extends StatelessWidget {
     'win_total' =>
       'Gewinne insgesamt ${QuestsScreen._coins(mission.target)} Coins',
     'free_spin_count' => 'Spiele ${mission.target} Freispiele',
+    'daily_mission_claims' => 'Schließe ${mission.target} Daily Missionen ab',
     _ => 'Erreiche das Missionsziel',
   };
+
+  static String _reward(MissionView mission) {
+    final parts = <String>['${QuestsScreen._coins(mission.rewardCoins)} C'];
+    if (mission.rewardMissionPoints > 0) {
+      parts.add('${mission.rewardMissionPoints} MP');
+    }
+    if (mission.rewardLoyaltyPoints > 0) {
+      parts.add('${mission.rewardLoyaltyPoints} LP');
+    }
+    if (mission.rewardStamps > 0) parts.add('${mission.rewardStamps} STAMP');
+    if (mission.rewardToolboxes > 0) {
+      parts.add('${mission.rewardToolboxes} TOOLBOX');
+    }
+    if (mission.rewardBoosters > 0) {
+      parts.add('${mission.rewardBoosters} BOOST');
+    }
+    return parts.join(' · ');
+  }
 
   static Color _color(String tier) => switch (tier) {
     'pro' => const Color(0xff42e3ff),
@@ -1165,6 +1223,8 @@ class QuestCard extends StatelessWidget {
     required this.onClaim,
     required this.color,
     this.tier,
+    this.locked = false,
+    this.lockedLabel,
   });
 
   final String title, description, reward, rewardId;
@@ -1173,10 +1233,12 @@ class QuestCard extends StatelessWidget {
   final RewardClaimCallback onClaim;
   final Color color;
   final String? tier;
+  final bool locked;
+  final String? lockedLabel;
 
   @override
   Widget build(BuildContext context) {
-    final complete = progress >= target;
+    final complete = !locked && progress >= target;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -1223,17 +1285,31 @@ class QuestCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    Text(description, style: MetaStyle.caption),
+                    Text(
+                      locked ? (lockedLabel ?? 'GESPERRT') : description,
+                      style: MetaStyle.caption,
+                    ),
                   ],
                 ),
               ),
-              Column(
-                children: [
-                  Icon(Icons.monetization_on, color: color, size: 20),
-                  Text(reward, style: MetaStyle.reward),
-                ],
-              ),
             ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.card_giftcard, color: color, size: 18),
+                const SizedBox(width: 7),
+                Expanded(child: Text(reward, style: MetaStyle.reward)),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1251,19 +1327,21 @@ class QuestCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text('${progress.clamp(0, target)} / $target'),
-              const SizedBox(width: 10),
-              FilledButton(
-                onPressed: complete && !claimed
-                    ? () => onClaim(rewardId)
-                    : null,
-                style: FilledButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: Text(claimed ? 'CLAIMED' : 'CLAIM'),
-              ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: complete && !claimed && !locked
+                  ? () => onClaim(rewardId)
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.black,
+              ),
+              child: Text(locked ? 'LOCKED' : (claimed ? 'CLAIMED' : 'CLAIM')),
+            ),
           ),
         ],
       ),

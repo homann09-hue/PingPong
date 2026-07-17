@@ -48,8 +48,8 @@ void main() {
     await tester.tap(find.text('QUESTS'));
     await tester.pumpAndSettle();
     expect(find.text('MISSION CONTROL'), findsOneWidget);
-    expect(find.text('HEUTE'), findsOneWidget);
-    expect(find.text('DIESE WOCHE'), findsOneWidget);
+    expect(find.text('DAILY MISSIONS'), findsOneWidget);
+    expect(find.text('WÖCHENTLICHE MISSIONSLEISTE'), findsOneWidget);
 
     await tester.tap(find.text('CLUB'));
     await tester.pumpAndSettle();
@@ -222,6 +222,54 @@ void main() {
     expect(find.text('Slot-Spin'), findsOneWidget);
     expect(find.text('-1.000'), findsOneWidget);
   });
+
+  testWidgets(
+    'mission control renders daily, pro, locked super and weekly tracks',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 1200));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QuestsScreen(
+            spins: 0,
+            totalWon: 0,
+            freeSpins: 0,
+            claimed: const {},
+            onClaim: (_) async {},
+            achievements: const [],
+            missions: [
+              _mission('daily-spins-10', 'daily', 'standard'),
+              _mission('pro-spins-40', 'three_day', 'pro'),
+              _mission(
+                'super-free-spins-3',
+                'daily',
+                'super',
+                unlocked: false,
+                unlockProgress: 2,
+                unlockTarget: 3,
+                boosters: 1,
+              ),
+              _mission(
+                'weekly-bar-3',
+                'weekly',
+                'pro',
+                metric: 'daily_mission_claims',
+                stamps: 1,
+              ),
+            ],
+            onMissionClaim: (_) async {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('DAILY MISSIONS'), findsOneWidget);
+      expect(find.text('PRO MISSIONS'), findsOneWidget);
+      expect(find.text('SUPER MISSIONS'), findsOneWidget);
+      expect(find.text('WÖCHENTLICHE MISSIONSLEISTE'), findsOneWidget);
+      expect(find.text('2/3 UNLOCK'), findsOneWidget);
+      expect(find.text('LOCKED'), findsOneWidget);
+    },
+  );
 
   testWidgets('Check & Win exchanges a complete mark card through the API', (
     tester,
@@ -633,3 +681,37 @@ class _LoyaltyApi extends CasinoApi {
         rewardBalance: 345,
       );
 }
+
+MissionView _mission(
+  String id,
+  String cadence,
+  String tier, {
+  String metric = 'spin_count',
+  bool unlocked = true,
+  int unlockProgress = 0,
+  int unlockTarget = 0,
+  int stamps = 0,
+  int boosters = 0,
+}) => MissionView(
+  id: id,
+  cadence: cadence,
+  tier: tier,
+  translationKey: 'mission.$id',
+  metric: metric,
+  target: 10,
+  progress: 0,
+  rewardCoins: 100000,
+  rewardMissionPoints: 10,
+  rewardLoyaltyPoints: 25,
+  rewardStamps: stamps,
+  rewardToolboxes: 0,
+  rewardBoosters: boosters,
+  completed: false,
+  claimed: false,
+  periodKey: '2026-07-17',
+  startsAt: DateTime.utc(2026, 7, 17),
+  endsAt: DateTime.utc(2026, 7, 18),
+  unlocked: unlocked,
+  unlockProgress: unlockProgress,
+  unlockTarget: unlockTarget,
+);

@@ -12,6 +12,7 @@ import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus
 import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
 import { loyaltyRewardOffer, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
+import { missionCatalog, missionUnlock, missionWindow, type MissionDefinition } from "../missions/mission-system.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -306,11 +307,16 @@ export class InMemorySpinStore implements SpinStore {
   }
 
   public async getMissions(playerId: string, now: Date): Promise<readonly MissionView[]> {
-    return missionDefinitions.map((definition) => {
-      const periodKey = missionPeriod(definition.cadence, now);
+    const claims = this.missionClaimCounts(playerId, now);
+    return missionCatalog.definitions.map((definition) => {
+      const window = missionWindow(definition.cadence, now);
+      const periodKey = window.periodKey;
       const state = this.missionProgress.get(`${playerId}:${definition.id}:${periodKey}`) ?? { progress: 0, claimed: false };
-      return { ...definition, progress: Math.min(definition.target, state.progress), completed: state.progress >= definition.target,
-        claimed: state.claimed, periodKey };
+      const unlock = missionUnlock(definition, claims.daily, claims.pro);
+      return { ...definition, rewardCoins: definition.rewards.coins,
+        progress: Math.min(definition.target, state.progress), completed: unlock.unlocked && state.progress >= definition.target,
+        claimed: state.claimed, periodKey, startsAt: window.startsAt, endsAt: window.endsAt,
+        unlocked: unlock.unlocked, unlockProgress: unlock.progress, unlockTarget: unlock.target };
     });
   }
 
@@ -319,11 +325,27 @@ export class InMemorySpinStore implements SpinStore {
     if (!mission || !mission.completed || mission.claimed) throw new MissionNotClaimableError();
     const key = `${playerId}:${missionId}:${mission.periodKey}`;
     this.missionProgress.set(key, { progress: mission.progress, claimed: true });
-    const before = this.balances.get(playerId) ?? this.defaultBalance;
-    const coinBalance = before + mission.rewardCoins;
+    const coinBefore = this.balances.get(playerId) ?? this.defaultBalance;
+    const coinBalance = coinBefore + mission.rewards.coins;
     this.balances.set(playerId, coinBalance);
-    this.record(playerId, mission.rewardCoins, "mission_claim", "mission", key, before, coinBalance);
-    return { missionId, coins: mission.rewardCoins, coinBalance };
+    if (mission.rewards.coins > 0) this.record(playerId, mission.rewards.coins, "mission_claim", "mission", `${key}:coin`, coinBefore, coinBalance);
+    const wallet = { ...this.economy.get(playerId) };
+    const rewardCurrencies: readonly [SpinEconomyCurrency, number][] = [
+      ["mission_point", mission.rewards.missionPoints], ["loyalty_point", mission.rewards.loyaltyPoints],
+      ["stamp", mission.rewards.stamps], ["toolbox", mission.rewards.toolboxes], ["booster", mission.rewards.boosters],
+    ];
+    const balances: Record<string, number> = { coin: coinBalance };
+    for (const [currency, amount] of rewardCurrencies) {
+      const before = wallet[currency] ?? 0;
+      const after = before + amount;
+      wallet[currency] = after;
+      balances[currency] = after;
+      if (amount > 0) this.record(playerId, amount, "mission_claim", "mission", `${key}:${currency}`, before, after, currency);
+    }
+    this.economy.set(playerId, wallet);
+    const definition = missionCatalog.definitions.find((item) => item.id === missionId)!;
+    if (definition.cadence === "daily" && definition.tier === "standard") this.advanceWeeklyMissionBar(playerId, now);
+    return { missionId, coins: mission.rewards.coins, coinBalance, rewards: mission.rewards, balances };
   }
 
   public async getLiveEvents(playerId: string, now: Date): Promise<readonly LiveEventView[]> {
@@ -531,12 +553,33 @@ export class InMemorySpinStore implements SpinStore {
 
   private advanceMissions(playerId: string, wager: number, win: number, freeSpins: number, now: Date): void {
     const increments: Record<string, number> = { spin_count: 1, wager_total: wager, win_total: win, free_spin_count: freeSpins };
-    for (const mission of missionDefinitions) {
-      const period = missionPeriod(mission.cadence, now);
+    const claims = this.missionClaimCounts(playerId, now);
+    for (const mission of missionCatalog.definitions) {
+      if (mission.metric === "daily_mission_claims" || !missionUnlock(mission, claims.daily, claims.pro).unlocked) continue;
+      const period = missionWindow(mission.cadence, now).periodKey;
       const key = `${playerId}:${mission.id}:${period}`;
       const state = this.missionProgress.get(key) ?? { progress: 0, claimed: false };
       this.missionProgress.set(key, { ...state, progress: Math.min(mission.target, state.progress + increments[mission.metric]!) });
     }
+  }
+
+  private advanceWeeklyMissionBar(playerId: string, now: Date): void {
+    for (const mission of missionCatalog.definitions.filter((item) => item.metric === "daily_mission_claims")) {
+      const key = `${playerId}:${mission.id}:${missionWindow("weekly", now).periodKey}`;
+      const state = this.missionProgress.get(key) ?? { progress: 0, claimed: false };
+      this.missionProgress.set(key, { ...state, progress: Math.min(mission.target, state.progress + 1) });
+    }
+  }
+
+  private missionClaimCounts(playerId: string, now: Date): { readonly daily: number; readonly pro: number } {
+    const claimed = (definition: MissionDefinition): boolean => {
+      const key = `${playerId}:${definition.id}:${missionWindow(definition.cadence, now).periodKey}`;
+      return this.missionProgress.get(key)?.claimed === true;
+    };
+    return {
+      daily: missionCatalog.definitions.filter((item) => item.cadence === "daily" && item.tier === "standard" && claimed(item)).length,
+      pro: missionCatalog.definitions.filter((item) => item.cadence === "three_day" && item.tier === "pro" && claimed(item)).length,
+    };
   }
 
   private advanceEvents(playerId: string, wager: number, win: number, freeSpins: number, now: Date): void {
@@ -548,20 +591,4 @@ export class InMemorySpinStore implements SpinStore {
       this.eventProgress.set(key, Math.min(maximum, progress + eventIncrement(event.metric, wager, win, freeSpins)));
     }
   }
-}
-
-const missionDefinitions = [
-  { id: "daily-spins-10", cadence: "daily", tier: "standard", translationKey: "mission.daily_spins_10", metric: "spin_count", target: 10, rewardCoins: 100_000 },
-  { id: "daily-wager-10000", cadence: "daily", tier: "standard", translationKey: "mission.daily_wager_10000", metric: "wager_total", target: 10_000, rewardCoins: 150_000 },
-  { id: "daily-win-50000", cadence: "daily", tier: "pro", translationKey: "mission.daily_win_50000", metric: "win_total", target: 50_000, rewardCoins: 200_000 },
-  { id: "daily-free-spins-3", cadence: "daily", tier: "pro", translationKey: "mission.daily_free_spins_3", metric: "free_spin_count", target: 3, rewardCoins: 250_000 },
-  { id: "weekly-spins-100", cadence: "weekly", tier: "pro", translationKey: "mission.weekly_spins_100", metric: "spin_count", target: 100, rewardCoins: 750_000 },
-  { id: "weekly-wager-250000", cadence: "weekly", tier: "super", translationKey: "mission.weekly_wager_250000", metric: "wager_total", target: 250_000, rewardCoins: 1_500_000 },
-  { id: "weekly-free-spins-25", cadence: "weekly", tier: "crazy", translationKey: "mission.weekly_free_spins_25", metric: "free_spin_count", target: 25, rewardCoins: 2_000_000 },
-] as const;
-
-function missionPeriod(cadence: "daily" | "weekly" | "event", now: Date): string {
-  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  if (cadence === "weekly") date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
-  return date.toISOString().slice(0, 10);
 }

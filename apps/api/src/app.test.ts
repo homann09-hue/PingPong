@@ -595,13 +595,15 @@ describe("spin API", () => {
     expect(audit.json().entries.map((entry: { action: string }) => entry.action)).toEqual(["campaign.published", "campaign.created"]);
     await liveOpsApp.close();
   });
-  it("publishes tiered daily and weekly missions with cadence-specific periods", async () => {
+  it("publishes daily, three-day, unlockable, and weekly mission tracks", async () => {
     const response = await app.inject({ method: "GET", url: "/v1/missions", headers: { authorization: "Bearer valid" } });
     expect(response.statusCode).toBe(200);
     const missions = response.json().missions as Array<{ id: string; cadence: string; tier: string; periodKey: string }>;
     expect(missions.find((mission) => mission.id === "daily-spins-10")).toMatchObject({ cadence: "daily", tier: "standard" });
-    expect(missions.find((mission) => mission.id === "weekly-spins-100")).toMatchObject({ cadence: "weekly", tier: "pro" });
-    expect(missions.find((mission) => mission.id === "weekly-spins-100")?.periodKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(missions.find((mission) => mission.id === "pro-spins-40")).toMatchObject({ cadence: "three_day", tier: "pro" });
+    expect(missions.find((mission) => mission.id === "super-free-spins-3")).toMatchObject({ unlocked: false, unlockTarget: 3 });
+    expect(missions.find((mission) => mission.id === "weekly-bar-7")).toMatchObject({ cadence: "weekly", tier: "crazy" });
+    expect(missions.find((mission) => mission.id === "weekly-bar-7")?.periodKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
   it("tracks live-event milestones and credits each reward exactly once", async () => {
     const eventApp = buildApp({
@@ -733,7 +735,7 @@ describe("spin API", () => {
       (wallet.json().balances as Array<{ currency: string; balance: number }>)
         .map((entry) => [entry.currency, entry.balance]),
     );
-    expect(balances.size).toBe(13);
+    expect(balances.size).toBe(14);
     expect(balances.get("coin")).toBeTypeOf("number");
     expect(balances.get("gem")).toBe(320);
     expect(balances.get("vip_point")).toBeGreaterThan(0);

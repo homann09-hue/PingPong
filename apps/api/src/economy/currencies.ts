@@ -2,6 +2,7 @@ export const walletCurrencies = [
   "coin", "gem", "loyalty_point", "vip_point", "high_roller_point",
   "clan_point", "league_point", "mission_point", "lotsa_cash", "stamp",
   "check_win_mark", "booster", "oinky_coupon",
+  "toolbox",
 ] as const;
 
 export type WalletCurrency = typeof walletCurrencies[number];

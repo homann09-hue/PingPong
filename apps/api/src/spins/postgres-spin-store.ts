@@ -14,6 +14,7 @@ import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type Wall
 import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
 import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
 import { loyaltyRewardOffer, loyaltyRewardsCatalog, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
+import { type MissionCadence, type MissionRewards } from "../missions/mission-system.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
@@ -178,12 +179,20 @@ export class PostgresSpinStore implements SpinStore {
       await client.query(
         `INSERT INTO mission_progress (player_id, mission_id, period_key, progress, completed_at)
          SELECT $1, id, CASE cadence WHEN 'weekly' THEN date_trunc('week', now() AT TIME ZONE 'UTC')::date
+                              WHEN 'three_day' THEN date '1970-01-01' + ((((now() AT TIME ZONE 'UTC')::date - date '1970-01-01') / 3) * 3)
                               ELSE (now() AT TIME ZONE 'UTC')::date END,
                 LEAST(target, CASE metric WHEN 'spin_count' THEN 1 WHEN 'wager_total' THEN $2
                   WHEN 'win_total' THEN $3 WHEN 'free_spin_count' THEN $4 ELSE 0 END),
                 CASE WHEN CASE metric WHEN 'spin_count' THEN 1 WHEN 'wager_total' THEN $2
                   WHEN 'win_total' THEN $3 WHEN 'free_spin_count' THEN $4 ELSE 0 END >= target THEN now() END
-           FROM mission_definitions WHERE active=true AND (starts_at IS NULL OR starts_at<=now())
+           FROM mission_definitions WHERE active=true AND metric<>'daily_mission_claims'
+             AND unlock_daily_claims <= (SELECT count(*) FROM mission_progress mp JOIN mission_definitions md ON md.id=mp.mission_id
+               WHERE mp.player_id=$1 AND md.cadence='daily' AND md.tier='standard' AND mp.claimed_at IS NOT NULL
+                 AND mp.period_key=(now() AT TIME ZONE 'UTC')::date)
+             AND unlock_pro_claims <= (SELECT count(*) FROM mission_progress mp JOIN mission_definitions md ON md.id=mp.mission_id
+               WHERE mp.player_id=$1 AND md.cadence='three_day' AND md.tier='pro' AND mp.claimed_at IS NOT NULL
+                 AND mp.period_key=date '1970-01-01' + ((((now() AT TIME ZONE 'UTC')::date - date '1970-01-01') / 3) * 3))
+             AND (starts_at IS NULL OR starts_at<=now())
              AND (ends_at IS NULL OR ends_at>now())
          ON CONFLICT (player_id, mission_id, period_key) DO UPDATE
            SET progress=LEAST((SELECT target FROM mission_definitions WHERE id=EXCLUDED.mission_id), mission_progress.progress+EXCLUDED.progress),
@@ -990,50 +999,115 @@ export class PostgresSpinStore implements SpinStore {
   }
 
   public async getMissions(playerId: string, now: Date): Promise<readonly MissionView[]> {
-    const result = await this.pool.query<{ id: string; cadence: "daily" | "weekly" | "event"; tier: "standard" | "pro" | "super" | "crazy"; translation_key: string; metric: string; target: string; reward_coins: string; progress: string; claimed_at: Date | null; period_key: string }>(
-      `SELECT definitions.id, definitions.cadence, definitions.tier, definitions.translation_key,
+    const result = await this.pool.query<{ id: string; cadence: MissionCadence; tier: "standard" | "pro" | "super" | "crazy"; translation_key: string; metric: string; target: string; reward_coins: string; reward_mission_points: string; reward_loyalty_points: string; reward_stamps: string; reward_toolboxes: string; reward_boosters: string; unlock_daily_claims: number; unlock_pro_claims: number; daily_claims: string; pro_claims: string; progress: string; claimed_at: Date | null; period_key: string; starts_at: Date; ends_at: Date }>(
+      `WITH counts AS (
+         SELECT
+           count(*) FILTER (WHERE d.cadence='daily' AND d.tier='standard' AND p.period_key=($2::timestamptz AT TIME ZONE 'UTC')::date) AS daily_claims,
+           count(*) FILTER (WHERE d.cadence='three_day' AND d.tier='pro' AND p.period_key=date '1970-01-01' + (((($2::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3)) AS pro_claims
+         FROM mission_progress p JOIN mission_definitions d ON d.id=p.mission_id
+         WHERE p.player_id=$1 AND p.claimed_at IS NOT NULL
+       )
+       SELECT definitions.id, definitions.cadence, definitions.tier, definitions.translation_key,
               definitions.metric, definitions.target, definitions.reward_coins,
+              definitions.reward_mission_points, definitions.reward_loyalty_points, definitions.reward_stamps,
+              definitions.reward_toolboxes, definitions.reward_boosters, definitions.unlock_daily_claims,
+              definitions.unlock_pro_claims, counts.daily_claims, counts.pro_claims,
               COALESCE(progress.progress,0) AS progress, progress.claimed_at,
               CASE definitions.cadence WHEN 'weekly' THEN date_trunc('week', $2::timestamptz AT TIME ZONE 'UTC')::date
-                   ELSE ($2::timestamptz AT TIME ZONE 'UTC')::date END AS period_key
-         FROM mission_definitions AS definitions LEFT JOIN mission_progress AS progress
+                   WHEN 'three_day' THEN date '1970-01-01' + (((($2::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3)
+                   ELSE ($2::timestamptz AT TIME ZONE 'UTC')::date END AS period_key,
+              CASE definitions.cadence WHEN 'weekly' THEN date_trunc('week', $2::timestamptz AT TIME ZONE 'UTC')
+                   WHEN 'three_day' THEN (date '1970-01-01' + (((($2::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3))::timestamp
+                   ELSE date_trunc('day',$2::timestamptz AT TIME ZONE 'UTC') END AT TIME ZONE 'UTC' AS starts_at,
+              CASE definitions.cadence WHEN 'weekly' THEN date_trunc('week', $2::timestamptz AT TIME ZONE 'UTC') + interval '7 days'
+                   WHEN 'three_day' THEN (date '1970-01-01' + (((($2::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3) + 3)::timestamp
+                   ELSE date_trunc('day',$2::timestamptz AT TIME ZONE 'UTC') + interval '1 day' END AT TIME ZONE 'UTC' AS ends_at
+         FROM mission_definitions AS definitions CROSS JOIN counts LEFT JOIN mission_progress AS progress
            ON progress.mission_id=definitions.id AND progress.player_id=$1
           AND progress.period_key=CASE definitions.cadence WHEN 'weekly' THEN date_trunc('week', $2::timestamptz AT TIME ZONE 'UTC')::date
+                                   WHEN 'three_day' THEN date '1970-01-01' + (((($2::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3)
                                    ELSE ($2::timestamptz AT TIME ZONE 'UTC')::date END
         WHERE definitions.active=true AND (definitions.starts_at IS NULL OR definitions.starts_at<=$2)
           AND (definitions.ends_at IS NULL OR definitions.ends_at>$2) ORDER BY definitions.id`, [playerId, now],
     );
     return result.rows.map((row) => { const target = this.safeInteger(row.target, "Mission target"); const progress = this.safeInteger(row.progress, "Mission progress");
+      const rewards: MissionRewards = { coins: this.safeInteger(row.reward_coins, "Mission coins"),
+        missionPoints: this.safeInteger(row.reward_mission_points, "Mission points"),
+        loyaltyPoints: this.safeInteger(row.reward_loyalty_points, "Mission loyalty points"),
+        stamps: this.safeInteger(row.reward_stamps, "Mission stamps"), toolboxes: this.safeInteger(row.reward_toolboxes, "Mission toolboxes"),
+        boosters: this.safeInteger(row.reward_boosters, "Mission boosters") };
+      const dailyClaims = Number(row.daily_claims); const proClaims = Number(row.pro_claims);
+      const unlockTarget = row.unlock_daily_claims + row.unlock_pro_claims;
+      const unlockProgress = Math.min(row.unlock_daily_claims, dailyClaims) + Math.min(row.unlock_pro_claims, proClaims);
+      const unlocked = unlockProgress >= unlockTarget;
       return { id: row.id, cadence: row.cadence, tier: row.tier, translationKey: row.translation_key,
-        metric: row.metric, target, progress, rewardCoins: this.safeInteger(row.reward_coins, "Mission reward"),
-        completed: progress >= target, claimed: Boolean(row.claimed_at), periodKey: row.period_key }; });
+        metric: row.metric, target, progress, rewards, rewardCoins: rewards.coins,
+        completed: unlocked && progress >= target, claimed: Boolean(row.claimed_at), periodKey: row.period_key,
+        startsAt: row.starts_at.toISOString(), endsAt: row.ends_at.toISOString(), unlocked, unlockProgress, unlockTarget }; });
   }
 
   public async claimMission(playerId: string, missionId: string, now: Date): Promise<MissionClaim> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const mission = await client.query<{ reward_coins: string; progress: string; target: string; claimed_at: Date | null; period_key: string }>(
-        `SELECT definitions.reward_coins, definitions.target, progress.progress, progress.claimed_at, progress.period_key
+      await client.query(`INSERT INTO wallets (player_id,currency,balance) VALUES
+        ($1,'mission_point',0),($1,'loyalty_point',0),($1,'stamp',0),($1,'toolbox',0),($1,'booster',0)
+        ON CONFLICT (player_id,currency) DO NOTHING`, [playerId]);
+      const walletRows = await client.query<{ currency: WalletCurrency; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','mission_point','loyalty_point','stamp','toolbox','booster') ORDER BY currency FOR UPDATE", [playerId]);
+      if (walletRows.rows.length !== 6) throw new Error("Player mission wallets do not exist");
+      const mission = await client.query<{ cadence: MissionCadence; tier: "standard" | "pro" | "super" | "crazy"; reward_coins: string; reward_mission_points: string; reward_loyalty_points: string; reward_stamps: string; reward_toolboxes: string; reward_boosters: string; unlock_daily_claims: number; unlock_pro_claims: number; daily_claims: string; pro_claims: string; progress: string; target: string; claimed_at: Date | null; period_key: string }>(
+        `SELECT definitions.cadence, definitions.tier, definitions.reward_coins, definitions.reward_mission_points,
+                definitions.reward_loyalty_points, definitions.reward_stamps, definitions.reward_toolboxes,
+                definitions.reward_boosters, definitions.unlock_daily_claims, definitions.unlock_pro_claims,
+                (SELECT count(*) FROM mission_progress mp JOIN mission_definitions md ON md.id=mp.mission_id
+                  WHERE mp.player_id=$1 AND md.cadence='daily' AND md.tier='standard' AND mp.claimed_at IS NOT NULL
+                    AND mp.period_key=($3::timestamptz AT TIME ZONE 'UTC')::date) AS daily_claims,
+                (SELECT count(*) FROM mission_progress mp JOIN mission_definitions md ON md.id=mp.mission_id
+                  WHERE mp.player_id=$1 AND md.cadence='three_day' AND md.tier='pro' AND mp.claimed_at IS NOT NULL
+                    AND mp.period_key=date '1970-01-01' + (((($3::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3)) AS pro_claims,
+                definitions.target, progress.progress, progress.claimed_at, progress.period_key
            FROM mission_progress AS progress JOIN mission_definitions AS definitions ON definitions.id=progress.mission_id
           WHERE progress.player_id=$1 AND progress.mission_id=$2
             AND progress.period_key=CASE definitions.cadence WHEN 'weekly' THEN date_trunc('week', $3::timestamptz AT TIME ZONE 'UTC')::date
+                                     WHEN 'three_day' THEN date '1970-01-01' + (((($3::timestamptz AT TIME ZONE 'UTC')::date-date '1970-01-01')/3)*3)
                                      ELSE ($3::timestamptz AT TIME ZONE 'UTC')::date END FOR UPDATE OF progress`,
         [playerId, missionId, now],
       );
       const row = mission.rows[0];
-      if (!row || row.claimed_at || Number(row.progress) < Number(row.target)) throw new MissionNotClaimableError();
+      const unlocked = row && Number(row.daily_claims) >= row.unlock_daily_claims && Number(row.pro_claims) >= row.unlock_pro_claims;
+      if (!row || !unlocked || row.claimed_at || Number(row.progress) < Number(row.target)) throw new MissionNotClaimableError();
       const period = row.period_key;
-      const coins = this.safeInteger(row.reward_coins, "Mission reward");
-      const wallet = await client.query<WalletRow>("SELECT balance FROM wallets WHERE player_id=$1 AND currency='coin' FOR UPDATE", [playerId]);
-      if (!wallet.rows[0]) throw new Error("Player coin wallet does not exist");
-      const before = this.safeInteger(wallet.rows[0].balance, "Mission wallet balance"); const coinBalance = before + coins; const referenceId = randomUUID();
+      const rewards: MissionRewards = { coins: this.safeInteger(row.reward_coins, "Mission coins"),
+        missionPoints: this.safeInteger(row.reward_mission_points, "Mission points"), loyaltyPoints: this.safeInteger(row.reward_loyalty_points, "Mission loyalty points"),
+        stamps: this.safeInteger(row.reward_stamps, "Mission stamps"), toolboxes: this.safeInteger(row.reward_toolboxes, "Mission toolboxes"),
+        boosters: this.safeInteger(row.reward_boosters, "Mission boosters") };
+      const rewardEntries: readonly [WalletCurrency, number][] = [["coin", rewards.coins], ["mission_point", rewards.missionPoints],
+        ["loyalty_point", rewards.loyaltyPoints], ["stamp", rewards.stamps], ["toolbox", rewards.toolboxes], ["booster", rewards.boosters]];
+      const balances: Record<string, number> = {}; const referenceId = randomUUID();
       await client.query("UPDATE mission_progress SET claimed_at=$4, version=version+1 WHERE player_id=$1 AND mission_id=$2 AND period_key=$3", [playerId, missionId, period, now]);
-      await client.query("UPDATE wallets SET balance=$1, version=version+1 WHERE player_id=$2 AND currency='coin'", [coinBalance, playerId]);
-      await this.ledger(client, { playerId, currency: "coin", amount: coins, reason: "mission_claim", source: "mission",
-        referenceId, idempotencyKey: `mission:${missionId}:${period}`, balanceBefore: before, balanceAfter: coinBalance,
-        metadata: { missionId, period } });
-      await client.query("COMMIT"); return { missionId, coins, coinBalance };
+      for (const [currency, amount] of rewardEntries) {
+        const before = this.safeInteger(walletRows.rows.find((wallet) => wallet.currency === currency)!.balance, `Mission ${currency} balance`);
+        const after = before + amount; balances[currency] = after;
+        if (amount === 0) continue;
+        await client.query("UPDATE wallets SET balance=$1,version=version+1 WHERE player_id=$2 AND currency=$3", [after, playerId, currency]);
+        await this.ledger(client, { playerId, currency, amount, reason: "mission_claim", source: "mission", referenceId,
+          idempotencyKey: `mission:${missionId}:${period}:${currency}`, balanceBefore: before, balanceAfter: after,
+          metadata: { missionId, period } });
+      }
+      if (row.cadence === "daily" && row.tier === "standard") {
+        await client.query(
+          `INSERT INTO mission_progress (player_id,mission_id,period_key,progress,completed_at)
+           SELECT $1,id,date_trunc('week',$2::timestamptz AT TIME ZONE 'UTC')::date,1,
+                  CASE WHEN target<=1 THEN $2 END FROM mission_definitions
+            WHERE active=true AND cadence='weekly' AND metric='daily_mission_claims'
+           ON CONFLICT (player_id,mission_id,period_key) DO UPDATE SET
+             progress=LEAST((SELECT target FROM mission_definitions WHERE id=EXCLUDED.mission_id),mission_progress.progress+1),
+             completed_at=CASE WHEN mission_progress.progress+1 >= (SELECT target FROM mission_definitions WHERE id=EXCLUDED.mission_id)
+               THEN COALESCE(mission_progress.completed_at,$2) ELSE mission_progress.completed_at END,
+             version=mission_progress.version+1`, [playerId, now]);
+      }
+      await client.query("COMMIT"); return { missionId, coins: rewards.coins, coinBalance: balances.coin!, rewards, balances };
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 

@@ -7,6 +7,7 @@ import type { EconomyBalance, WalletCurrency } from "../economy/currencies.js";
 import type { CheckWinClaim, CheckWinStatus } from "../economy/check-win.js";
 import type { BoosterActivation, BoosterCraft, BoosterStatus } from "../economy/xp-booster.js";
 import type { LoyaltyRedemption, LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
+import type { MissionCadence, MissionRewards, MissionTier } from "../missions/mission-system.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -114,13 +115,18 @@ export interface WheelSpinResult {
   readonly availableSpins: number;
 }
 export interface MissionView {
-  readonly id: string; readonly cadence: "daily" | "weekly" | "event";
-  readonly tier: "standard" | "pro" | "super" | "crazy"; readonly translationKey: string;
+  readonly id: string; readonly cadence: MissionCadence;
+  readonly tier: MissionTier; readonly translationKey: string;
   readonly metric: string; readonly target: number;
-  readonly progress: number; readonly rewardCoins: number; readonly completed: boolean;
-  readonly claimed: boolean; readonly periodKey: string;
+  readonly progress: number; readonly rewards: MissionRewards; readonly rewardCoins: number;
+  readonly completed: boolean; readonly claimed: boolean; readonly periodKey: string;
+  readonly startsAt: string; readonly endsAt: string; readonly unlocked: boolean;
+  readonly unlockProgress: number; readonly unlockTarget: number;
 }
-export interface MissionClaim { readonly missionId: string; readonly coins: number; readonly coinBalance: number }
+export interface MissionClaim {
+  readonly missionId: string; readonly coins: number; readonly coinBalance: number;
+  readonly rewards: MissionRewards; readonly balances: Readonly<Record<string, number>>;
+}
 export interface EventMilestoneView {
   readonly id: string; readonly target: number; readonly rewardCoins: number;
   readonly completed: boolean; readonly claimed: boolean;

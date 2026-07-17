@@ -627,12 +627,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       final reward = await api.claimMission(missionId);
       if (!mounted) return;
-      setState(() => balance = reward.balance);
+      setState(() {
+        balance = reward.coinBalance;
+        loyaltyPoints += reward.loyaltyPoints;
+      });
       await _loadProfile();
+      await _loadBoosters();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('+${_fmt(reward.coins)} MISSIONS-COINS'),
+          content: Text(
+            '+${_fmt(reward.coins)} COINS · +${reward.missionPoints} MP · +${reward.loyaltyPoints} LP'
+            '${reward.stamps > 0 ? ' · +${reward.stamps} STAMP' : ''}'
+            '${reward.toolboxes > 0 ? ' · +${reward.toolboxes} TOOLBOX' : ''}'
+            '${reward.boosters > 0 ? ' · +${reward.boosters} BOOSTER' : ''}',
+          ),
           backgroundColor: const Color(0xff6b2bd9),
         ),
       );

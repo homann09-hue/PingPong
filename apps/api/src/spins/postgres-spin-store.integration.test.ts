@@ -114,6 +114,10 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/028_loyalty_rewards.sql", import.meta.url), "utf8",
     );
     await pool.query(loyaltyMigration);
+    const missionTracksMigration = await readFile(
+      new URL("../../../../infra/postgres/029_mission_tracks.sql", import.meta.url), "utf8",
+    );
+    await pool.query(missionTracksMigration);
     await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5),($6),($7)",
       [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId, loyaltyPlayerId]);
     await pool.query(
@@ -193,11 +197,13 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(transactions.every((entry) => entry.balanceAfter === entry.balanceBefore + entry.amount)).toBe(true);
     const missions = await store.getMissions(playerId, new Date());
     expect(missions.find((mission) => mission.id === missionId)).toMatchObject({ progress: 1, completed: true, claimed: false });
-    expect(missions.find((mission) => mission.id === "weekly-spins-100")).toMatchObject({
-      cadence: "weekly", tier: "pro", translationKey: "mission.weekly_spins_100", progress: 1,
+    expect(missions.find((mission) => mission.id === "pro-spins-40")).toMatchObject({
+      cadence: "three_day", tier: "pro", translationKey: "mission.pro_spins_40", progress: 1,
     });
     const missionClaim = await store.claimMission(playerId, missionId, new Date());
     expect(missionClaim).toMatchObject({ missionId, coins: 1234 });
+    expect((await store.getMissions(playerId, new Date())).find((mission) => mission.id === "weekly-bar-1"))
+      .toMatchObject({ progress: 1, completed: true });
     await expect(store.claimMission(playerId, missionId, new Date())).rejects.toBeInstanceOf(Error);
     const liveEvents = await store.getLiveEvents(playerId, new Date());
     expect(liveEvents.find((event) => event.id === "spin-sprint")).toMatchObject({ progress: 1 });

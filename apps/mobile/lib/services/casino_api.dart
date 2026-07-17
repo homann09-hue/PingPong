@@ -122,14 +122,42 @@ class MissionView {
     required this.target,
     required this.progress,
     required this.rewardCoins,
+    required this.rewardMissionPoints,
+    required this.rewardLoyaltyPoints,
+    required this.rewardStamps,
+    required this.rewardToolboxes,
+    required this.rewardBoosters,
     required this.completed,
     required this.claimed,
     required this.periodKey,
+    required this.startsAt,
+    required this.endsAt,
+    required this.unlocked,
+    required this.unlockProgress,
+    required this.unlockTarget,
   });
 
   final String id, cadence, tier, translationKey, metric, periodKey;
-  final int target, progress, rewardCoins;
-  final bool completed, claimed;
+  final int target, progress, rewardCoins, rewardMissionPoints;
+  final int rewardLoyaltyPoints, rewardStamps, rewardToolboxes, rewardBoosters;
+  final DateTime startsAt, endsAt;
+  final int unlockProgress, unlockTarget;
+  final bool completed, claimed, unlocked;
+}
+
+class MissionClaimView {
+  const MissionClaimView({
+    required this.coins,
+    required this.coinBalance,
+    required this.missionPoints,
+    required this.loyaltyPoints,
+    required this.stamps,
+    required this.toolboxes,
+    required this.boosters,
+  });
+
+  final int coins, coinBalance, missionPoints, loyaltyPoints;
+  final int stamps, toolboxes, boosters;
 }
 
 class ProfileResponse {
@@ -1555,15 +1583,32 @@ class CasinoApi {
             target: item['target'] as int,
             progress: item['progress'] as int,
             rewardCoins: item['rewardCoins'] as int,
+            rewardMissionPoints:
+                (item['rewards'] as Map<String, dynamic>)['missionPoints']
+                    as int,
+            rewardLoyaltyPoints:
+                (item['rewards'] as Map<String, dynamic>)['loyaltyPoints']
+                    as int,
+            rewardStamps:
+                (item['rewards'] as Map<String, dynamic>)['stamps'] as int,
+            rewardToolboxes:
+                (item['rewards'] as Map<String, dynamic>)['toolboxes'] as int,
+            rewardBoosters:
+                (item['rewards'] as Map<String, dynamic>)['boosters'] as int,
             completed: item['completed'] as bool,
             claimed: item['claimed'] as bool,
             periodKey: item['periodKey'] as String,
+            startsAt: DateTime.parse(item['startsAt'] as String),
+            endsAt: DateTime.parse(item['endsAt'] as String),
+            unlocked: item['unlocked'] as bool,
+            unlockProgress: item['unlockProgress'] as int,
+            unlockTarget: item['unlockTarget'] as int,
           );
         })
         .toList(growable: false);
   }
 
-  Future<RewardClaimResponse> claimMission(String missionId) async {
+  Future<MissionClaimView> claimMission(String missionId) async {
     final response = await _client.post(
       Uri.parse('$base/v1/missions/$missionId/claim'),
     );
@@ -1575,9 +1620,15 @@ class CasinoApi {
       throw StateError('Mission konnte nicht abgeholt werden');
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return RewardClaimResponse(
+    final rewards = data['rewards'] as Map<String, dynamic>;
+    return MissionClaimView(
       coins: data['coins'] as int,
-      balance: data['coinBalance'] as int,
+      coinBalance: data['coinBalance'] as int,
+      missionPoints: rewards['missionPoints'] as int,
+      loyaltyPoints: rewards['loyaltyPoints'] as int,
+      stamps: rewards['stamps'] as int,
+      toolboxes: rewards['toolboxes'] as int,
+      boosters: rewards['boosters'] as int,
     );
   }
 
