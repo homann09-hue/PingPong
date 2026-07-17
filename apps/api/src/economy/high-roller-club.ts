@@ -8,6 +8,13 @@ export const highRollerClubRules = {
   leaguePointMultiplier: 2,
 } as const;
 
+/** Slot ids whose virtual-coin spin path requires an active club term. */
+export const highRollerExclusiveSlotIds = ["neon-nights"] as const;
+
+export function requiresHighRollerMembership(slotId: string): boolean {
+  return (highRollerExclusiveSlotIds as readonly string[]).includes(slotId);
+}
+
 export const highRollerPointSources = [
   { id: "spins", label: "Spins nach Einsatzhöhe" },
   { id: "level_up", label: "Levelaufstiege" },

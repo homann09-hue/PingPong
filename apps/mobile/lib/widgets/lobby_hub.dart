@@ -11,6 +11,7 @@ class LobbyHub extends StatelessWidget {
     required this.level,
     required this.now,
     required this.games,
+    required this.highRollerActive,
     required this.packageManager,
     required this.missions,
     required this.events,
@@ -34,6 +35,7 @@ class LobbyHub extends StatelessWidget {
   final int level;
   final DateTime now;
   final List<GameDefinition> games;
+  final bool highRollerActive;
   final SlotPackageManager packageManager;
   final List<MissionView> missions;
   final List<LiveEventView> events;
@@ -108,6 +110,7 @@ class LobbyHub extends StatelessWidget {
                   child: _SlotCoverCard(
                     game: featured[index],
                     level: level,
+                    highRollerActive: highRollerActive,
                     packageManager: packageManager,
                     large: true,
                     onPlay: onPlay,
@@ -142,6 +145,7 @@ class LobbyHub extends StatelessWidget {
                 (context, index) => _SlotCoverCard(
                   game: games[index],
                   level: level,
+                  highRollerActive: highRollerActive,
                   packageManager: packageManager,
                   onPlay: onPlay,
                   onPrepare: onPrepare,
@@ -477,6 +481,7 @@ class _SlotCoverCard extends StatelessWidget {
   const _SlotCoverCard({
     required this.game,
     required this.level,
+    required this.highRollerActive,
     required this.packageManager,
     required this.onPlay,
     required this.onPrepare,
@@ -484,13 +489,16 @@ class _SlotCoverCard extends StatelessWidget {
   });
   final GameDefinition game;
   final int level;
+  final bool highRollerActive;
   final SlotPackageManager packageManager;
   final bool large;
   final ValueChanged<GameDefinition> onPlay, onPrepare;
 
   @override
   Widget build(BuildContext context) {
-    final locked = level < game.unlockLevel;
+    final levelLocked = level < game.unlockLevel;
+    final clubLocked = game.highRollerExclusive && !highRollerActive;
+    final locked = levelLocked || clubLocked;
     final packageState = packageManager.stateFor(game);
     final ready = packageState == SlotPackageState.ready;
     return Semantics(
@@ -537,6 +545,11 @@ class _SlotCoverCard extends StatelessWidget {
                   children: [
                     if (game.isNew)
                       const _Pill(label: 'NEW', color: Color(0xffff3e74)),
+                    if (game.highRollerExclusive)
+                      const _Pill(
+                        label: 'HIGH ROLLER',
+                        color: Color(0xffffc52f),
+                      ),
                     const Spacer(),
                     Flexible(
                       child: _Pill(label: game.category, color: game.primary),
@@ -604,7 +617,9 @@ class _SlotCoverCard extends StatelessWidget {
                           ),
                           label: Text(
                             locked
-                                ? 'LEVEL ${game.unlockLevel}'
+                                ? clubLocked
+                                      ? 'HIGH ROLLER CLUB'
+                                      : 'LEVEL ${game.unlockLevel}'
                                 : ready
                                 ? 'PLAY'
                                 : packageState == SlotPackageState.failed

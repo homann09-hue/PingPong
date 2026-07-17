@@ -29,6 +29,7 @@ import type { PushDeliveryWorker } from "./messaging/push-delivery-worker.js";
 import type { MonetizationService } from "./monetization/monetization-service.js";
 import { ReceiptGatewayUnavailableError, ReceiptInvalidError, ReceiptPendingError } from "./monetization/receipt-verifier.js";
 import { StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError } from "./spins/spin-store.js";
+import { requiresHighRollerMembership } from "./economy/high-roller-club.js";
 import type { EconomyAdminStore } from "./admin/economy-admin-store.js";
 import { EconomyFourEyesViolationError, EconomyGrantNotFoundError, EconomyGrantStateError, EconomyPlayerNotFoundError } from "./admin/economy-admin-store.js";
 import type { OperationsStore } from "./operations/operations-store.js";
@@ -268,6 +269,7 @@ export function buildApp(dependencies: AppDependencies) {
       reels: config.reels.length,
       rows: config.rows,
       bonusBuyMultiplier: config.features?.bonusBuy?.costMultiplier ?? null,
+      highRollerExclusive: requiresHighRollerMembership(config.id),
     })),
   }));
   app.get("/v1/slots/:slotId/paytable", async (request, reply) => {
@@ -296,6 +298,7 @@ export function buildApp(dependencies: AppDependencies) {
       maxWinMultiplier: config.math.maxWinMultiplier,
       mathModelVersion: config.math.mathModelVersion,
       bet: config.bet ?? null,
+      highRollerExclusive: requiresHighRollerMembership(config.id),
       winClasses: config.winClasses ?? [],
       symbols: Object.fromEntries(Object.entries(config.symbols).map(([symbol, definition]) => [
         symbol,
@@ -1047,6 +1050,16 @@ export function buildApp(dependencies: AppDependencies) {
     const { slotId } = request.params as { slotId: string };
     const config = configs.get(slotId);
     if (!config) return reply.code(404).send({ code: "SLOT_NOT_FOUND" });
+    if (requiresHighRollerMembership(slotId)) {
+      const club = await dependencies.spinStore.getHighRollerClub(playerId, new Date());
+      if (!club.active) {
+        return reply.code(403).send({
+          code: "HIGH_ROLLER_MEMBERSHIP_REQUIRED",
+          entryPoints: club.entryPoints,
+          points: club.points,
+        });
+      }
+    }
     if (config.bet && !config.bet.steps.includes(body.data.bet)) {
       return reply.code(400).send({ code: "INVALID_BET", allowedSteps: config.bet.steps });
     }

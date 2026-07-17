@@ -33,5 +33,8 @@ purchase producers use stable identifiers rather than client-specific labels.
 - Point spending, Diamond Stamp grants, and cashback have immutable ledger legs.
 - Membership expiry does not require a cleanup job; server-time reads determine
   whether benefits are active.
-- Exclusive slot publication and additional source producers remain separate
-  integrations and must call the same server-owned economy boundary.
+- Exclusive slot ids are classified by the API domain and advertised in lobby
+  and paytable metadata. The spin endpoint remains authoritative and rejects
+  inactive players even when a modified client bypasses its lobby lock.
+- `neon-nights` is the first club-exclusive game. Additional source producers
+  remain separate integrations and must call the same server-owned economy boundary.

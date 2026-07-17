@@ -18,6 +18,7 @@ class GameDefinition {
     this.bundled = false,
     this.isNew = false,
     this.featured = false,
+    this.highRollerExclusive = false,
     this.bonusBuyMultiplier,
   });
 
@@ -26,7 +27,7 @@ class GameDefinition {
   final int packageVersion, packageSizeMb;
   final int? bonusBuyMultiplier;
   final String category;
-  final bool bundled, isNew, featured;
+  final bool bundled, isNew, featured, highRollerExclusive;
   final Color primary, secondary;
 }
 
@@ -109,6 +110,7 @@ const games = [
     packageVersion: 3,
     packageSizeMb: 19,
     isNew: true,
+    highRollerExclusive: true,
   ),
   GameDefinition(
     id: 'frozen-kingdom',

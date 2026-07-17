@@ -353,6 +353,14 @@ describe("spin API", () => {
     const response = await app.inject({ method: "POST", url: "/v1/slots/classic-3x3/spins", headers: { "idempotency-key": randomUUID() }, payload: { bet: 10 } });
     expect(response.statusCode).toBe(401);
   });
+  it("keeps High Roller games server-locked without an active membership", async () => {
+    const response = await app.inject({
+      method: "POST", url: "/v1/slots/neon-nights/spins",
+      headers: { "idempotency-key": randomUUID(), authorization: "Bearer valid" }, payload: { bet: 10 },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "HIGH_ROLLER_MEMBERSHIP_REQUIRED", entryPoints: 20_000, points: 0 });
+  });
   it("never permits a negative balance", async () => {
     const response = await app.inject({ method: "POST", url: "/v1/slots/classic-3x3/spins", headers: { "idempotency-key": randomUUID(), authorization: "Bearer valid" }, payload: { bet: 1_000 } });
     expect(response.statusCode).toBe(409);
@@ -706,7 +714,7 @@ describe("spin API", () => {
     expect(frozen.json()).toMatchObject({ version: 4, mathModelVersion: "4.0.0", volatility: "very_high" });
     const neon = await app.inject({ method: "GET", url: "/v1/slots/neon-nights/paytable" });
     expect(neon.json()).toMatchObject({
-      version: 3, mathModelVersion: "3.0.0",
+      version: 3, mathModelVersion: "3.0.0", highRollerExclusive: true,
       symbols: { M: { kind: "multiplier", payouts: {} } },
     });
     const pharaoh = await app.inject({ method: "GET", url: "/v1/slots/pharaoh-oasis/paytable" });

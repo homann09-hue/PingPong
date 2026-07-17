@@ -700,6 +700,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   Future<void> _play(GameDefinition game) async {
+    if (game.highRollerExclusive && highRollerClub?.active != true) {
+      await _openHighRollerClub();
+      return;
+    }
     final result = await Navigator.of(context).push<Map<String, int>>(
       MaterialPageRoute(
         builder: (_) => SlotScreen(
@@ -876,6 +880,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       level: level,
       now: lobbyNow,
       games: games,
+      highRollerActive: highRollerClub?.active ?? false,
       packageManager: slotPackages,
       missions: missions,
       events: liveEvents,
