@@ -250,6 +250,34 @@ void main() {
     expect(find.text('WEITER GEWINNEN'), findsOneWidget);
   });
 
+  testWidgets('XP booster crafts stamps and activates finite boosted spins', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    BoosterStatusView? latest;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: XpBoosterSheet(
+            api: _BoosterApi(),
+            onChanged: (value) => latest = value,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('xp-booster-sheet')), findsOneWidget);
+    expect(find.text('3/3'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'BOOSTER HERSTELLEN'));
+    await tester.pumpAndSettle();
+    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'BOOSTER AKTIVIEREN'));
+    await tester.pumpAndSettle();
+    expect(latest?.activeSpins, 20);
+    expect(find.text('2× XP • 20 Spins verbleibend'), findsOneWidget);
+  });
+
   testWidgets('VIP badge opens the progression sheet', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(const AuroraApp());
@@ -513,4 +541,27 @@ class _CheckWinApi extends CasinoApi {
     markBalance: 0,
     stampBalance: 3,
   );
+}
+
+class _BoosterApi extends CasinoApi {
+  @override
+  Future<BoosterStatusView> boosterStatus() async => const BoosterStatusView(
+    stamps: 3,
+    stampsPerBooster: 3,
+    boosters: 0,
+    activeSpins: 0,
+    boostedSpinsPerToken: 20,
+    xpMultiplier: 2,
+    maxActiveSpins: 200,
+    canCraft: true,
+    canActivate: false,
+  );
+
+  @override
+  Future<BoosterCraftView> craftBooster() async =>
+      const BoosterCraftView(stampBalance: 0, boosterBalance: 1);
+
+  @override
+  Future<BoosterActivationView> activateBooster() async =>
+      const BoosterActivationView(boosterBalance: 0, activeSpins: 20);
 }

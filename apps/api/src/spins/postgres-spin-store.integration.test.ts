@@ -11,6 +11,18 @@ import { storeProducts } from "../monetization/store-products.js";
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseSuite = databaseUrl ? describe : describe.skip;
 
+function winningSpin(configId: string): SpinResult {
+  return {
+    configId, configVersion: 1, mathModelVersion: "2.0.0",
+    seed: "42", baseBet: 10, wager: 10, bonusBuy: false,
+    stops: [0, 0, 0], grid: [["A"], ["A"], ["A"]],
+    wins: [{ kind: "line", payline: 0, symbol: "A", count: 3, amount: 5, cells: [[0, 0], [1, 0], [2, 0]] }],
+    rounds: [{ phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin: 5,
+      events: [{ type: "scatter.hit", data: { symbol: "S", count: 3 } }] }],
+    freeSpinsPlayed: 0, totalWin: 5, maxWinReached: false, maxWinMultiplier: 1_000,
+  };
+}
+
 databaseSuite("PostgresSpinStore integration", () => {
   const pool = new Pool({ connectionString: databaseUrl });
   const store = new PostgresSpinStore(pool);
@@ -19,6 +31,7 @@ databaseSuite("PostgresSpinStore integration", () => {
   const concurrentShopPlayerId = randomUUID();
   const storePlayerId = randomUUID();
   const checkWinPlayerId = randomUUID();
+  const boostPlayerId = randomUUID();
   const slotId = `integration-${randomUUID()}`;
   const missionId = `integration-mission-${randomUUID()}`;
 
@@ -92,12 +105,18 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/026_check_win_rewards.sql", import.meta.url), "utf8",
     );
     await pool.query(checkWinMigration);
-    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5)", [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId]);
+    const boosterMigration = await readFile(
+      new URL("../../../../infra/postgres/027_xp_boosters.sql", import.meta.url), "utf8",
+    );
+    await pool.query(boosterMigration);
+    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5),($6)",
+      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId]);
     await pool.query(
       `INSERT INTO wallets (player_id, currency, balance) VALUES
         ($1,'coin',100),($1,'gem',0),($2,'coin',1000),($2,'gem',320),($3,'coin',1000),($3,'gem',320),
-        ($4,'coin',1000),($4,'gem',320),($5,'coin',1000),($5,'gem',0),($5,'check_win_mark',5),($5,'stamp',0)`,
-      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId],
+        ($4,'coin',1000),($4,'gem',320),($5,'coin',1000),($5,'gem',0),($5,'check_win_mark',5),($5,'stamp',0),
+        ($6,'coin',1000),($6,'gem',0),($6,'stamp',3),($6,'booster',0)`,
+      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId],
     );
     await pool.query(
       "INSERT INTO slot_config_versions (slot_id, version, config, config_sha256, published_at) VALUES ($1,1,'{}',$2,now())",
@@ -113,18 +132,7 @@ databaseSuite("PostgresSpinStore integration", () => {
 
   it("atomically settles and persistently replays a spin", async () => {
     const idempotencyKey = randomUUID();
-    const spin: SpinResult = {
-      configId: slotId, configVersion: 1, mathModelVersion: "2.0.0",
-      seed: "42", baseBet: 10, wager: 10, bonusBuy: false,
-      stops: [0, 0, 0],
-      grid: [["A"], ["A"], ["A"]],
-      wins: [{ kind: "line", payline: 0, symbol: "A", count: 3, amount: 5, cells: [[0,0], [1,0], [2,0]] }],
-      rounds: [{
-        phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin: 5,
-        events: [{ type: "scatter.hit", data: { symbol: "S", count: 3 } }],
-      }],
-      freeSpinsPlayed: 0, totalWin: 5, maxWinReached: false, maxWinMultiplier: 1_000,
-    };
+    const spin = winningSpin(slotId);
     const command = { playerId, idempotencyKey, slotId, configVersion: 1, bet: 10, seed: 42n };
     const first = await store.settle(command, () => spin);
     const replay = await store.settle(command, () => { throw new Error("must not recalculate"); });
@@ -287,6 +295,26 @@ databaseSuite("PostgresSpinStore integration", () => {
       { currency: "coin", amount: "100000" },
       { currency: "stamp", amount: "1" },
     ]);
+  });
+
+  it("crafts and activates a booster that doubles and consumes one settled XP spin", async () => {
+    expect(await store.getBoosterStatus(boostPlayerId)).toMatchObject({ stamps: 3, canCraft: true, activeSpins: 0 });
+    const craftKey = randomUUID();
+    const craft = await store.craftBooster(boostPlayerId, craftKey);
+    expect(await store.craftBooster(boostPlayerId, craftKey)).toEqual({ ...craft, replayed: true });
+    const activationKey = randomUUID();
+    const activation = await store.activateBooster(boostPlayerId, activationKey);
+    expect(await store.activateBooster(boostPlayerId, activationKey)).toEqual({ ...activation, replayed: true });
+    expect(activation).toMatchObject({ boosterBalance: 0, activeSpins: 20 });
+    await store.settle({ playerId: boostPlayerId, idempotencyKey: randomUUID(), slotId,
+      configVersion: 1, bet: 10, seed: 42n }, () => winningSpin(slotId));
+    expect((await store.getProfile(boostPlayerId)).progression.xp).toBe(20);
+    expect(await store.getBoosterStatus(boostPlayerId)).toMatchObject({ activeSpins: 19, xpMultiplier: 2 });
+    const ledger = await pool.query<{ count: string }>(
+      "SELECT count(*) FROM wallet_ledger WHERE player_id=$1 AND source='xp_booster'",
+      [boostPlayerId],
+    );
+    expect(ledger.rows[0]?.count).toBe("3");
   });
 
   it("grants and refunds a verified provider transaction idempotently without storing its token", async () => {

@@ -225,6 +225,41 @@ class CheckWinClaimView {
   final int coins, stamps, coinBalance, markBalance, stampBalance;
 }
 
+/// Server-owned Stamp crafting and XP-booster activation state.
+class BoosterStatusView {
+  const BoosterStatusView({
+    required this.stamps,
+    required this.stampsPerBooster,
+    required this.boosters,
+    required this.activeSpins,
+    required this.boostedSpinsPerToken,
+    required this.xpMultiplier,
+    required this.maxActiveSpins,
+    required this.canCraft,
+    required this.canActivate,
+  });
+
+  final int stamps, stampsPerBooster, boosters, activeSpins;
+  final int boostedSpinsPerToken, xpMultiplier, maxActiveSpins;
+  final bool canCraft, canActivate;
+}
+
+class BoosterCraftView {
+  const BoosterCraftView({
+    required this.stampBalance,
+    required this.boosterBalance,
+  });
+  final int stampBalance, boosterBalance;
+}
+
+class BoosterActivationView {
+  const BoosterActivationView({
+    required this.boosterBalance,
+    required this.activeSpins,
+  });
+  final int boosterBalance, activeSpins;
+}
+
 class ShopOfferView {
   const ShopOfferView({
     required this.id,
@@ -953,6 +988,44 @@ class CasinoApi {
       coinBalance: data['coinBalance'] as int,
       markBalance: data['markBalance'] as int,
       stampBalance: data['stampBalance'] as int,
+    );
+  }
+
+  Future<BoosterStatusView> boosterStatus() async {
+    final response = await _client.get(Uri.parse('$base/v1/economy/boosters'));
+    if (response.statusCode != 200) {
+      throw StateError('Booster konnten nicht geladen werden');
+    }
+    return _boosterStatus(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<BoosterCraftView> craftBooster() async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/economy/boosters/craft'),
+      headers: {'idempotency-key': _uuid()},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Booster konnte nicht hergestellt werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return BoosterCraftView(
+      stampBalance: data['stampBalance'] as int,
+      boosterBalance: data['boosterBalance'] as int,
+    );
+  }
+
+  Future<BoosterActivationView> activateBooster() async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/economy/boosters/activate'),
+      headers: {'idempotency-key': _uuid()},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Booster konnte nicht aktiviert werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return BoosterActivationView(
+      boosterBalance: data['boosterBalance'] as int,
+      activeSpins: data['activeSpins'] as int,
     );
   }
 
@@ -1706,4 +1779,17 @@ class CasinoApi {
         .join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
+
+  static BoosterStatusView _boosterStatus(Map<String, dynamic> data) =>
+      BoosterStatusView(
+        stamps: data['stamps'] as int,
+        stampsPerBooster: data['stampsPerBooster'] as int,
+        boosters: data['boosters'] as int,
+        activeSpins: data['activeSpins'] as int,
+        boostedSpinsPerToken: data['boostedSpinsPerToken'] as int,
+        xpMultiplier: data['xpMultiplier'] as int,
+        maxActiveSpins: data['maxActiveSpins'] as int,
+        canCraft: data['canCraft'] as bool,
+        canActivate: data['canActivate'] as bool,
+      );
 }

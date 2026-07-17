@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -9,6 +9,7 @@ import { applyProgressiveAward, jackpotContribution, jackpotDefinitions, trigger
 import type { ShopOffer } from "../shop/shop-catalog.js";
 import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
 import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
+import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -31,6 +32,10 @@ export class InMemorySpinStore implements SpinStore {
   );
   private readonly shopReplays = new Map<string, ShopPurchase>();
   private readonly checkWinReplays = new Map<string, CheckWinClaim>();
+  private readonly boosterCraftReplays = new Map<string, BoosterCraft>();
+  private readonly boosterActivationReplays = new Map<string, BoosterActivation>();
+  private readonly boosterActionKinds = new Map<string, "craft" | "activate">();
+  private readonly activeBoostSpins = new Map<string, number>();
   private readonly limitedShopPurchases = new Set<string>();
   private readonly storePurchases = new Map<string, StorePurchaseSettlement & { readonly playerId: string }>();
   private readonly limitedStorePurchases = new Set<string>();
@@ -64,7 +69,9 @@ export class InMemorySpinStore implements SpinStore {
       level: 12, xp: 625, spins: 0, totalWon: 0, freeSpins: 0,
       vipPoints: 2_450,
     };
-    const earnedXp = Math.max(10, Math.floor(command.bet / 10));
+    const activeBoostSpins = this.activeBoostSpins.get(command.playerId) ?? 0;
+    const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
+    const earnedXp = Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
     const accumulatedXp = previous.xp + earnedXp;
     const progression = {
       level: previous.level + Math.floor(accumulatedXp / 1_000),
@@ -86,6 +93,7 @@ export class InMemorySpinStore implements SpinStore {
     }
     this.balances.set(command.playerId, settled.coinBalance);
     this.progression.set(command.playerId, progression);
+    if (activeBoostSpins > 0) this.activeBoostSpins.set(command.playerId, activeBoostSpins - 1);
     const economy = this.economy.get(command.playerId) ?? {};
     for (const [currency, amount] of Object.entries(spinEconomyDeltas({
       bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
@@ -155,6 +163,61 @@ export class InMemorySpinStore implements SpinStore {
     this.record(playerId, claim.stamps, "check_win_reward", "check_win", `${idempotencyKey}:stamps`, stampBefore, claim.stampBalance, "stamp");
     this.checkWinReplays.set(replayKey, claim);
     return claim;
+  }
+
+  public async getBoosterStatus(playerId: string): Promise<BoosterStatus> {
+    const wallet = this.economy.get(playerId);
+    return boosterStatus(wallet?.stamp ?? 0, wallet?.booster ?? 0, this.activeBoostSpins.get(playerId) ?? 0);
+  }
+
+  public async craftBooster(playerId: string, idempotencyKey: string): Promise<BoosterCraft> {
+    const replayKey = `${playerId}:${idempotencyKey}`;
+    if (this.boosterActionKinds.get(replayKey) === "activate") throw new BoosterActionConflictError();
+    const replay = this.boosterCraftReplays.get(replayKey);
+    if (replay) return { ...replay, replayed: true };
+    const wallet = { ...this.economy.get(playerId) };
+    const stampBefore = wallet.stamp ?? 0;
+    if (stampBefore < xpBoosterRules.stampsPerBooster) throw new BoosterNotCraftableError();
+    const boosterBefore = wallet.booster ?? 0;
+    const craft: BoosterCraft = {
+      actionId: randomUUID(), stampsSpent: xpBoosterRules.stampsPerBooster, boostersGranted: 1,
+      stampBalance: stampBefore - xpBoosterRules.stampsPerBooster,
+      boosterBalance: boosterBefore + 1, replayed: false,
+    };
+    wallet.stamp = craft.stampBalance;
+    wallet.booster = craft.boosterBalance;
+    this.economy.set(playerId, wallet);
+    this.record(playerId, -craft.stampsSpent, "booster_craft", "xp_booster", `${idempotencyKey}:stamps`, stampBefore, craft.stampBalance, "stamp");
+    this.record(playerId, craft.boostersGranted, "booster_craft", "xp_booster", `${idempotencyKey}:boosters`, boosterBefore, craft.boosterBalance, "booster");
+    this.boosterCraftReplays.set(replayKey, craft);
+    this.boosterActionKinds.set(replayKey, "craft");
+    return craft;
+  }
+
+  public async activateBooster(playerId: string, idempotencyKey: string): Promise<BoosterActivation> {
+    const replayKey = `${playerId}:${idempotencyKey}`;
+    if (this.boosterActionKinds.get(replayKey) === "craft") throw new BoosterActionConflictError();
+    const replay = this.boosterActivationReplays.get(replayKey);
+    if (replay) return { ...replay, replayed: true };
+    const wallet = { ...this.economy.get(playerId) };
+    const boosterBefore = wallet.booster ?? 0;
+    if (boosterBefore < 1) throw new BoosterNotAvailableError();
+    const currentActiveSpins = this.activeBoostSpins.get(playerId) ?? 0;
+    if (currentActiveSpins + xpBoosterRules.boostedSpinsPerToken > xpBoosterRules.maxActiveSpins) {
+      throw new BoosterNotAvailableError();
+    }
+    const activeSpins = currentActiveSpins + xpBoosterRules.boostedSpinsPerToken;
+    const activation: BoosterActivation = {
+      actionId: randomUUID(), boostersSpent: 1, boosterBalance: boosterBefore - 1,
+      activeSpins, replayed: false,
+    };
+    wallet.booster = activation.boosterBalance;
+    this.economy.set(playerId, wallet);
+    this.activeBoostSpins.set(playerId, activeSpins);
+    this.record(playerId, -1, "booster_activation", "xp_booster", `${idempotencyKey}:activate`, boosterBefore, activation.boosterBalance, "booster");
+    this.boosterActivationReplays.set(replayKey, activation);
+    this.boosterActionKinds.set(replayKey, "activate");
+    return activation;
   }
 
   public async getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus> {

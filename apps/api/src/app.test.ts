@@ -777,6 +777,31 @@ describe("spin API", () => {
     expect(premature.json().code).toBe("CHECK_WIN_NOT_CLAIMABLE");
     await checkWinApp.close();
   });
+  it("publishes booster terms and rejects crafting or activation without inventory", async () => {
+    const boosterApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(1_000),
+    });
+    const status = await boosterApp.inject({
+      method: "GET", url: "/v1/economy/boosters", headers: { authorization: "Bearer valid" },
+    });
+    expect(status.json()).toEqual({ stamps: 0, stampsPerBooster: 3, boosters: 0, activeSpins: 0,
+      boostedSpinsPerToken: 20, xpMultiplier: 2, maxActiveSpins: 200,
+      canCraft: false, canActivate: false });
+    const craft = await boosterApp.inject({
+      method: "POST", url: "/v1/economy/boosters/craft",
+      headers: { authorization: "Bearer valid", "idempotency-key": randomUUID() },
+    });
+    expect(craft.statusCode).toBe(409);
+    expect(craft.json().code).toBe("BOOSTER_NOT_CRAFTABLE");
+    const activate = await boosterApp.inject({
+      method: "POST", url: "/v1/economy/boosters/activate",
+      headers: { authorization: "Bearer valid", "idempotency-key": randomUUID() },
+    });
+    expect(activate.statusCode).toBe(409);
+    expect(activate.json().code).toBe("BOOSTER_NOT_AVAILABLE");
+    await boosterApp.close();
+  });
   it("uses server time and rejects a second timed daily reward", async () => {
     const timedApp = buildApp({
       authenticator: { authenticate: async () => playerId }, spinStore: new InMemorySpinStore(1_000),

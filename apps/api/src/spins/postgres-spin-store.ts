@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { SpinResult } from "@aurora/slot-engine";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -11,6 +11,7 @@ import { applyProgressiveAward, jackpotContribution, jackpotDefinitions, trigger
 import type { ShopOffer } from "../shop/shop-catalog.js";
 import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
 import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
+import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
@@ -19,6 +20,7 @@ interface CheckWinClaimRow {
   id: string; marks_spent: string; coins_granted: string; stamps_granted: string;
   coin_balance_after: string; mark_balance_after: string; stamp_balance_after: string;
 }
+interface BoosterActionRow { action: "craft" | "activate"; result: BoosterCraft | BoosterActivation }
 interface WalletTransactionRow {
   id: string;
   currency: WalletCurrency;
@@ -58,6 +60,11 @@ export class PostgresSpinStore implements SpinStore {
       const balance = Number(wallet.rows[0].balance);
       if (!Number.isSafeInteger(balance)) throw new Error("Wallet balance exceeds API safe integer range");
       if (balance < command.bet) throw new InsufficientFundsError();
+      const boostState = await client.query<{ remaining_spins: number }>(
+        "SELECT remaining_spins FROM player_boost_states WHERE player_id=$1 FOR UPDATE",
+        [command.playerId],
+      );
+      const activeBoostSpins = boostState.rows[0]?.remaining_spins ?? 0;
 
       let spin = calculate();
       const pools = await client.query<{ tier: JackpotTier; pool_amount: string; seed_amount: string }>(
@@ -94,7 +101,8 @@ export class PostgresSpinStore implements SpinStore {
       );
       if (!playerResult.rows[0]) throw new Error("Player does not exist");
       const previousXp = Number(playerResult.rows[0].xp);
-      const accumulatedXp = previousXp + Math.max(10, Math.floor(command.bet / 10));
+      const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
+      const accumulatedXp = previousXp + Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
       const activity = await client.query<{ spins: string; total_won: string; free_spins: string }>(
         `SELECT COUNT(*) AS spins, COALESCE(SUM(win), 0) AS total_won,
                 COALESCE(SUM((result->>'freeSpinsPlayed')::integer), 0) AS free_spins
@@ -136,6 +144,12 @@ export class PostgresSpinStore implements SpinStore {
       }
       await client.query("UPDATE wallets SET balance = $1, version = version + 1 WHERE player_id = $2 AND currency = 'coin'", [balanceAfter, command.playerId]);
       await client.query("UPDATE players SET level = $1, xp = $2, vip_points = $3 WHERE id = $4", [progression.level, progression.xp, progression.vipPoints, command.playerId]);
+      if (activeBoostSpins > 0) {
+        await client.query(
+          "UPDATE player_boost_states SET remaining_spins=remaining_spins-1,version=version+1 WHERE player_id=$1",
+          [command.playerId],
+        );
+      }
       for (const [currency, amount] of Object.entries(spinEconomyDeltas({
         bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
       })) as [SpinEconomyCurrency, number][]) {
@@ -631,6 +645,143 @@ export class PostgresSpinStore implements SpinStore {
         idempotencyKey: `${idempotencyKey}:stamps`, balanceBefore: stampBefore, balanceAfter: claim.stampBalance, metadata });
       await client.query("COMMIT");
       return claim;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
+
+  public async getBoosterStatus(playerId: string): Promise<BoosterStatus> {
+    const [wallets, state] = await Promise.all([
+      this.pool.query<{ currency: "stamp" | "booster"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('stamp','booster')",
+        [playerId],
+      ),
+      this.pool.query<{ remaining_spins: number }>(
+        "SELECT remaining_spins FROM player_boost_states WHERE player_id=$1",
+        [playerId],
+      ),
+    ]);
+    const stamps = wallets.rows.find((row) => row.currency === "stamp");
+    const boosters = wallets.rows.find((row) => row.currency === "booster");
+    return boosterStatus(
+      stamps ? this.safeInteger(stamps.balance, "Stamp balance") : 0,
+      boosters ? this.safeInteger(boosters.balance, "Booster balance") : 0,
+      state.rows[0]?.remaining_spins ?? 0,
+    );
+  }
+
+  public async craftBooster(playerId: string, idempotencyKey: string): Promise<BoosterCraft> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'stamp',0),($1,'booster',0)
+         ON CONFLICT (player_id,currency) DO NOTHING`,
+        [playerId],
+      );
+      const wallets = await client.query<{ currency: "stamp" | "booster"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('stamp','booster') ORDER BY currency FOR UPDATE",
+        [playerId],
+      );
+      const prior = await client.query<BoosterActionRow>(
+        "SELECT action,result FROM booster_actions WHERE player_id=$1 AND idempotency_key=$2",
+        [playerId, idempotencyKey],
+      );
+      if (prior.rows[0]) {
+        if (prior.rows[0].action !== "craft") throw new BoosterActionConflictError();
+        await client.query("COMMIT");
+        return { ...(prior.rows[0].result as BoosterCraft), replayed: true };
+      }
+      const stampBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "stamp")!.balance, "Stamp balance");
+      const boosterBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "booster")!.balance, "Booster balance");
+      if (stampBefore < xpBoosterRules.stampsPerBooster) throw new BoosterNotCraftableError();
+      const craft: BoosterCraft = {
+        actionId: randomUUID(), stampsSpent: xpBoosterRules.stampsPerBooster, boostersGranted: 1,
+        stampBalance: stampBefore - xpBoosterRules.stampsPerBooster,
+        boosterBalance: boosterBefore + 1, replayed: false,
+      };
+      await client.query(
+        `UPDATE wallets SET balance=CASE currency WHEN 'stamp' THEN $1::bigint ELSE $2::bigint END,
+         version=version+1 WHERE player_id=$3 AND currency IN ('stamp','booster')`,
+        [craft.stampBalance, craft.boosterBalance, playerId],
+      );
+      await client.query(
+        "INSERT INTO booster_actions (id,player_id,action,idempotency_key,rule_version,result) VALUES ($1,$2,'craft',$3,$4,$5)",
+        [craft.actionId, playerId, idempotencyKey, xpBoosterRules.version, JSON.stringify(craft)],
+      );
+      const metadata = { ruleVersion: xpBoosterRules.version };
+      await this.ledger(client, { playerId, currency: "stamp", amount: -craft.stampsSpent,
+        reason: "booster_craft", source: "xp_booster", referenceId: craft.actionId,
+        idempotencyKey: `${idempotencyKey}:stamps`, balanceBefore: stampBefore, balanceAfter: craft.stampBalance, metadata });
+      await this.ledger(client, { playerId, currency: "booster", amount: craft.boostersGranted,
+        reason: "booster_craft", source: "xp_booster", referenceId: craft.actionId,
+        idempotencyKey: `${idempotencyKey}:boosters`, balanceBefore: boosterBefore, balanceAfter: craft.boosterBalance, metadata });
+      await client.query("COMMIT");
+      return craft;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
+
+  public async activateBooster(playerId: string, idempotencyKey: string): Promise<BoosterActivation> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'booster',0) ON CONFLICT (player_id,currency) DO NOTHING",
+        [playerId],
+      );
+      const wallet = await client.query<WalletRow>(
+        "SELECT balance FROM wallets WHERE player_id=$1 AND currency='booster' FOR UPDATE",
+        [playerId],
+      );
+      const prior = await client.query<BoosterActionRow>(
+        "SELECT action,result FROM booster_actions WHERE player_id=$1 AND idempotency_key=$2",
+        [playerId, idempotencyKey],
+      );
+      if (prior.rows[0]) {
+        if (prior.rows[0].action !== "activate") throw new BoosterActionConflictError();
+        await client.query("COMMIT");
+        return { ...(prior.rows[0].result as BoosterActivation), replayed: true };
+      }
+      const boosterBefore = this.safeInteger(wallet.rows[0]!.balance, "Booster balance");
+      if (boosterBefore < 1) throw new BoosterNotAvailableError();
+      await client.query(
+        "INSERT INTO player_boost_states (player_id,remaining_spins) VALUES ($1,0) ON CONFLICT (player_id) DO NOTHING",
+        [playerId],
+      );
+      const state = await client.query<{ remaining_spins: number }>(
+        "SELECT remaining_spins FROM player_boost_states WHERE player_id=$1 FOR UPDATE",
+        [playerId],
+      );
+      if (state.rows[0]!.remaining_spins + xpBoosterRules.boostedSpinsPerToken > xpBoosterRules.maxActiveSpins) {
+        throw new BoosterNotAvailableError();
+      }
+      const activation: BoosterActivation = {
+        actionId: randomUUID(), boostersSpent: 1, boosterBalance: boosterBefore - 1,
+        activeSpins: state.rows[0]!.remaining_spins + xpBoosterRules.boostedSpinsPerToken,
+        replayed: false,
+      };
+      await client.query(
+        "UPDATE wallets SET balance=$1,version=version+1 WHERE player_id=$2 AND currency='booster'",
+        [activation.boosterBalance, playerId],
+      );
+      await client.query(
+        "UPDATE player_boost_states SET remaining_spins=$1,version=version+1 WHERE player_id=$2",
+        [activation.activeSpins, playerId],
+      );
+      await client.query(
+        "INSERT INTO booster_actions (id,player_id,action,idempotency_key,rule_version,result) VALUES ($1,$2,'activate',$3,$4,$5)",
+        [activation.actionId, playerId, idempotencyKey, xpBoosterRules.version, JSON.stringify(activation)],
+      );
+      await this.ledger(client, { playerId, currency: "booster", amount: -1,
+        reason: "booster_activation", source: "xp_booster", referenceId: activation.actionId,
+        idempotencyKey: `${idempotencyKey}:activate`, balanceBefore: boosterBefore,
+        balanceAfter: activation.boosterBalance, metadata: { ruleVersion: xpBoosterRules.version } });
+      await client.query("COMMIT");
+      return activation;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

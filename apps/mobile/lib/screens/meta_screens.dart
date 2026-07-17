@@ -221,6 +221,7 @@ String _transactionLabel(String source) => switch (source) {
   'store_purchase' => 'Paket gekauft',
   'store_refund' => 'Kauf storniert',
   'check_win' => 'Check & Win',
+  'xp_booster' => 'XP Booster',
   _ => 'Wallet-Buchung',
 };
 
@@ -400,6 +401,235 @@ class _CheckWinSheetState extends State<CheckWinSheet> {
       ),
     );
   }
+}
+
+/// Crafts Stamp inventory into boosters and activates the finite 2× XP effect.
+class XpBoosterSheet extends StatefulWidget {
+  const XpBoosterSheet({super.key, required this.api, this.onChanged});
+
+  final CasinoApi api;
+  final ValueChanged<BoosterStatusView>? onChanged;
+
+  @override
+  State<XpBoosterSheet> createState() => _XpBoosterSheetState();
+}
+
+class _XpBoosterSheetState extends State<XpBoosterSheet> {
+  BoosterStatusView? status;
+  bool busy = false;
+  bool failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    if (mounted) setState(() => failed = false);
+    try {
+      final loaded = await widget.api.boosterStatus();
+      if (!mounted) return;
+      setState(() => status = loaded);
+      widget.onChanged?.call(loaded);
+    } on StateError {
+      if (mounted) setState(() => failed = true);
+    }
+  }
+
+  Future<void> _craft() async {
+    final current = status;
+    if (busy || current?.canCraft != true) return;
+    setState(() => busy = true);
+    try {
+      final result = await widget.api.craftBooster();
+      if (!mounted) return;
+      _setStatus(
+        BoosterStatusView(
+          stamps: result.stampBalance,
+          stampsPerBooster: current!.stampsPerBooster,
+          boosters: result.boosterBalance,
+          activeSpins: current.activeSpins,
+          boostedSpinsPerToken: current.boostedSpinsPerToken,
+          xpMultiplier: current.xpMultiplier,
+          maxActiveSpins: current.maxActiveSpins,
+          canCraft: result.stampBalance >= current.stampsPerBooster,
+          canActivate:
+              result.boosterBalance > 0 &&
+              current.activeSpins + current.boostedSpinsPerToken <=
+                  current.maxActiveSpins,
+        ),
+      );
+    } on StateError {
+      _showFailure('Booster konnte nicht hergestellt werden.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _activate() async {
+    final current = status;
+    if (busy || current?.canActivate != true) return;
+    setState(() => busy = true);
+    try {
+      final result = await widget.api.activateBooster();
+      if (!mounted) return;
+      _setStatus(
+        BoosterStatusView(
+          stamps: current!.stamps,
+          stampsPerBooster: current.stampsPerBooster,
+          boosters: result.boosterBalance,
+          activeSpins: result.activeSpins,
+          boostedSpinsPerToken: current.boostedSpinsPerToken,
+          xpMultiplier: current.xpMultiplier,
+          maxActiveSpins: current.maxActiveSpins,
+          canCraft: current.canCraft,
+          canActivate:
+              result.boosterBalance > 0 &&
+              result.activeSpins + current.boostedSpinsPerToken <=
+                  current.maxActiveSpins,
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${current.xpMultiplier}× XP FÜR ${result.activeSpins} SPINS AKTIV',
+          ),
+        ),
+      );
+    } on StateError {
+      _showFailure('Booster konnte nicht aktiviert werden.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void _setStatus(BoosterStatusView value) {
+    setState(() => status = value);
+    widget.onChanged?.call(value);
+  }
+
+  void _showFailure(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = status;
+    return SafeArea(
+      child: Container(
+        key: const Key('xp-booster-sheet'),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xff153c62), Color(0xff15072f)],
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(top: BorderSide(color: Color(0xff63eaff), width: 2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(
+              child: SizedBox(
+                width: 44,
+                child: Divider(thickness: 4, color: Colors.white38),
+              ),
+            ),
+            const Icon(Icons.bolt, size: 58, color: Color(0xff63eaff)),
+            const Text(
+              'XP BOOSTER',
+              textAlign: TextAlign.center,
+              style: MetaStyle.hero,
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Verarbeite Sammelmarken zu Boostern. Aktivierte Booster gelten nur für serverseitig abgerechnete Spins.',
+              textAlign: TextAlign.center,
+              style: MetaStyle.caption,
+            ),
+            const SizedBox(height: 18),
+            if (failed)
+              FilledButton(onPressed: _load, child: const Text('ERNEUT LADEN'))
+            else if (current == null)
+              const Center(child: CircularProgressIndicator())
+            else ...[
+              _BoosterCard(
+                icon: Icons.verified,
+                title: 'SAMMELMARKEN',
+                value: '${current.stamps}/${current.stampsPerBooster}',
+                detail: '${current.stampsPerBooster} Marken → 1 Booster',
+                button: 'BOOSTER HERSTELLEN',
+                enabled: current.canCraft && !busy,
+                onPressed: _craft,
+              ),
+              const SizedBox(height: 12),
+              _BoosterCard(
+                icon: Icons.bolt,
+                title: 'BOOSTER-INVENTAR',
+                value: '${current.boosters}',
+                detail: current.activeSpins > 0
+                    ? '${current.xpMultiplier}× XP • ${current.activeSpins} Spins verbleibend'
+                    : '${current.xpMultiplier}× XP für ${current.boostedSpinsPerToken} Spins',
+                button: 'BOOSTER AKTIVIEREN',
+                enabled: current.canActivate && !busy,
+                onPressed: _activate,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BoosterCard extends StatelessWidget {
+  const _BoosterCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.button,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title, value, detail, button;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: MetaStyle.card(const Color(0xff63eaff)),
+    child: Row(
+      children: [
+        Icon(icon, size: 38, color: const Color(0xff63eaff)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: MetaStyle.title),
+              Text(value, style: MetaStyle.hero),
+              Text(detail, style: MetaStyle.caption),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: enabled ? onPressed : null,
+                child: Text(button),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class NotificationSettingsSheet extends StatefulWidget {

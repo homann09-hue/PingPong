@@ -5,6 +5,7 @@ import type { StoreProduct } from "../monetization/store-products.js";
 import type { VerifiedStoreTransaction } from "../monetization/receipt-verifier.js";
 import type { EconomyBalance, WalletCurrency } from "../economy/currencies.js";
 import type { CheckWinClaim, CheckWinStatus } from "../economy/check-win.js";
+import type { BoosterActivation, BoosterCraft, BoosterStatus } from "../economy/xp-booster.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -147,6 +148,9 @@ export interface SpinStore {
   listWalletTransactions(playerId: string, limit: number): Promise<readonly WalletTransaction[]>;
   getCheckWinStatus(playerId: string): Promise<CheckWinStatus>;
   claimCheckWin(playerId: string, idempotencyKey: string): Promise<CheckWinClaim>;
+  getBoosterStatus(playerId: string): Promise<BoosterStatus>;
+  craftBooster(playerId: string, idempotencyKey: string): Promise<BoosterCraft>;
+  activateBooster(playerId: string, idempotencyKey: string): Promise<BoosterActivation>;
   getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus>;
   claimTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardClaim>;
   getWheelStatus(playerId: string, now: Date): Promise<WheelStatus>;
@@ -173,6 +177,9 @@ export class MissionNotClaimableError extends Error {}
 export class EventMilestoneNotClaimableError extends Error {}
 export class InsufficientGemsError extends Error {}
 export class CheckWinNotClaimableError extends Error {}
+export class BoosterNotCraftableError extends Error {}
+export class BoosterNotAvailableError extends Error {}
+export class BoosterActionConflictError extends Error {}
 export class ShopOfferLimitReachedError extends Error {}
 export class StoreTransactionConflictError extends Error {}
 export class StoreProductLimitReachedError extends Error {}

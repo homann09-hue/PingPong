@@ -71,6 +71,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   TimedRewardView? dailyReward;
   WheelView? rewardWheel;
   CheckWinStatusView? checkWinStatus;
+  BoosterStatusView? boosterStatus;
   List<Map<String, dynamic>> tournamentLeaders = const [];
   int tab = 0;
   bool rewardBusy = false;
@@ -100,6 +101,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
     _loadProfile();
     _loadCheckWin();
+    _loadBoosters();
     _loadShopOffers();
     storeUpdates = storeBridge.updates.listen(_handleStorePurchaseUpdate);
     unawaited(_loadPlatformStore());
@@ -340,6 +342,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  Future<void> _loadBoosters() async {
+    try {
+      final loaded = await api.boosterStatus();
+      if (mounted) setState(() => boosterStatus = loaded);
+    } on StateError {
+      // Booster actions remain unavailable until the authoritative state responds.
+    }
+  }
+
   Future<void> _loadProfile() async {
     try {
       final profile = await api.profile();
@@ -524,6 +535,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await Future.wait([
       _loadProfile(),
       _loadCheckWin(),
+      _loadBoosters(),
       _loadShopOffers(),
       _loadSocial(),
       _loadLiveOps(),
@@ -675,6 +687,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
     await _loadProfile();
     await _loadCheckWin();
+    await _loadBoosters();
     if (mounted && result['openRewards'] == 1) await _openRewardCenter();
   }
 
@@ -946,6 +959,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
       subtitle: 'Aktive Fortschritts- und Belohnungssysteme',
       actions: [
         _HubAction(
+          icon: Icons.bolt,
+          title: 'XP Booster',
+          detail: boosterStatus == null
+              ? 'Status wird geladen'
+              : boosterStatus!.activeSpins > 0
+              ? '${boosterStatus!.xpMultiplier}× XP · ${boosterStatus!.activeSpins} Spins verbleibend'
+              : '${boosterStatus!.boosters} Booster · ${boosterStatus!.stamps}/${boosterStatus!.stampsPerBooster} Marken',
+          badge:
+              boosterStatus?.canCraft == true ||
+                  boosterStatus?.canActivate == true
+              ? 1
+              : 0,
+          onTap: () => unawaited(_openXpBooster()),
+        ),
+        _HubAction(
           icon: Icons.check_circle_outline,
           title: 'Check & Win',
           detail: checkWinStatus == null
@@ -1001,6 +1029,22 @@ class _LobbyScreenState extends State<LobbyScreen> {
       ),
     );
     await _loadCheckWin();
+    await _loadBoosters();
+  }
+
+  Future<void> _openXpBooster() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => XpBoosterSheet(
+        api: api,
+        onChanged: (value) {
+          if (mounted) setState(() => boosterStatus = value);
+        },
+      ),
+    );
+    await _loadBoosters();
   }
 
   void _openLobbySettings() => unawaited(
