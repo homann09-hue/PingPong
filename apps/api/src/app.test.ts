@@ -802,6 +802,34 @@ describe("spin API", () => {
     expect(activate.json().code).toBe("BOOSTER_NOT_AVAILABLE");
     await boosterApp.close();
   });
+  it("publishes loyalty terms and rejects invalid or unaffordable exchanges", async () => {
+    const loyaltyApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(1_000),
+    });
+    const status = await loyaltyApp.inject({
+      method: "GET", url: "/v1/economy/loyalty-rewards", headers: { authorization: "Bearer valid" },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toMatchObject({ version: 1, loyaltyPoints: 0 });
+    expect(status.json().offers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "coin-cache", costLoyaltyPoints: 100, rewardCurrency: "coin",
+        rewardAmount: 100_000, canRedeem: false }),
+    ]));
+    const missing = await loyaltyApp.inject({
+      method: "POST", url: "/v1/economy/loyalty-rewards/not-real/redeem",
+      headers: { authorization: "Bearer valid", "idempotency-key": randomUUID() },
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ code: "LOYALTY_REWARD_NOT_FOUND" });
+    const unaffordable = await loyaltyApp.inject({
+      method: "POST", url: "/v1/economy/loyalty-rewards/coin-cache/redeem",
+      headers: { authorization: "Bearer valid", "idempotency-key": randomUUID() },
+    });
+    expect(unaffordable.statusCode).toBe(409);
+    expect(unaffordable.json()).toEqual({ code: "INSUFFICIENT_LOYALTY_POINTS" });
+    await loyaltyApp.close();
+  });
   it("uses server time and rejects a second timed daily reward", async () => {
     const timedApp = buildApp({
       authenticator: { authenticate: async () => playerId }, spinStore: new InMemorySpinStore(1_000),

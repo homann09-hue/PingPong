@@ -278,6 +278,38 @@ void main() {
     expect(find.text('2× XP • 20 Spins verbleibend'), findsOneWidget);
   });
 
+  testWidgets('loyalty rewards exchange LP and refresh offer affordability', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    LoyaltyRedemptionView? received;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LoyaltyRewardsSheet(
+            api: _LoyaltyApi(),
+            onRedeemed: (value) => received = value,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('loyalty-rewards-sheet')), findsOneWidget);
+    expect(find.text('500 LP'), findsNWidgets(2));
+    expect(find.text('25 Diamanten'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('redeem-gem-pouch')));
+    await tester.pumpAndSettle();
+    expect(received?.rewardBalance, 345);
+    expect(find.text('0 LP'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('redeem-coin-cache')))
+          .onPressed,
+      isNull,
+    );
+  });
+
   testWidgets('VIP badge opens the progression sheet', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(const AuroraApp());
@@ -564,4 +596,40 @@ class _BoosterApi extends CasinoApi {
   @override
   Future<BoosterActivationView> activateBooster() async =>
       const BoosterActivationView(boosterBalance: 0, activeSpins: 20);
+}
+
+class _LoyaltyApi extends CasinoApi {
+  @override
+  Future<LoyaltyRewardsView> loyaltyRewards() async => const LoyaltyRewardsView(
+    version: 1,
+    loyaltyPoints: 500,
+    offers: [
+      LoyaltyRewardOfferView(
+        id: 'coin-cache',
+        title: 'Coin Cache',
+        costLoyaltyPoints: 100,
+        rewardCurrency: 'coin',
+        rewardAmount: 100000,
+        canRedeem: true,
+      ),
+      LoyaltyRewardOfferView(
+        id: 'gem-pouch',
+        title: 'Gem Pouch',
+        costLoyaltyPoints: 500,
+        rewardCurrency: 'gem',
+        rewardAmount: 25,
+        canRedeem: true,
+      ),
+    ],
+  );
+
+  @override
+  Future<LoyaltyRedemptionView> redeemLoyaltyReward(String offerId) async =>
+      LoyaltyRedemptionView(
+        offerId: offerId,
+        rewardCurrency: 'gem',
+        rewardAmount: 25,
+        loyaltyPointBalance: 0,
+        rewardBalance: 345,
+      );
 }

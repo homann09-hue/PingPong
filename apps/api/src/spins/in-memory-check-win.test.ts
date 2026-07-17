@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { SpinResult } from "@aurora/slot-engine";
 import { InMemorySpinStore } from "./in-memory-spin-store.js";
-import { BoosterActionConflictError, CheckWinNotClaimableError } from "./spin-store.js";
+import { BoosterActionConflictError, CheckWinNotClaimableError, LoyaltyRedemptionConflictError } from "./spin-store.js";
 
 const winningSpin: SpinResult = {
   configId: "check-win-test", configVersion: 1, mathModelVersion: "test",
@@ -60,5 +60,29 @@ describe("InMemorySpinStore Check-&-Win", () => {
     expect(await store.getBoosterStatus(playerId)).toMatchObject({ activeSpins: 19, xpMultiplier: 2 });
     expect((await store.listWalletTransactions(playerId, 100))
       .filter((entry) => entry.source === "xp_booster")).toHaveLength(3);
+  });
+
+  it("atomically exchanges earned loyalty points and replays without duplicate value", async () => {
+    const store = new InMemorySpinStore(50_000);
+    const playerId = randomUUID();
+    await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "check-win-test",
+      configVersion: 1, bet: 10_000, seed: 1n }, () => winningSpin);
+    const status = await store.getLoyaltyRewards(playerId);
+    expect(status).toMatchObject({ version: 1, loyaltyPoints: 100 });
+    expect(status.offers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "coin-cache", canRedeem: true }),
+    ]));
+
+    const key = randomUUID();
+    const first = await store.redeemLoyaltyReward(playerId, "coin-cache", key);
+    const replay = await store.redeemLoyaltyReward(playerId, "coin-cache", key);
+    expect(first).toMatchObject({ offerId: "coin-cache", loyaltyPointsSpent: 100,
+      rewardCurrency: "coin", rewardAmount: 100_000, loyaltyPointBalance: 0,
+      rewardBalance: 140_005, replayed: false });
+    expect(replay).toEqual({ ...first, replayed: true });
+    await expect(store.redeemLoyaltyReward(playerId, "gem-pouch", key))
+      .rejects.toBeInstanceOf(LoyaltyRedemptionConflictError);
+    expect((await store.listWalletTransactions(playerId, 100))
+      .filter((entry) => entry.source === "loyalty_rewards")).toHaveLength(2);
   });
 });

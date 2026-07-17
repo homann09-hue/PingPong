@@ -222,8 +222,206 @@ String _transactionLabel(String source) => switch (source) {
   'store_refund' => 'Kauf storniert',
   'check_win' => 'Check & Win',
   'xp_booster' => 'XP Booster',
+  'loyalty_rewards' => 'Loyalty Rewards',
   _ => 'Wallet-Buchung',
 };
+
+/// Exchanges server-earned Loyalty Points for fixed virtual reward offers.
+class LoyaltyRewardsSheet extends StatefulWidget {
+  const LoyaltyRewardsSheet({super.key, required this.api, this.onRedeemed});
+
+  final CasinoApi api;
+  final ValueChanged<LoyaltyRedemptionView>? onRedeemed;
+
+  @override
+  State<LoyaltyRewardsSheet> createState() => _LoyaltyRewardsSheetState();
+}
+
+class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet> {
+  LoyaltyRewardsView? status;
+  String? busyOfferId;
+  bool failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    if (mounted) setState(() => failed = false);
+    try {
+      final loaded = await widget.api.loyaltyRewards();
+      if (mounted) setState(() => status = loaded);
+    } on StateError {
+      if (mounted) setState(() => failed = true);
+    }
+  }
+
+  Future<void> _redeem(LoyaltyRewardOfferView offer) async {
+    if (busyOfferId != null || !offer.canRedeem) return;
+    setState(() => busyOfferId = offer.id);
+    try {
+      final result = await widget.api.redeemLoyaltyReward(offer.id);
+      if (!mounted) return;
+      final current = status!;
+      setState(() {
+        status = LoyaltyRewardsView(
+          version: current.version,
+          loyaltyPoints: result.loyaltyPointBalance,
+          offers: current.offers
+              .map(
+                (item) => LoyaltyRewardOfferView(
+                  id: item.id,
+                  title: item.title,
+                  costLoyaltyPoints: item.costLoyaltyPoints,
+                  rewardCurrency: item.rewardCurrency,
+                  rewardAmount: item.rewardAmount,
+                  canRedeem:
+                      result.loyaltyPointBalance >= item.costLoyaltyPoints,
+                ),
+              )
+              .toList(growable: false),
+        );
+      });
+      widget.onRedeemed?.call(result);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '+${_walletNumber(result.rewardAmount)} ${result.rewardCurrency == 'coin' ? 'COINS' : 'DIAMANTEN'}',
+          ),
+          backgroundColor: const Color(0xff6b2bd9),
+        ),
+      );
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Loyalty Reward konnte nicht eingelöst werden.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busyOfferId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = status;
+    return SafeArea(
+      child: Container(
+        key: const Key('loyalty-rewards-sheet'),
+        constraints: const BoxConstraints(maxHeight: 680),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xff4d185e), Color(0xff16082f)],
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(top: BorderSide(color: Color(0xffff8bd8), width: 2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(
+              child: SizedBox(
+                width: 44,
+                child: Divider(thickness: 4, color: Colors.white38),
+              ),
+            ),
+            const Icon(
+              Icons.workspace_premium,
+              size: 52,
+              color: Color(0xffff8bd8),
+            ),
+            const Text(
+              'LOYALTY REWARDS',
+              textAlign: TextAlign.center,
+              style: MetaStyle.hero,
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Spiele Slots, sammle LP und tausche sie gegen virtuelle Belohnungen.',
+              textAlign: TextAlign.center,
+              style: MetaStyle.caption,
+            ),
+            const SizedBox(height: 16),
+            if (failed)
+              FilledButton(onPressed: _load, child: const Text('ERNEUT LADEN'))
+            else if (current == null)
+              const Center(child: CircularProgressIndicator())
+            else ...[
+              Text(
+                '${_walletNumber(current.loyaltyPoints)} LP',
+                textAlign: TextAlign.center,
+                style: MetaStyle.reward,
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: current.offers.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final offer = current.offers[index];
+                    final busy = busyOfferId == offer.id;
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: MetaStyle.card(const Color(0xffff8bd8)),
+                      child: Row(
+                        children: [
+                          Icon(
+                            offer.rewardCurrency == 'coin'
+                                ? Icons.monetization_on
+                                : Icons.diamond,
+                            color: offer.rewardCurrency == 'coin'
+                                ? const Color(0xffffcf3a)
+                                : const Color(0xff42e3ff),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(offer.title, style: MetaStyle.title),
+                                Text(
+                                  '${_walletNumber(offer.rewardAmount)} ${offer.rewardCurrency == 'coin' ? 'Coins' : 'Diamanten'}',
+                                  style: MetaStyle.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton(
+                            key: Key('redeem-${offer.id}'),
+                            onPressed: offer.canRedeem && busyOfferId == null
+                                ? () => _redeem(offer)
+                                : null,
+                            child: busy
+                                ? const SizedBox.square(
+                                    dimension: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text('${offer.costLoyaltyPoints} LP'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Interactive server-backed Check-&-Win collection and exchange surface.
 class CheckWinSheet extends StatefulWidget {

@@ -72,6 +72,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   WheelView? rewardWheel;
   CheckWinStatusView? checkWinStatus;
   BoosterStatusView? boosterStatus;
+  LoyaltyRewardsView? loyaltyRewards;
   List<Map<String, dynamic>> tournamentLeaders = const [];
   int tab = 0;
   bool rewardBusy = false;
@@ -102,6 +103,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadProfile();
     _loadCheckWin();
     _loadBoosters();
+    _loadLoyaltyRewards();
     _loadShopOffers();
     storeUpdates = storeBridge.updates.listen(_handleStorePurchaseUpdate);
     unawaited(_loadPlatformStore());
@@ -351,6 +353,20 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  Future<void> _loadLoyaltyRewards() async {
+    try {
+      final loaded = await api.loyaltyRewards();
+      if (mounted) {
+        setState(() {
+          loyaltyRewards = loaded;
+          loyaltyPoints = loaded.loyaltyPoints;
+        });
+      }
+    } on StateError {
+      // Loyalty exchange remains unavailable until the server catalog responds.
+    }
+  }
+
   Future<void> _loadProfile() async {
     try {
       final profile = await api.profile();
@@ -536,6 +552,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       _loadProfile(),
       _loadCheckWin(),
       _loadBoosters(),
+      _loadLoyaltyRewards(),
       _loadShopOffers(),
       _loadSocial(),
       _loadLiveOps(),
@@ -688,6 +705,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await _loadProfile();
     await _loadCheckWin();
     await _loadBoosters();
+    await _loadLoyaltyRewards();
     if (mounted && result['openRewards'] == 1) await _openRewardCenter();
   }
 
@@ -974,6 +992,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
           onTap: () => unawaited(_openXpBooster()),
         ),
         _HubAction(
+          icon: Icons.workspace_premium,
+          title: 'Loyalty Rewards',
+          detail: loyaltyRewards == null
+              ? 'Katalog wird geladen'
+              : '$loyaltyPoints LP · ${loyaltyRewards!.offers.where((offer) => offer.canRedeem).length} Rewards verfügbar',
+          badge:
+              loyaltyRewards?.offers.where((offer) => offer.canRedeem).length ??
+              0,
+          onTap: () => unawaited(_openLoyaltyRewards()),
+        ),
+        _HubAction(
           icon: Icons.check_circle_outline,
           title: 'Check & Win',
           detail: checkWinStatus == null
@@ -1045,6 +1074,29 @@ class _LobbyScreenState extends State<LobbyScreen> {
       ),
     );
     await _loadBoosters();
+  }
+
+  Future<void> _openLoyaltyRewards() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => LoyaltyRewardsSheet(
+        api: api,
+        onRedeemed: (result) {
+          if (!mounted) return;
+          setState(() {
+            loyaltyPoints = result.loyaltyPointBalance;
+            if (result.rewardCurrency == 'coin') {
+              balance = result.rewardBalance;
+            } else {
+              gems = result.rewardBalance;
+            }
+          });
+        },
+      ),
+    );
+    await _loadLoyaltyRewards();
   }
 
   void _openLobbySettings() => unawaited(

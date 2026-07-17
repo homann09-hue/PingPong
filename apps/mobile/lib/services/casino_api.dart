@@ -260,6 +260,45 @@ class BoosterActivationView {
   final int boosterBalance, activeSpins;
 }
 
+class LoyaltyRewardOfferView {
+  const LoyaltyRewardOfferView({
+    required this.id,
+    required this.title,
+    required this.costLoyaltyPoints,
+    required this.rewardCurrency,
+    required this.rewardAmount,
+    required this.canRedeem,
+  });
+
+  final String id, title, rewardCurrency;
+  final int costLoyaltyPoints, rewardAmount;
+  final bool canRedeem;
+}
+
+class LoyaltyRewardsView {
+  const LoyaltyRewardsView({
+    required this.version,
+    required this.loyaltyPoints,
+    required this.offers,
+  });
+
+  final int version, loyaltyPoints;
+  final List<LoyaltyRewardOfferView> offers;
+}
+
+class LoyaltyRedemptionView {
+  const LoyaltyRedemptionView({
+    required this.offerId,
+    required this.rewardCurrency,
+    required this.rewardAmount,
+    required this.loyaltyPointBalance,
+    required this.rewardBalance,
+  });
+
+  final String offerId, rewardCurrency;
+  final int rewardAmount, loyaltyPointBalance, rewardBalance;
+}
+
 class ShopOfferView {
   const ShopOfferView({
     required this.id,
@@ -1029,6 +1068,34 @@ class CasinoApi {
     );
   }
 
+  Future<LoyaltyRewardsView> loyaltyRewards() async {
+    final response = await _client.get(
+      Uri.parse('$base/v1/economy/loyalty-rewards'),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Loyalty Rewards konnten nicht geladen werden');
+    }
+    return _loyaltyRewards(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<LoyaltyRedemptionView> redeemLoyaltyReward(String offerId) async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/economy/loyalty-rewards/$offerId/redeem'),
+      headers: {'idempotency-key': _uuid()},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Loyalty Reward konnte nicht eingelöst werden');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return LoyaltyRedemptionView(
+      offerId: data['offerId'] as String,
+      rewardCurrency: data['rewardCurrency'] as String,
+      rewardAmount: data['rewardAmount'] as int,
+      loyaltyPointBalance: data['loyaltyPointBalance'] as int,
+      rewardBalance: data['rewardBalance'] as int,
+    );
+  }
+
   Future<List<ShopOfferView>> shopOffers() async {
     final response = await _client.get(Uri.parse('$base/v1/shop/offers'));
     if (response.statusCode != 200) {
@@ -1791,5 +1858,24 @@ class CasinoApi {
         maxActiveSpins: data['maxActiveSpins'] as int,
         canCraft: data['canCraft'] as bool,
         canActivate: data['canActivate'] as bool,
+      );
+
+  static LoyaltyRewardsView _loyaltyRewards(Map<String, dynamic> data) =>
+      LoyaltyRewardsView(
+        version: data['version'] as int,
+        loyaltyPoints: data['loyaltyPoints'] as int,
+        offers: (data['offers'] as List)
+            .map((value) {
+              final offer = value as Map<String, dynamic>;
+              return LoyaltyRewardOfferView(
+                id: offer['id'] as String,
+                title: offer['title'] as String,
+                costLoyaltyPoints: offer['costLoyaltyPoints'] as int,
+                rewardCurrency: offer['rewardCurrency'] as String,
+                rewardAmount: offer['rewardAmount'] as int,
+                canRedeem: offer['canRedeem'] as bool,
+              );
+            })
+            .toList(growable: false),
       );
 }

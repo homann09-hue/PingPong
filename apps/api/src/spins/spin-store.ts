@@ -6,6 +6,7 @@ import type { VerifiedStoreTransaction } from "../monetization/receipt-verifier.
 import type { EconomyBalance, WalletCurrency } from "../economy/currencies.js";
 import type { CheckWinClaim, CheckWinStatus } from "../economy/check-win.js";
 import type { BoosterActivation, BoosterCraft, BoosterStatus } from "../economy/xp-booster.js";
+import type { LoyaltyRedemption, LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -151,6 +152,8 @@ export interface SpinStore {
   getBoosterStatus(playerId: string): Promise<BoosterStatus>;
   craftBooster(playerId: string, idempotencyKey: string): Promise<BoosterCraft>;
   activateBooster(playerId: string, idempotencyKey: string): Promise<BoosterActivation>;
+  getLoyaltyRewards(playerId: string): Promise<LoyaltyRewardsStatus>;
+  redeemLoyaltyReward(playerId: string, offerId: string, idempotencyKey: string): Promise<LoyaltyRedemption>;
   getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus>;
   claimTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardClaim>;
   getWheelStatus(playerId: string, now: Date): Promise<WheelStatus>;
@@ -180,6 +183,9 @@ export class CheckWinNotClaimableError extends Error {}
 export class BoosterNotCraftableError extends Error {}
 export class BoosterNotAvailableError extends Error {}
 export class BoosterActionConflictError extends Error {}
+export class LoyaltyRewardNotFoundError extends Error {}
+export class InsufficientLoyaltyPointsError extends Error {}
+export class LoyaltyRedemptionConflictError extends Error {}
 export class ShopOfferLimitReachedError extends Error {}
 export class StoreTransactionConflictError extends Error {}
 export class StoreProductLimitReachedError extends Error {}

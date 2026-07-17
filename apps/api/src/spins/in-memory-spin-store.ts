@@ -10,6 +10,8 @@ import type { ShopOffer } from "../shop/shop-catalog.js";
 import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
 import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
 import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
+import { loyaltyRewardOffer, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
+import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -36,6 +38,7 @@ export class InMemorySpinStore implements SpinStore {
   private readonly boosterActivationReplays = new Map<string, BoosterActivation>();
   private readonly boosterActionKinds = new Map<string, "craft" | "activate">();
   private readonly activeBoostSpins = new Map<string, number>();
+  private readonly loyaltyRedemptions = new Map<string, LoyaltyRedemption>();
   private readonly limitedShopPurchases = new Set<string>();
   private readonly storePurchases = new Map<string, StorePurchaseSettlement & { readonly playerId: string }>();
   private readonly limitedStorePurchases = new Set<string>();
@@ -218,6 +221,41 @@ export class InMemorySpinStore implements SpinStore {
     this.boosterActivationReplays.set(replayKey, activation);
     this.boosterActionKinds.set(replayKey, "activate");
     return activation;
+  }
+
+  public async getLoyaltyRewards(playerId: string): Promise<LoyaltyRewardsStatus> {
+    return loyaltyRewardsStatus(this.economy.get(playerId)?.loyalty_point ?? 0);
+  }
+
+  public async redeemLoyaltyReward(playerId: string, offerId: string, idempotencyKey: string): Promise<LoyaltyRedemption> {
+    const offer = loyaltyRewardOffer(offerId);
+    if (!offer) throw new LoyaltyRewardNotFoundError();
+    const replayKey = `${playerId}:${idempotencyKey}`;
+    const replay = this.loyaltyRedemptions.get(replayKey);
+    if (replay) {
+      if (replay.offerId !== offerId) throw new LoyaltyRedemptionConflictError();
+      return { ...replay, replayed: true };
+    }
+    const wallet = { ...this.economy.get(playerId) };
+    const loyaltyBefore = wallet.loyalty_point ?? 0;
+    if (loyaltyBefore < offer.costLoyaltyPoints) throw new InsufficientLoyaltyPointsError();
+    const rewardBefore = offer.rewardCurrency === "coin"
+      ? this.balances.get(playerId) ?? this.defaultBalance
+      : this.gemBalances.get(playerId) ?? 320;
+    const redemption: LoyaltyRedemption = {
+      redemptionId: randomUUID(), offerId, loyaltyPointsSpent: offer.costLoyaltyPoints,
+      rewardCurrency: offer.rewardCurrency, rewardAmount: offer.rewardAmount,
+      loyaltyPointBalance: loyaltyBefore - offer.costLoyaltyPoints,
+      rewardBalance: rewardBefore + offer.rewardAmount, replayed: false,
+    };
+    wallet.loyalty_point = redemption.loyaltyPointBalance;
+    this.economy.set(playerId, wallet);
+    if (offer.rewardCurrency === "coin") this.balances.set(playerId, redemption.rewardBalance);
+    else this.gemBalances.set(playerId, redemption.rewardBalance);
+    this.record(playerId, -redemption.loyaltyPointsSpent, "loyalty_redemption", "loyalty_rewards", `${idempotencyKey}:lp`, loyaltyBefore, redemption.loyaltyPointBalance, "loyalty_point");
+    this.record(playerId, redemption.rewardAmount, "loyalty_reward", "loyalty_rewards", `${idempotencyKey}:reward`, rewardBefore, redemption.rewardBalance, offer.rewardCurrency);
+    this.loyaltyRedemptions.set(replayKey, redemption);
+    return redemption;
   }
 
   public async getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus> {

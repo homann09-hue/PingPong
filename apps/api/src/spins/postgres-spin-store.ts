@@ -3,6 +3,7 @@ import { Pool, type PoolClient } from "pg";
 import type { SpinResult } from "@aurora/slot-engine";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
 import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -12,6 +13,7 @@ import type { ShopOffer } from "../shop/shop-catalog.js";
 import { economyBalances, spinEconomyDeltas, type SpinEconomyCurrency, type WalletCurrency } from "../economy/currencies.js";
 import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus } from "../economy/check-win.js";
 import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
+import { loyaltyRewardOffer, loyaltyRewardsCatalog, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
@@ -21,6 +23,10 @@ interface CheckWinClaimRow {
   coin_balance_after: string; mark_balance_after: string; stamp_balance_after: string;
 }
 interface BoosterActionRow { action: "craft" | "activate"; result: BoosterCraft | BoosterActivation }
+interface LoyaltyRedemptionRow {
+  id: string; offer_id: string; loyalty_points_spent: string; reward_currency: "coin" | "gem";
+  reward_amount: string; loyalty_balance_after: string; reward_balance_after: string;
+}
 interface WalletTransactionRow {
   id: string;
   currency: WalletCurrency;
@@ -788,6 +794,82 @@ export class PostgresSpinStore implements SpinStore {
     } finally { client.release(); }
   }
 
+  public async getLoyaltyRewards(playerId: string): Promise<LoyaltyRewardsStatus> {
+    const wallet = await this.pool.query<WalletRow>(
+      "SELECT balance FROM wallets WHERE player_id=$1 AND currency='loyalty_point'",
+      [playerId],
+    );
+    return loyaltyRewardsStatus(wallet.rows[0] ? this.safeInteger(wallet.rows[0].balance, "Loyalty point balance") : 0);
+  }
+
+  public async redeemLoyaltyReward(playerId: string, offerId: string, idempotencyKey: string): Promise<LoyaltyRedemption> {
+    const offer = loyaltyRewardOffer(offerId);
+    if (!offer) throw new LoyaltyRewardNotFoundError();
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'loyalty_point',0) ON CONFLICT (player_id,currency) DO NOTHING",
+        [playerId],
+      );
+      const wallets = await client.query<{ currency: "loyalty_point" | "coin" | "gem"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('loyalty_point',$2) ORDER BY currency FOR UPDATE",
+        [playerId, offer.rewardCurrency],
+      );
+      const prior = await client.query<LoyaltyRedemptionRow>(
+        "SELECT id,offer_id,loyalty_points_spent,reward_currency,reward_amount,loyalty_balance_after,reward_balance_after FROM loyalty_redemptions WHERE player_id=$1 AND idempotency_key=$2",
+        [playerId, idempotencyKey],
+      );
+      if (prior.rows[0]) {
+        if (prior.rows[0].offer_id !== offerId) throw new LoyaltyRedemptionConflictError();
+        await client.query("COMMIT");
+        return this.loyaltyRedemption(prior.rows[0], true);
+      }
+      const loyaltyRow = wallets.rows.find((row) => row.currency === "loyalty_point");
+      const rewardRow = wallets.rows.find((row) => row.currency === offer.rewardCurrency);
+      if (!loyaltyRow || !rewardRow) throw new Error("Player loyalty reward wallets do not exist");
+      const loyaltyBefore = this.safeInteger(loyaltyRow.balance, "Loyalty point balance");
+      if (loyaltyBefore < offer.costLoyaltyPoints) throw new InsufficientLoyaltyPointsError();
+      const rewardBefore = this.safeInteger(rewardRow.balance, "Loyalty reward balance");
+      const redemption: LoyaltyRedemption = {
+        redemptionId: randomUUID(), offerId, loyaltyPointsSpent: offer.costLoyaltyPoints,
+        rewardCurrency: offer.rewardCurrency, rewardAmount: offer.rewardAmount,
+        loyaltyPointBalance: loyaltyBefore - offer.costLoyaltyPoints,
+        rewardBalance: rewardBefore + offer.rewardAmount, replayed: false,
+      };
+      await client.query(
+        "UPDATE wallets SET balance=$1,version=version+1 WHERE player_id=$2 AND currency='loyalty_point'",
+        [redemption.loyaltyPointBalance, playerId],
+      );
+      await client.query(
+        "UPDATE wallets SET balance=$1,version=version+1 WHERE player_id=$2 AND currency=$3",
+        [redemption.rewardBalance, playerId, offer.rewardCurrency],
+      );
+      await client.query(
+        `INSERT INTO loyalty_redemptions
+          (id,player_id,idempotency_key,catalog_version,offer_id,loyalty_points_spent,reward_currency,reward_amount,loyalty_balance_after,reward_balance_after)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [redemption.redemptionId, playerId, idempotencyKey, loyaltyRewardsCatalog.version, offerId,
+          redemption.loyaltyPointsSpent, redemption.rewardCurrency, redemption.rewardAmount,
+          redemption.loyaltyPointBalance, redemption.rewardBalance],
+      );
+      const metadata = { catalogVersion: loyaltyRewardsCatalog.version, offerId };
+      await this.ledger(client, { playerId, currency: "loyalty_point", amount: -redemption.loyaltyPointsSpent,
+        reason: "loyalty_redemption", source: "loyalty_rewards", referenceId: redemption.redemptionId,
+        idempotencyKey: `${idempotencyKey}:lp`, balanceBefore: loyaltyBefore,
+        balanceAfter: redemption.loyaltyPointBalance, metadata });
+      await this.ledger(client, { playerId, currency: redemption.rewardCurrency, amount: redemption.rewardAmount,
+        reason: "loyalty_reward", source: "loyalty_rewards", referenceId: redemption.redemptionId,
+        idempotencyKey: `${idempotencyKey}:reward`, balanceBefore: rewardBefore,
+        balanceAfter: redemption.rewardBalance, metadata });
+      await client.query("COMMIT");
+      return redemption;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
+
   public async getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus> {
     return rewardStatus(type, await this.timedState(this.pool, playerId, type), now);
   }
@@ -1087,6 +1169,18 @@ export class PostgresSpinStore implements SpinStore {
       coinBalance: this.safeInteger(row.coin_balance_after, "Check-&-Win coin balance"),
       markBalance: this.safeInteger(row.mark_balance_after, "Check-&-Win mark balance"),
       stampBalance: this.safeInteger(row.stamp_balance_after, "Check-&-Win stamp balance"),
+      replayed,
+    };
+  }
+
+  private loyaltyRedemption(row: LoyaltyRedemptionRow, replayed: boolean): LoyaltyRedemption {
+    return {
+      redemptionId: row.id, offerId: row.offer_id,
+      loyaltyPointsSpent: this.safeInteger(row.loyalty_points_spent, "Loyalty points spent"),
+      rewardCurrency: row.reward_currency,
+      rewardAmount: this.safeInteger(row.reward_amount, "Loyalty reward amount"),
+      loyaltyPointBalance: this.safeInteger(row.loyalty_balance_after, "Loyalty point balance"),
+      rewardBalance: this.safeInteger(row.reward_balance_after, "Loyalty reward balance"),
       replayed,
     };
   }

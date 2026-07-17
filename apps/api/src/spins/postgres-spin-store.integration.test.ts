@@ -32,6 +32,7 @@ databaseSuite("PostgresSpinStore integration", () => {
   const storePlayerId = randomUUID();
   const checkWinPlayerId = randomUUID();
   const boostPlayerId = randomUUID();
+  const loyaltyPlayerId = randomUUID();
   const slotId = `integration-${randomUUID()}`;
   const missionId = `integration-mission-${randomUUID()}`;
 
@@ -109,14 +110,19 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/027_xp_boosters.sql", import.meta.url), "utf8",
     );
     await pool.query(boosterMigration);
-    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5),($6)",
-      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId]);
+    const loyaltyMigration = await readFile(
+      new URL("../../../../infra/postgres/028_loyalty_rewards.sql", import.meta.url), "utf8",
+    );
+    await pool.query(loyaltyMigration);
+    await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5),($6),($7)",
+      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId, loyaltyPlayerId]);
     await pool.query(
       `INSERT INTO wallets (player_id, currency, balance) VALUES
         ($1,'coin',100),($1,'gem',0),($2,'coin',1000),($2,'gem',320),($3,'coin',1000),($3,'gem',320),
         ($4,'coin',1000),($4,'gem',320),($5,'coin',1000),($5,'gem',0),($5,'check_win_mark',5),($5,'stamp',0),
-        ($6,'coin',1000),($6,'gem',0),($6,'stamp',3),($6,'booster',0)`,
-      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId],
+        ($6,'coin',1000),($6,'gem',0),($6,'stamp',3),($6,'booster',0),
+        ($7,'coin',1000),($7,'gem',10),($7,'loyalty_point',500)`,
+      [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId, loyaltyPlayerId],
     );
     await pool.query(
       "INSERT INTO slot_config_versions (slot_id, version, config, config_sha256, published_at) VALUES ($1,1,'{}',$2,now())",
@@ -315,6 +321,28 @@ databaseSuite("PostgresSpinStore integration", () => {
       [boostPlayerId],
     );
     expect(ledger.rows[0]?.count).toBe("3");
+  });
+
+  it("redeems loyalty points atomically and persists an idempotent result", async () => {
+    const status = await store.getLoyaltyRewards(loyaltyPlayerId);
+    expect(status).toMatchObject({ loyaltyPoints: 500 });
+    expect(status.offers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "coin-cache", canRedeem: true }),
+    ]));
+    const key = randomUUID();
+    const first = await store.redeemLoyaltyReward(loyaltyPlayerId, "gem-pouch", key);
+    const replay = await store.redeemLoyaltyReward(loyaltyPlayerId, "gem-pouch", key);
+    expect(first).toMatchObject({ loyaltyPointsSpent: 500, rewardCurrency: "gem",
+      rewardAmount: 25, loyaltyPointBalance: 0, rewardBalance: 35, replayed: false });
+    expect(replay).toEqual({ ...first, replayed: true });
+    const ledger = await pool.query<{ currency: string; amount: string }>(
+      "SELECT currency,amount FROM wallet_ledger WHERE player_id=$1 AND source='loyalty_rewards' ORDER BY currency",
+      [loyaltyPlayerId],
+    );
+    expect(ledger.rows).toEqual([
+      { currency: "gem", amount: "25" },
+      { currency: "loyalty_point", amount: "-500" },
+    ]);
   });
 
   it("grants and refunds a verified provider transaction idempotently without storing its token", async () => {

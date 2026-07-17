@@ -10,6 +10,7 @@ import type { Authenticator } from "./auth.js";
 import type { IdentityService } from "./identity/identity-service.js";
 import type { SpinStore } from "./spins/spin-store.js";
 import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
+import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spins/spin-store.js";
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
 import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
@@ -886,6 +887,29 @@ export function buildApp(dependencies: AppDependencies) {
       }
     });
   }
+  app.get("/v1/economy/loyalty-rewards", async (request, reply) => {
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return dependencies.spinStore.getLoyaltyRewards(playerId);
+  });
+  app.post("/v1/economy/loyalty-rewards/:offerId/redeem", async (request, reply) => {
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const offerId = z.string().regex(/^[a-z0-9-]{1,64}$/).safeParse((request.params as { offerId: string }).offerId);
+    if (!offerId.success) return reply.code(400).send({ code: "INVALID_REQUEST" });
+    const keyResult = idempotencyKey.safeParse(request.headers["idempotency-key"]);
+    if (!keyResult.success) return reply.code(400).send({ code: "INVALID_IDEMPOTENCY_KEY" });
+    const rate = authRateLimiter.consume(`loyalty-rewards:${playerId}`, 10, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    try {
+      return await dependencies.spinStore.redeemLoyaltyReward(playerId, offerId.data, keyResult.data);
+    } catch (error) {
+      if (error instanceof LoyaltyRewardNotFoundError) return reply.code(404).send({ code: "LOYALTY_REWARD_NOT_FOUND" });
+      if (error instanceof InsufficientLoyaltyPointsError) return reply.code(409).send({ code: "INSUFFICIENT_LOYALTY_POINTS" });
+      if (error instanceof LoyaltyRedemptionConflictError) return reply.code(409).send({ code: "LOYALTY_REDEMPTION_CONFLICT" });
+      throw error;
+    }
+  });
   for (const type of ["hourly", "daily"] as const) {
     app.get(`/v1/rewards/${type}`, async (request, reply) => {
       const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);

@@ -157,6 +157,8 @@ Apply `infra/postgres/026_check_win_rewards.sql` to persist idempotent
 Check-&-Win exchanges and their reward-version audit data.
 Apply `infra/postgres/027_xp_boosters.sql` to add Stamp crafting, replay-safe
 booster activation, and the finite server-counted boosted-spin state.
+Apply `infra/postgres/028_loyalty_rewards.sql` to persist replay-safe Loyalty
+Point exchanges with the exact catalog version and booked reward values.
 
 The wallet API publishes a stable thirteen-balance economy snapshot: Coins,
 Gems, LP, VIP points, High-Roller points, Clan points, League points, Mission
@@ -175,6 +177,11 @@ Three Stamps craft one Booster token. Activating a token adds twenty 2× XP
 spins; only a successfully settled, non-replayed spin consumes one charge.
 Crafting, activation, inventory debits, and booster grants remain immutable in
 the wallet ledger and are exposed through the Boost Center.
+Every settled spin also earns wager-scaled Loyalty Points. The Boost Center
+publishes a versioned Loyalty Rewards catalog where LP can be exchanged for
+fixed play-money Coin or Gem rewards. The server locks both wallets, validates
+affordability, records both ledger legs, and replays a repeated request without
+granting value twice.
 
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan
