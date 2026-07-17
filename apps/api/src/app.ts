@@ -9,7 +9,7 @@ import { SlotEngine, auroraConfig, classicConfig, themedConfigs, type SlotConfig
 import type { Authenticator } from "./auth.js";
 import type { IdentityService } from "./identity/identity-service.js";
 import type { SpinStore } from "./spins/spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spins/spin-store.js";
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
 import { standardWheel } from "./rewards/bonus-wheel.js";
@@ -882,6 +882,26 @@ export function buildApp(dependencies: AppDependencies) {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     return dependencies.spinStore.getLoyaltyRewards(playerId);
+  });
+  app.get("/v1/economy/high-roller-club", async (request, reply) => {
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return dependencies.spinStore.getHighRollerClub(playerId, new Date());
+  });
+  app.post("/v1/economy/high-roller-club/activate", async (request, reply) => {
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const keyResult = idempotencyKey.safeParse(request.headers["idempotency-key"]);
+    if (!keyResult.success) return reply.code(400).send({ code: "INVALID_IDEMPOTENCY_KEY" });
+    const rate = authRateLimiter.consume(`high-roller:${playerId}`, 5, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    try {
+      return await dependencies.spinStore.activateHighRollerClub(playerId, keyResult.data, new Date());
+    } catch (error) {
+      if (error instanceof HighRollerNotEligibleError) return reply.code(409).send({ code: "HIGH_ROLLER_NOT_ELIGIBLE" });
+      if (error instanceof HighRollerAlreadyActiveError) return reply.code(409).send({ code: "HIGH_ROLLER_ALREADY_ACTIVE" });
+      throw error;
+    }
   });
   app.post("/v1/economy/loyalty-rewards/:offerId/redeem", async (request, reply) => {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);

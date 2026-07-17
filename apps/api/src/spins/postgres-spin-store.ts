@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { SpinResult } from "@aurora/slot-engine";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
@@ -15,6 +15,7 @@ import { checkWinReward, checkWinStatus, type CheckWinClaim, type CheckWinStatus
 import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraft, type BoosterStatus } from "../economy/xp-booster.js";
 import { loyaltyRewardOffer, loyaltyRewardsCatalog, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import { type MissionCadence, type MissionRewards } from "../missions/mission-system.js";
+import { highRollerCashback, highRollerClubRules, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus } from "../economy/high-roller-club.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
@@ -102,7 +103,6 @@ export class PostgresSpinStore implements SpinStore {
           [triggeredTier],
         );
       }
-      const balanceAfter = balance - command.bet + spin.totalWin;
       const playerResult = await client.query<PlayerRow>(
         "SELECT level, xp, vip_points FROM players WHERE id = $1 FOR UPDATE", [command.playerId],
       );
@@ -123,6 +123,13 @@ export class PostgresSpinStore implements SpinStore {
         freeSpins: Number(activity.rows[0]?.free_spins ?? 0) + spin.freeSpinsPlayed,
         vipPoints: Number(playerResult.rows[0].vip_points) + Math.max(1, Math.floor(command.bet / 100)),
       };
+      const membership = await client.query<{ active_until: Date }>(
+        "SELECT active_until FROM high_roller_memberships WHERE player_id=$1", [command.playerId],
+      );
+      const highRollerActive = (membership.rows[0]?.active_until.getTime() ?? 0) > Date.now();
+      const winBalance = balance - command.bet + spin.totalWin;
+      const cashback = highRollerCashback(command.bet, spin.totalWin, highRollerActive);
+      const balanceAfter = winBalance + cashback;
       const spinId = randomUUID();
       await client.query(
         `INSERT INTO spins (
@@ -159,6 +166,7 @@ export class PostgresSpinStore implements SpinStore {
       }
       for (const [currency, amount] of Object.entries(spinEconomyDeltas({
         bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
+        levelsGained: progression.level - playerResult.rows[0].level, highRollerActive,
       })) as [SpinEconomyCurrency, number][]) {
         if (amount <= 0) continue;
         const updated = await client.query<{ balance: string }>(
@@ -246,8 +254,15 @@ export class PostgresSpinStore implements SpinStore {
           referenceId: spinId,
           idempotencyKey: `${command.idempotencyKey}:win`,
           balanceBefore: balanceAfterWager,
-          balanceAfter,
+          balanceAfter: winBalance,
           metadata: { slotId: command.slotId, configVersion: command.configVersion },
+        });
+      }
+      if (cashback > 0) {
+        await this.ledger(client, {
+          playerId: command.playerId, amount: cashback, reason: "high_roller_cashback", source: "high_roller_club",
+          referenceId: spinId, idempotencyKey: `${command.idempotencyKey}:cashback`, balanceBefore: winBalance,
+          balanceAfter, metadata: { clubVersion: highRollerClubRules.version },
         });
       }
       await client.query(
@@ -873,6 +888,81 @@ export class PostgresSpinStore implements SpinStore {
         balanceAfter: redemption.rewardBalance, metadata });
       await client.query("COMMIT");
       return redemption;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
+
+  public async getHighRollerClub(playerId: string, now: Date): Promise<HighRollerClubStatus> {
+    const result = await this.pool.query<{ balance: string; active_until: Date | null }>(
+      `SELECT COALESCE(wallets.balance,0)::text AS balance, memberships.active_until
+         FROM players LEFT JOIN wallets ON wallets.player_id=players.id AND wallets.currency='high_roller_point'
+                      LEFT JOIN high_roller_memberships AS memberships ON memberships.player_id=players.id
+        WHERE players.id=$1`, [playerId],
+    );
+    if (!result.rows[0]) throw new Error("Player High Roller wallet does not exist");
+    return highRollerStatus(this.safeInteger(result.rows[0].balance, "High Roller points"), result.rows[0].active_until, now);
+  }
+
+  public async activateHighRollerClub(playerId: string, idempotencyKey: string, now: Date): Promise<HighRollerActivation> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const replay = await client.query<{ result: HighRollerActivation }>(
+        "SELECT result FROM high_roller_activations WHERE player_id=$1 AND idempotency_key=$2", [playerId, idempotencyKey],
+      );
+      if (replay.rows[0]) { await client.query("COMMIT"); return { ...replay.rows[0].result, replayed: true }; }
+      await client.query(
+        `INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'high_roller_point',0),($1,'stamp',0)
+         ON CONFLICT (player_id,currency) DO NOTHING`, [playerId],
+      );
+      const wallets = await client.query<{ currency: "high_roller_point" | "stamp"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('high_roller_point','stamp') ORDER BY currency FOR UPDATE", [playerId],
+      );
+      if (wallets.rows.length !== 2) throw new Error("Player High Roller wallets do not exist");
+      await client.query(
+        "INSERT INTO high_roller_memberships (player_id,active_until) VALUES ($1,to_timestamp(0)) ON CONFLICT (player_id) DO NOTHING", [playerId],
+      );
+      const membership = await client.query<{ active_until: Date }>(
+        "SELECT active_until FROM high_roller_memberships WHERE player_id=$1 FOR UPDATE", [playerId],
+      );
+      const pointsBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "high_roller_point")!.balance, "High Roller points");
+      const stampBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "stamp")!.balance, "Stamp balance");
+      const status = highRollerStatus(pointsBefore, membership.rows[0]!.active_until, now);
+      if (status.active) throw new HighRollerAlreadyActiveError();
+      if (!status.eligible) throw new HighRollerNotEligibleError();
+      const pointsAfter = pointsBefore - highRollerClubRules.entryPoints;
+      const stampBalance = stampBefore + highRollerClubRules.diamondStampsPerActivation;
+      const activeUntil = new Date(now.getTime() + highRollerClubRules.accessDays * 86_400_000);
+      const activationId = randomUUID();
+      const activation: HighRollerActivation = {
+        ...highRollerStatus(pointsAfter, activeUntil, now), activationId,
+        pointsSpent: highRollerClubRules.entryPoints, stampsGranted: highRollerClubRules.diamondStampsPerActivation,
+        stampBalance, replayed: false,
+      };
+      await client.query(
+        "UPDATE wallets SET balance=CASE currency WHEN 'high_roller_point' THEN $2 ELSE $3 END,version=version+1 WHERE player_id=$1 AND currency IN ('high_roller_point','stamp')",
+        [playerId, pointsAfter, stampBalance],
+      );
+      await client.query(
+        "UPDATE high_roller_memberships SET active_until=$2,activated_at=$3,version=version+1 WHERE player_id=$1",
+        [playerId, activeUntil, now],
+      );
+      await client.query(
+        `INSERT INTO high_roller_activations (id,player_id,idempotency_key,points_spent,stamps_granted,active_until,result)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [activationId, playerId, idempotencyKey, activation.pointsSpent, activation.stampsGranted, activeUntil, JSON.stringify(activation)],
+      );
+      const metadata = { clubVersion: highRollerClubRules.version, activeUntil: activeUntil.toISOString() };
+      await this.ledger(client, { playerId, currency: "high_roller_point", amount: -activation.pointsSpent,
+        reason: "high_roller_activation", source: "high_roller_club", referenceId: activationId,
+        idempotencyKey: `${idempotencyKey}:points`, balanceBefore: pointsBefore, balanceAfter: pointsAfter, metadata });
+      await this.ledger(client, { playerId, currency: "stamp", amount: activation.stampsGranted,
+        reason: "high_roller_diamond_stamp", source: "high_roller_club", referenceId: activationId,
+        idempotencyKey: `${idempotencyKey}:stamp`, balanceBefore: stampBefore, balanceAfter: stampBalance, metadata });
+      await client.query("COMMIT");
+      return activation;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

@@ -388,6 +388,31 @@ void main() {
     );
   });
 
+  testWidgets('High Roller Club activates seven-day benefits', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    HighRollerClubView? received;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HighRollerClubSheet(
+            api: _HighRollerApi(),
+            onChanged: (value) => received = value,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('high-roller-club-sheet')), findsOneWidget);
+    expect(find.text('20.000 / 20.000 PUNKTE'), findsOneWidget);
+    expect(find.text('Endless Cashback'), findsOneWidget);
+    expect(find.text('Spins nach Einsatzhöhe'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '7 TAGE AKTIVIEREN'));
+    await tester.pumpAndSettle();
+    expect(received?.active, isTrue);
+    expect(find.textContaining('AKTIV · 7T'), findsOneWidget);
+  });
+
   testWidgets('VIP badge opens the progression sheet', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(const AuroraApp());
@@ -709,6 +734,52 @@ class _LoyaltyApi extends CasinoApi {
         rewardAmount: 25,
         loyaltyPointBalance: 0,
         rewardBalance: 345,
+      );
+}
+
+class _HighRollerApi extends CasinoApi {
+  static const sources = [
+    HighRollerSourceView(id: 'spins', label: 'Spins nach Einsatzhöhe'),
+  ];
+  static const benefits = [
+    HighRollerBenefitView(
+      id: 'endless_cashback',
+      label: 'Endless Cashback',
+      detail: '2 % Cashback auf Verlust-Spins',
+      active: false,
+    ),
+  ];
+
+  @override
+  Future<HighRollerClubView> highRollerClub() async => const HighRollerClubView(
+    points: 20000,
+    entryPoints: 20000,
+    eligible: true,
+    active: false,
+    activeUntil: null,
+    remainingSeconds: 0,
+    sources: sources,
+    benefits: benefits,
+  );
+
+  @override
+  Future<HighRollerClubView> activateHighRollerClub() async =>
+      HighRollerClubView(
+        points: 0,
+        entryPoints: 20000,
+        eligible: false,
+        active: true,
+        activeUntil: DateTime.now().toUtc().add(const Duration(days: 7)),
+        remainingSeconds: 604800,
+        sources: sources,
+        benefits: const [
+          HighRollerBenefitView(
+            id: 'endless_cashback',
+            label: 'Endless Cashback',
+            detail: '2 % Cashback auf Verlust-Spins',
+            active: true,
+          ),
+        ],
       );
 }
 

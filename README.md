@@ -162,6 +162,8 @@ Point exchanges with the exact catalog version and booked reward values.
 Apply `infra/postgres/029_mission_tracks.sql` to add three-day Pro missions,
 server-derived Super/Crazy unlocks, weekly Daily-claim milestones, Toolboxes,
 and atomic multi-currency mission rewards.
+Apply `infra/postgres/030_high_roller_club.sql` to persist replay-safe High
+Roller Club activations and seven-day membership state.
 
 The wallet API publishes a stable fourteen-balance economy snapshot: Coins,
 Gems, LP, VIP points, High-Roller points, Clan points, League points, Mission
@@ -202,6 +204,14 @@ tiers. The API derives progress from authoritative player counters and requires
 the previous tier to be claimed before a higher reward can be credited. The
 Flutter client groups all fifteen achievements by category and renders locked
 tier progression without trusting client-supplied targets or reward amounts.
+
+The High Roller Club consumes 20,000 earned High-Roller Points for seven days
+of access. Higher wagers and level-ups award points through the common spin
+settlement policy. Activation is idempotent and atomically grants a Diamond
+Stamp. Active members receive ledgered 2% cashback on losing spins and double
+World-Slots-League points; expiry is evaluated against server time. The Boost
+Center exposes progress, remaining access time, benefits, and the complete
+source catalog without allowing the client to activate early or choose costs.
 
 The Club surface is backed by the authenticated social API rather than local
 widget state. It supports durable friend requests, accepted friendships, clan

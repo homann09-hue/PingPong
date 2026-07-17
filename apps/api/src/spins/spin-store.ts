@@ -8,6 +8,7 @@ import type { CheckWinClaim, CheckWinStatus } from "../economy/check-win.js";
 import type { BoosterActivation, BoosterCraft, BoosterStatus } from "../economy/xp-booster.js";
 import type { LoyaltyRedemption, LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import type { MissionCadence, MissionRewards, MissionTier } from "../missions/mission-system.js";
+import type { HighRollerActivation, HighRollerClubStatus } from "../economy/high-roller-club.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -160,6 +161,8 @@ export interface SpinStore {
   activateBooster(playerId: string, idempotencyKey: string): Promise<BoosterActivation>;
   getLoyaltyRewards(playerId: string): Promise<LoyaltyRewardsStatus>;
   redeemLoyaltyReward(playerId: string, offerId: string, idempotencyKey: string): Promise<LoyaltyRedemption>;
+  getHighRollerClub(playerId: string, now: Date): Promise<HighRollerClubStatus>;
+  activateHighRollerClub(playerId: string, idempotencyKey: string, now: Date): Promise<HighRollerActivation>;
   getTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardStatus>;
   claimTimedReward(playerId: string, type: TimedRewardType, now: Date): Promise<TimedRewardClaim>;
   getWheelStatus(playerId: string, now: Date): Promise<WheelStatus>;
@@ -192,6 +195,8 @@ export class BoosterActionConflictError extends Error {}
 export class LoyaltyRewardNotFoundError extends Error {}
 export class InsufficientLoyaltyPointsError extends Error {}
 export class LoyaltyRedemptionConflictError extends Error {}
+export class HighRollerNotEligibleError extends Error {}
+export class HighRollerAlreadyActiveError extends Error {}
 export class ShopOfferLimitReachedError extends Error {}
 export class StoreTransactionConflictError extends Error {}
 export class StoreProductLimitReachedError extends Error {}

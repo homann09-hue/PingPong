@@ -19,12 +19,16 @@ export function spinEconomyDeltas(input: {
   readonly bet: number;
   readonly totalWin: number;
   readonly freeSpins: number;
+  readonly levelsGained?: number;
+  readonly highRollerActive?: boolean;
 }): Readonly<Partial<Record<SpinEconomyCurrency, number>>> {
+  const leaguePoints = Math.max(1, Math.floor(input.bet / 200))
+    + Math.floor(input.totalWin / Math.max(1, input.bet));
   return {
     loyalty_point: Math.max(1, Math.floor(input.bet / 100)),
-    high_roller_point: input.bet >= 5_000 ? Math.max(1, Math.floor(input.bet / 1_000)) : 0,
+    high_roller_point: highRollerSpinPoints(input.bet, input.levelsGained ?? 0),
     clan_point: Math.max(1, Math.floor(input.bet / 500)),
-    league_point: Math.max(1, Math.floor(input.bet / 200)) + Math.floor(input.totalWin / Math.max(1, input.bet)),
+    league_point: leaguePoints * (input.highRollerActive ? highRollerClubRules.leaguePointMultiplier : 1),
     mission_point: 1 + input.freeSpins,
     check_win_mark: input.totalWin > 0 ? 1 : 0,
   };
@@ -35,3 +39,4 @@ export function economyBalances(
 ): readonly EconomyBalance[] {
   return walletCurrencies.map((currency) => ({ currency, balance: values[currency] ?? 0 }));
 }
+import { highRollerClubRules, highRollerSpinPoints } from "./high-roller-club.js";

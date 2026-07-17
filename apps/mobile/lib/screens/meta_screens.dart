@@ -987,6 +987,160 @@ class _NotificationSettingsSheetState extends State<NotificationSettingsSheet> {
   );
 }
 
+class HighRollerClubSheet extends StatefulWidget {
+  const HighRollerClubSheet({super.key, required this.api, this.onChanged});
+  final CasinoApi api;
+  final ValueChanged<HighRollerClubView>? onChanged;
+
+  @override
+  State<HighRollerClubSheet> createState() => _HighRollerClubSheetState();
+}
+
+class _HighRollerClubSheetState extends State<HighRollerClubSheet> {
+  HighRollerClubView? status;
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final loaded = await widget.api.highRollerClub();
+      if (mounted) setState(() => status = loaded);
+    } on StateError {
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
+  Future<void> _activate() async {
+    if (busy || status?.eligible != true) return;
+    setState(() => busy = true);
+    try {
+      final activated = await widget.api.activateHighRollerClub();
+      if (!mounted) return;
+      setState(() => status = activated);
+      widget.onChanged?.call(activated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('High Roller Club für 7 Tage aktiviert.')),
+      );
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Club-Aktivierung nicht möglich.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = status;
+    return Container(
+      key: const Key('high-roller-club-sheet'),
+      margin: const EdgeInsets.only(top: 46),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xff32134d), Color(0xff090311)],
+        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        border: Border(top: BorderSide(color: Color(0xffffd45c), width: 2)),
+      ),
+      child: current == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
+              children: [
+                const Icon(
+                  Icons.diamond_rounded,
+                  color: Color(0xffffd45c),
+                  size: 66,
+                ),
+                const Text(
+                  'HIGH ROLLER CLUB',
+                  style: MetaStyle.hero,
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  current.active
+                      ? 'AKTIV · ${_remaining(current.remainingSeconds)}'
+                      : '${_number(current.points)} / ${_number(current.entryPoints)} PUNKTE',
+                  style: MetaStyle.reward,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                LinearProgressIndicator(
+                  value: current.active
+                      ? 1
+                      : (current.points / current.entryPoints).clamp(0, 1),
+                  minHeight: 14,
+                  color: const Color(0xffffd45c),
+                  backgroundColor: Colors.black45,
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: current.eligible && !busy ? _activate : null,
+                  icon: const Icon(Icons.lock_open_rounded),
+                  label: Text(
+                    current.active
+                        ? 'MITGLIEDSCHAFT AKTIV'
+                        : current.eligible
+                        ? '7 TAGE AKTIVIEREN'
+                        : 'NOCH ${_number(current.entryPoints - current.points)} PUNKTE',
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Text('DEINE VORTEILE', style: MetaStyle.hero),
+                const SizedBox(height: 8),
+                for (final benefit in current.benefits)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      benefit.active ? Icons.check_circle : Icons.lock_outline,
+                      color: benefit.active
+                          ? const Color(0xffffd45c)
+                          : Colors.white38,
+                    ),
+                    title: Text(benefit.label, style: MetaStyle.title),
+                    subtitle: Text(benefit.detail, style: MetaStyle.caption),
+                  ),
+                const SizedBox(height: 16),
+                const Text('PUNKTEQUELLEN', style: MetaStyle.hero),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final source in current.sources)
+                      Chip(
+                        avatar: const Icon(Icons.add_circle, size: 17),
+                        label: Text(source.label),
+                        backgroundColor: const Color(0xff51216f),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+
+  static String _remaining(int seconds) {
+    final duration = Duration(seconds: seconds);
+    return '${duration.inDays}T ${duration.inHours.remainder(24)}H';
+  }
+
+  static String _number(int value) => value.toString().replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (_) => '.',
+  );
+}
+
 class QuestsScreen extends StatelessWidget {
   const QuestsScreen({
     super.key,

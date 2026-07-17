@@ -118,6 +118,10 @@ databaseSuite("PostgresSpinStore integration", () => {
       new URL("../../../../infra/postgres/029_mission_tracks.sql", import.meta.url), "utf8",
     );
     await pool.query(missionTracksMigration);
+    const highRollerMigration = await readFile(
+      new URL("../../../../infra/postgres/030_high_roller_club.sql", import.meta.url), "utf8",
+    );
+    await pool.query(highRollerMigration);
     await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5),($6),($7)",
       [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId, loyaltyPlayerId]);
     await pool.query(

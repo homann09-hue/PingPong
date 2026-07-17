@@ -73,6 +73,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   CheckWinStatusView? checkWinStatus;
   BoosterStatusView? boosterStatus;
   LoyaltyRewardsView? loyaltyRewards;
+  HighRollerClubView? highRollerClub;
   List<Map<String, dynamic>> tournamentLeaders = const [];
   int tab = 0;
   bool rewardBusy = false;
@@ -104,6 +105,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadCheckWin();
     _loadBoosters();
     _loadLoyaltyRewards();
+    _loadHighRollerClub();
     _loadShopOffers();
     storeUpdates = storeBridge.updates.listen(_handleStorePurchaseUpdate);
     unawaited(_loadPlatformStore());
@@ -367,6 +369,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  Future<void> _loadHighRollerClub() async {
+    try {
+      final loaded = await api.highRollerClub();
+      if (mounted) setState(() => highRollerClub = loaded);
+    } on StateError {
+      // Club actions stay unavailable until authoritative state responds.
+    }
+  }
+
   Future<void> _loadProfile() async {
     try {
       final profile = await api.profile();
@@ -553,6 +564,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       _loadCheckWin(),
       _loadBoosters(),
       _loadLoyaltyRewards(),
+      _loadHighRollerClub(),
       _loadShopOffers(),
       _loadSocial(),
       _loadLiveOps(),
@@ -715,6 +727,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await _loadCheckWin();
     await _loadBoosters();
     await _loadLoyaltyRewards();
+    await _loadHighRollerClub();
     if (mounted && result['openRewards'] == 1) await _openRewardCenter();
   }
 
@@ -986,6 +999,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
       subtitle: 'Aktive Fortschritts- und Belohnungssysteme',
       actions: [
         _HubAction(
+          icon: Icons.diamond_rounded,
+          title: 'High Roller Club',
+          detail: highRollerClub == null
+              ? 'Clubstatus wird geladen'
+              : highRollerClub!.active
+              ? 'AKTIV · ${highRollerClub!.remainingSeconds ~/ 86400} Tage verbleibend'
+              : '${_fmt(highRollerClub!.points)} / ${_fmt(highRollerClub!.entryPoints)} Punkte',
+          badge: highRollerClub?.eligible == true ? 1 : 0,
+          onTap: () => unawaited(_openHighRollerClub()),
+        ),
+        _HubAction(
           icon: Icons.bolt,
           title: 'XP Booster',
           detail: boosterStatus == null
@@ -1068,6 +1092,22 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
     await _loadCheckWin();
     await _loadBoosters();
+  }
+
+  Future<void> _openHighRollerClub() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => HighRollerClubSheet(
+        api: api,
+        onChanged: (value) {
+          if (mounted) setState(() => highRollerClub = value);
+        },
+      ),
+    );
+    await _loadHighRollerClub();
+    await _loadProfile();
   }
 
   Future<void> _openXpBooster() async {

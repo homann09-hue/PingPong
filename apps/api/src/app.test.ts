@@ -377,6 +377,20 @@ describe("spin API", () => {
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({ code: "REWARD_REQUIREMENT_NOT_MET" });
   });
+  it("publishes the High Roller Club contract and rejects premature entry", async () => {
+    const status = await app.inject({
+      method: "GET", url: "/v1/economy/high-roller-club", headers: { authorization: "Bearer valid" },
+    });
+    const activation = await app.inject({
+      method: "POST", url: "/v1/economy/high-roller-club/activate",
+      headers: { authorization: "Bearer valid", "idempotency-key": randomUUID() },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toMatchObject({ entryPoints: 20_000, active: false, eligible: false });
+    expect(status.json().sources).toHaveLength(10);
+    expect(status.json().benefits).toHaveLength(5);
+    expect(activation.json()).toEqual({ code: "HIGH_ROLLER_NOT_ELIGIBLE" });
+  });
   it("claims catalog achievements once and validates their tier progression", async () => {
     const achievementApp = buildApp({
       authenticator: { authenticate: async () => playerId },

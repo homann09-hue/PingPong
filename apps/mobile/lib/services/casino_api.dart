@@ -330,6 +330,40 @@ class LoyaltyRedemptionView {
   final int rewardAmount, loyaltyPointBalance, rewardBalance;
 }
 
+class HighRollerSourceView {
+  const HighRollerSourceView({required this.id, required this.label});
+  final String id, label;
+}
+
+class HighRollerBenefitView {
+  const HighRollerBenefitView({
+    required this.id,
+    required this.label,
+    required this.detail,
+    required this.active,
+  });
+  final String id, label, detail;
+  final bool active;
+}
+
+class HighRollerClubView {
+  const HighRollerClubView({
+    required this.points,
+    required this.entryPoints,
+    required this.eligible,
+    required this.active,
+    required this.activeUntil,
+    required this.remainingSeconds,
+    required this.sources,
+    required this.benefits,
+  });
+  final int points, entryPoints, remainingSeconds;
+  final bool eligible, active;
+  final DateTime? activeUntil;
+  final List<HighRollerSourceView> sources;
+  final List<HighRollerBenefitView> benefits;
+}
+
 class ShopOfferView {
   const ShopOfferView({
     required this.id,
@@ -1128,6 +1162,27 @@ class CasinoApi {
       loyaltyPointBalance: data['loyaltyPointBalance'] as int,
       rewardBalance: data['rewardBalance'] as int,
     );
+  }
+
+  Future<HighRollerClubView> highRollerClub() async {
+    final response = await _client.get(
+      Uri.parse('$base/v1/economy/high-roller-club'),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('High Roller Club konnte nicht geladen werden');
+    }
+    return _highRollerClub(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<HighRollerClubView> activateHighRollerClub() async {
+    final response = await _client.post(
+      Uri.parse('$base/v1/economy/high-roller-club/activate'),
+      headers: {'idempotency-key': _uuid()},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('High Roller Club konnte nicht aktiviert werden');
+    }
+    return _highRollerClub(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<List<ShopOfferView>> shopOffers() async {
@@ -1931,6 +1986,38 @@ class CasinoApi {
                 rewardCurrency: offer['rewardCurrency'] as String,
                 rewardAmount: offer['rewardAmount'] as int,
                 canRedeem: offer['canRedeem'] as bool,
+              );
+            })
+            .toList(growable: false),
+      );
+
+  static HighRollerClubView _highRollerClub(Map<String, dynamic> data) =>
+      HighRollerClubView(
+        points: data['points'] as int,
+        entryPoints: data['entryPoints'] as int,
+        eligible: data['eligible'] as bool,
+        active: data['active'] as bool,
+        activeUntil: data['activeUntil'] == null
+            ? null
+            : DateTime.parse(data['activeUntil'] as String),
+        remainingSeconds: data['remainingSeconds'] as int,
+        sources: (data['sources'] as List)
+            .map((value) {
+              final source = value as Map<String, dynamic>;
+              return HighRollerSourceView(
+                id: source['id'] as String,
+                label: source['label'] as String,
+              );
+            })
+            .toList(growable: false),
+        benefits: (data['benefits'] as List)
+            .map((value) {
+              final benefit = value as Map<String, dynamic>;
+              return HighRollerBenefitView(
+                id: benefit['id'] as String,
+                label: benefit['label'] as String,
+                detail: benefit['detail'] as String,
+                active: benefit['active'] as bool,
               );
             })
             .toList(growable: false),

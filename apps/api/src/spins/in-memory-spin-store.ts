@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -13,6 +13,7 @@ import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraf
 import { loyaltyRewardOffer, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 import { missionCatalog, missionUnlock, missionWindow, type MissionDefinition } from "../missions/mission-system.js";
+import { highRollerCashback, highRollerClubRules, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus } from "../economy/high-roller-club.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -40,6 +41,8 @@ export class InMemorySpinStore implements SpinStore {
   private readonly boosterActionKinds = new Map<string, "craft" | "activate">();
   private readonly activeBoostSpins = new Map<string, number>();
   private readonly loyaltyRedemptions = new Map<string, LoyaltyRedemption>();
+  private readonly highRollerActiveUntil = new Map<string, Date>();
+  private readonly highRollerActivations = new Map<string, HighRollerActivation>();
   private readonly limitedShopPurchases = new Set<string>();
   private readonly storePurchases = new Map<string, StorePurchaseSettlement & { readonly playerId: string }>();
   private readonly limitedStorePurchases = new Set<string>();
@@ -85,22 +88,27 @@ export class InMemorySpinStore implements SpinStore {
       freeSpins: previous.freeSpins + spin.freeSpinsPlayed,
       vipPoints: previous.vipPoints + Math.max(1, Math.floor(command.bet / 100)),
     };
+    const highRollerActive = (this.highRollerActiveUntil.get(command.playerId)?.getTime() ?? 0) > Date.now();
+    const cashback = highRollerCashback(command.bet, spin.totalWin, highRollerActive);
+    const winBalance = current - command.bet + spin.totalWin;
     const settled = {
       spin,
-      coinBalance: current - command.bet + spin.totalWin,
+      coinBalance: winBalance + cashback,
       progression,
     };
     const afterWager = current - command.bet;
     this.record(command.playerId, -command.bet, "slot_wager", "slot", command.idempotencyKey, current, afterWager);
     if (spin.totalWin > 0) {
-      this.record(command.playerId, spin.totalWin, "slot_win", "slot", `${command.idempotencyKey}:win`, afterWager, settled.coinBalance);
+      this.record(command.playerId, spin.totalWin, "slot_win", "slot", `${command.idempotencyKey}:win`, afterWager, winBalance);
     }
+    if (cashback > 0) this.record(command.playerId, cashback, "high_roller_cashback", "high_roller_club", `${command.idempotencyKey}:cashback`, winBalance, settled.coinBalance);
     this.balances.set(command.playerId, settled.coinBalance);
     this.progression.set(command.playerId, progression);
     if (activeBoostSpins > 0) this.activeBoostSpins.set(command.playerId, activeBoostSpins - 1);
     const economy = this.economy.get(command.playerId) ?? {};
     for (const [currency, amount] of Object.entries(spinEconomyDeltas({
       bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
+      levelsGained: progression.level - previous.level, highRollerActive,
     })) as [SpinEconomyCurrency, number][]) {
       if (amount <= 0) continue;
       const before = economy[currency] ?? 0;
@@ -119,6 +127,36 @@ export class InMemorySpinStore implements SpinStore {
       (this.tournamentScores.get(tournamentKey) ?? 0) + tournamentPoints(command.bet, spin.totalWin),
     );
     return settled;
+  }
+
+  public async getHighRollerClub(playerId: string, now: Date): Promise<HighRollerClubStatus> {
+    return highRollerStatus(this.economy.get(playerId)?.high_roller_point ?? 0, this.highRollerActiveUntil.get(playerId) ?? null, now);
+  }
+
+  public async activateHighRollerClub(playerId: string, idempotencyKey: string, now: Date): Promise<HighRollerActivation> {
+    const replayKey = `${playerId}:${idempotencyKey}`;
+    const replay = this.highRollerActivations.get(replayKey);
+    if (replay) return { ...replay, replayed: true };
+    const wallet = { ...this.economy.get(playerId) };
+    const status = highRollerStatus(wallet.high_roller_point ?? 0, this.highRollerActiveUntil.get(playerId) ?? null, now);
+    if (status.active) throw new HighRollerAlreadyActiveError();
+    if (!status.eligible) throw new HighRollerNotEligibleError();
+    wallet.high_roller_point = status.points - highRollerClubRules.entryPoints;
+    const stampBefore = wallet.stamp ?? 0;
+    wallet.stamp = stampBefore + highRollerClubRules.diamondStampsPerActivation;
+    const activeUntil = new Date(now.getTime() + highRollerClubRules.accessDays * 86_400_000);
+    this.highRollerActiveUntil.set(playerId, activeUntil);
+    this.economy.set(playerId, wallet);
+    const activationId = randomUUID();
+    this.record(playerId, -highRollerClubRules.entryPoints, "high_roller_activation", "high_roller_club", `${idempotencyKey}:points`, status.points, wallet.high_roller_point, "high_roller_point");
+    this.record(playerId, highRollerClubRules.diamondStampsPerActivation, "high_roller_diamond_stamp", "high_roller_club", `${idempotencyKey}:stamp`, stampBefore, wallet.stamp, "stamp");
+    const activation: HighRollerActivation = {
+      ...highRollerStatus(wallet.high_roller_point, activeUntil, now), activationId,
+      pointsSpent: highRollerClubRules.entryPoints, stampsGranted: highRollerClubRules.diamondStampsPerActivation,
+      stampBalance: wallet.stamp, replayed: false,
+    };
+    this.highRollerActivations.set(replayKey, activation);
+    return activation;
   }
 
   public async claimReward(playerId: string, rewardId: string, coins: number): Promise<RewardClaim> {

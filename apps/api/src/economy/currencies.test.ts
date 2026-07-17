@@ -10,11 +10,13 @@ describe("multi-currency economy", () => {
   });
 
   it("awards higher-bet and win progression without inventing premium collectibles", () => {
-    expect(spinEconomyDeltas({ bet: 5_000, totalWin: 12_500, freeSpins: 3 })).toEqual({
+    expect(spinEconomyDeltas({
+      bet: 5_000, totalWin: 12_500, freeSpins: 3, levelsGained: 1, highRollerActive: true,
+    })).toEqual({
       loyalty_point: 50,
-      high_roller_point: 5,
+      high_roller_point: 1_050,
       clan_point: 10,
-      league_point: 27,
+      league_point: 54,
       mission_point: 4,
       check_win_mark: 1,
     });
