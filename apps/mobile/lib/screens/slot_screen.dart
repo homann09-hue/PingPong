@@ -14,15 +14,18 @@ class SlotScreen extends StatefulWidget {
     required this.xp,
     required this.vipPoints,
     this.gems = 320,
+    this.api,
   });
   final GameDefinition game;
   final int balance, level, xp, vipPoints, gems;
+  final CasinoApi? api;
   @override
   State<SlotScreen> createState() => _SlotScreenState();
 }
 
 class _SlotScreenState extends State<SlotScreen> {
-  final api = CasinoApi(), random = Random();
+  late final CasinoApi api;
+  final random = Random();
   late int balance, level, xp, vipPoints;
   int bet = 100, win = 0, free = 0;
   List<int> betSteps = const [100, 200, 500, 1000, 2000, 5000, 10000];
@@ -49,6 +52,7 @@ class _SlotScreenState extends State<SlotScreen> {
   @override
   void initState() {
     super.initState();
+    api = widget.api ?? CasinoApi();
     balance = widget.balance;
     level = widget.level;
     xp = widget.xp;
@@ -106,7 +110,16 @@ class _SlotScreenState extends State<SlotScreen> {
       winDetail = null;
       winningCells = {};
     });
-    final request = api.spin(widget.game.id, bet, bonusBuy: bonusBuy);
+    SpinResponse? response;
+    Object? requestError;
+    final request = api
+        .spin(widget.game.id, bet, bonusBuy: bonusBuy)
+        .then<void>(
+          (value) => response = value,
+          onError: (Object exception) {
+            requestError = exception;
+          },
+        );
     for (var i = 0; i < 7; i++) {
       await Future<void>.delayed(Duration(milliseconds: turbo ? 18 : 65));
       if (!mounted) return null;
@@ -121,7 +134,9 @@ class _SlotScreenState extends State<SlotScreen> {
       );
     }
     try {
-      final r = await request;
+      await request;
+      if (requestError != null) throw requestError!;
+      final r = response!;
       if (!mounted) return null;
       final freeRounds = r.rounds
           .where((round) => round.phase == 'free_spin')
@@ -184,6 +199,45 @@ class _SlotScreenState extends State<SlotScreen> {
         ),
       );
       return r;
+    } on SpinException catch (exception) {
+      if (!mounted) return null;
+      if (exception.code == 'HIGH_ROLLER_MEMBERSHIP_REQUIRED') {
+        setState(() {
+          error = 'Deine High-Roller-Mitgliedschaft ist nicht mehr aktiv.';
+          autoplay = false;
+          stopAutoplayRequested = true;
+        });
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('HIGH ROLLER CLUB'),
+            content: const Text(
+              'Dieser exklusive Slot benötigt eine aktive Mitgliedschaft.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ZUM CLUB'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) {
+          Navigator.pop(context, {
+            'balance': balance,
+            'level': level,
+            'xp': xp,
+            'spins': spins,
+            'totalWon': totalWon,
+            'totalFreeSpins': totalFreeSpins,
+            'vipPoints': vipPoints,
+            'highRollerRequired': 1,
+          });
+        }
+      } else {
+        setState(() => error = 'Spin abgelehnt (${exception.code}).');
+      }
+      return null;
     } catch (e) {
       if (mounted) {
         setState(() => error = 'Verbindung verloren – noch einmal tippen.');

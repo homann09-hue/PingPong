@@ -3,10 +3,62 @@ import 'package:aurora_mobile/models/game_definition.dart';
 import 'package:aurora_mobile/screens/meta_screens.dart';
 import 'package:aurora_mobile/screens/slot_screen.dart';
 import 'package:aurora_mobile/services/casino_api.dart';
+import 'package:aurora_mobile/services/slot_package_manager.dart';
+import 'package:aurora_mobile/widgets/lobby_hub.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('club-locked slot card opens the High Roller journey', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final manager = SlotPackageManager();
+    final neon = games.firstWhere((game) => game.id == 'neon-nights');
+    GameDefinition? requested;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LobbyHub(
+            level: 12,
+            now: DateTime.utc(2026, 7, 17),
+            games: [neon],
+            highRollerActive: false,
+            packageManager: manager,
+            missions: const [],
+            events: const [],
+            shopOffers: const [],
+            social: null,
+            campaign: null,
+            hourlyReward: null,
+            dailyReward: null,
+            wheel: null,
+            onRefresh: () async {},
+            onPlay: (game) => requested = game,
+            onPrepare: (_) {},
+            onNavigate: (_) {},
+            onOpenRewards: () {},
+            onOpenInbox: () {},
+            onOpenBoosts: () {},
+            onOpenSettings: () {},
+            onOpenShop: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final action = find.byKey(const Key('slot-action-neon-nights'));
+    await tester.dragUntilVisible(
+      action,
+      find.byKey(const Key('lobby-hub-scroll')),
+      const Offset(0, -500),
+    );
+    expect(tester.widget<FilledButton>(action).onPressed, isNotNull);
+    await tester.tap(action);
+    expect(requested?.id, 'neon-nights');
+    manager.dispose();
+  });
+
   testWidgets('lobby exposes central hub, progression and slot catalog', (
     tester,
   ) async {
@@ -621,6 +673,41 @@ void main() {
     expect(find.text('25 AUTO SPINS'), findsOneWidget);
     expect(find.text('50 AUTO SPINS'), findsOneWidget);
   });
+
+  testWidgets('expired High Roller access stops an open exclusive slot', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.firstWhere((game) => game.id == 'neon-nights'),
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _ExpiredHighRollerApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('SPIN'));
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('HIGH ROLLER CLUB'), findsOneWidget);
+    expect(
+      find.text('Dieser exklusive Slot benötigt eine aktive Mitgliedschaft.'),
+      findsOneWidget,
+    );
+    expect(find.text('ZUM CLUB'), findsOneWidget);
+  });
+}
+
+class _ExpiredHighRollerApi extends CasinoApi {
+  @override
+  Future<SpinResponse> spin(String gameId, int bet, {bool bonusBuy = false}) =>
+      Future.error(const SpinException('HIGH_ROLLER_MEMBERSHIP_REQUIRED', 403));
 }
 
 class _RewardApi extends CasinoApi {

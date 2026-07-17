@@ -406,6 +406,12 @@ class ShopPurchaseException implements Exception {
   final String code;
 }
 
+class SpinException implements Exception {
+  const SpinException(this.code, this.statusCode);
+  final String code;
+  final int statusCode;
+}
+
 class StoreProductView {
   const StoreProductView({
     required this.key,
@@ -782,7 +788,11 @@ class CasinoApi {
       body: jsonEncode({'bet': bet, 'bonusBuy': bonusBuy}),
     );
     if (response.statusCode != 200) {
-      throw StateError('Spin fehlgeschlagen (${response.statusCode})');
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      throw SpinException(
+        payload['code'] as String? ?? 'SPIN_REJECTED',
+        response.statusCode,
+      );
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final spin = data['spin'] as Map<String, dynamic>;

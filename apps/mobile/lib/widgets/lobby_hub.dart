@@ -508,14 +508,16 @@ class _SlotCoverCard extends StatelessWidget {
               : ready
               ? 'ready to play'
               : 'content download available'}',
-      button: !locked,
+      button: !levelLocked,
       child: Material(
         color: const Color(0xff100725),
         borderRadius: BorderRadius.circular(19),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: locked
+          onTap: levelLocked
               ? null
+              : clubLocked
+              ? () => onPlay(game)
               : ready
               ? () => onPlay(game)
               : () => onPrepare(game),
@@ -594,8 +596,10 @@ class _SlotCoverCard extends StatelessWidget {
                         width: double.infinity,
                         child: FilledButton.icon(
                           key: Key('slot-action-${game.id}'),
-                          onPressed: locked
+                          onPressed: levelLocked
                               ? null
+                              : clubLocked
+                              ? () => onPlay(game)
                               : ready
                               ? () => onPlay(game)
                               : () => onPrepare(game),

@@ -736,6 +736,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await _loadBoosters();
     await _loadLoyaltyRewards();
     await _loadHighRollerClub();
+    if (mounted && result['highRollerRequired'] == 1) {
+      await _openHighRollerClub();
+    }
     if (mounted && result['openRewards'] == 1) await _openRewardCenter();
   }
 

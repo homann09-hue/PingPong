@@ -44,5 +44,8 @@ debt path and prevents further grants until support resolution.
 - Exclusive slot ids are classified by the API domain and advertised in lobby
   and paytable metadata. The spin endpoint remains authoritative and rejects
   inactive players even when a modified client bypasses its lobby lock.
+- Club-locked lobby cards remain actionable and open qualification details.
+  If access expires during an open slot or autoplay session, the structured
+  server rejection stops play and routes the player back to the Club surface.
 - `neon-nights` is the first club-exclusive game. Additional producers must call
   the same server-owned economy boundary.
