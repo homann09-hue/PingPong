@@ -27,6 +27,11 @@ virtual-shop purchases credit fixed, versioned awards inside the transaction of
 their source action. Space Battle, Oinky, and Golden Pass remain explicitly
 unavailable until their authoritative producers exist.
 
+Verified iOS and Android products define their own point grant in the
+version-controlled product catalog. Provider refunds atomically recover those
+points with Coins and Gems; unrecovered value enters the existing purchase-review
+debt path and prevents further grants until support resolution.
+
 ## Consequences
 
 - Membership cannot be extended, duplicated, or activated below threshold by

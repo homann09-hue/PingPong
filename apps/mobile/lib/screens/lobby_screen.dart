@@ -510,6 +510,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
         gems = purchase.gemBalance;
         storeBusyProductId = null;
       });
+      await _loadHighRollerClub();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('+${_fmt(purchase.coins)} COINS'),

@@ -494,17 +494,26 @@ export class InMemorySpinStore implements SpinStore {
     }
     const coinBefore = this.balances.get(command.playerId) ?? this.defaultBalance;
     const gemBefore = this.gemBalances.get(command.playerId) ?? 320;
+    const highRollerBefore = this.economy.get(command.playerId)?.high_roller_point ?? 0;
     const purchase: StorePurchaseSettlement & { readonly playerId: string } = {
       purchaseId: randomUUID(), playerId: command.playerId, productKey: command.product.key,
       storeProductId: command.verified.storeProductId, transactionId: command.verified.transactionId,
       coins: command.product.grantCoins, gems: command.product.grantGems,
       coinBalance: coinBefore + command.product.grantCoins, gemBalance: gemBefore + command.product.grantGems,
+      highRollerPoints: command.product.grantHighRollerPoints,
+      highRollerPointBalance: highRollerBefore + command.product.grantHighRollerPoints,
       replayed: false,
     };
     this.balances.set(command.playerId, purchase.coinBalance);
     this.gemBalances.set(command.playerId, purchase.gemBalance);
+    this.economy.set(command.playerId, {
+      ...this.economy.get(command.playerId),
+      high_roller_point: purchase.highRollerPointBalance,
+    });
     this.record(command.playerId, purchase.coins, "verified_store_purchase", "store_purchase", purchase.purchaseId, coinBefore, purchase.coinBalance);
     if (purchase.gems > 0) this.record(command.playerId, purchase.gems, "verified_store_purchase", "store_purchase", `${purchase.purchaseId}:gems`, gemBefore, purchase.gemBalance, "gem");
+    this.record(command.playerId, purchase.highRollerPoints, "high_roller_source", "store_purchase",
+      `${purchase.purchaseId}:high-roller`, highRollerBefore, purchase.highRollerPointBalance, "high_roller_point");
     this.storePurchases.set(transactionKey, purchase);
     if (command.product.purchaseLimit === "once") this.limitedStorePurchases.add(limitKey);
     return purchase;
@@ -519,13 +528,22 @@ export class InMemorySpinStore implements SpinStore {
     if (!purchase) return true;
     const coinBefore = this.balances.get(purchase.playerId) ?? this.defaultBalance;
     const gemBefore = this.gemBalances.get(purchase.playerId) ?? 320;
+    const highRollerBefore = this.economy.get(purchase.playerId)?.high_roller_point ?? 0;
     const recoveredCoins = Math.min(coinBefore, purchase.coins);
     const recoveredGems = Math.min(gemBefore, purchase.gems);
+    const recoveredHighRollerPoints = Math.min(highRollerBefore, purchase.highRollerPoints);
     this.balances.set(purchase.playerId, coinBefore - recoveredCoins);
     this.gemBalances.set(purchase.playerId, gemBefore - recoveredGems);
+    this.economy.set(purchase.playerId, {
+      ...this.economy.get(purchase.playerId),
+      high_roller_point: highRollerBefore - recoveredHighRollerPoints,
+    });
     if (recoveredCoins > 0) this.record(purchase.playerId, -recoveredCoins, "store_refund", "store_refund", `${command.eventId}:coins`, coinBefore, coinBefore - recoveredCoins);
     if (recoveredGems > 0) this.record(purchase.playerId, -recoveredGems, "store_refund", "store_refund", `${command.eventId}:gems`, gemBefore, gemBefore - recoveredGems, "gem");
-    if (recoveredCoins < purchase.coins || recoveredGems < purchase.gems) this.storePurchaseDebt.add(purchase.playerId);
+    if (recoveredHighRollerPoints > 0) this.record(purchase.playerId, -recoveredHighRollerPoints, "store_refund", "store_refund",
+      `${command.eventId}:high-roller`, highRollerBefore, highRollerBefore - recoveredHighRollerPoints, "high_roller_point");
+    if (recoveredCoins < purchase.coins || recoveredGems < purchase.gems
+      || recoveredHighRollerPoints < purchase.highRollerPoints) this.storePurchaseDebt.add(purchase.playerId);
     return true;
   }
 

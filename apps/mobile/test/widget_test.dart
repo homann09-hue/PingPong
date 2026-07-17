@@ -150,6 +150,7 @@ void main() {
         featured: false,
         grantCoins: 1000000,
         grantGems: 0,
+        grantHighRollerPoints: 1000,
         purchaseLimit: 'repeatable',
         storeKind: 'consumable',
         storeProductId: 'aurora_coin_stack',
@@ -174,6 +175,10 @@ void main() {
 
     expect(find.text('DAILY FORTUNE'), findsOneWidget);
     expect(find.text('200.000 COINS  •  20 GEMS'), findsOneWidget);
+    expect(
+      find.text('1.000.000 COINS  •  0 GEMS  •  +1.000 HR'),
+      findsOneWidget,
+    );
     expect(find.text('SOON'), findsNothing);
     expect(find.text('4,99 €'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '4,99 €'));

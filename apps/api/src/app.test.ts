@@ -82,7 +82,7 @@ describe("verified store monetization API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().products).toHaveLength(4);
     expect(response.json().products[0]).toMatchObject({ storeProductId: "com.aurora.socialcasino.starter_vault", grantCoins: 2_000_000,
-      purchaseLimit: "once", storeKind: "nonConsumable" });
+      grantHighRollerPoints: 4_000, purchaseLimit: "once", storeKind: "nonConsumable" });
     expect(response.body).not.toContain("price");
   });
 
@@ -94,7 +94,8 @@ describe("verified store monetization API", () => {
     } };
     const first = await storeApp.inject(request); const replay = await storeApp.inject(request);
     expect(first.statusCode).toBe(200);
-    expect(first.json()).toMatchObject({ coins: 1_000_000, coinBalance: 1_001_000, replayed: false });
+    expect(first.json()).toMatchObject({ coins: 1_000_000, coinBalance: 1_001_000,
+      highRollerPoints: 1_000, highRollerPointBalance: 1_000, replayed: false });
     expect(replay.json()).toMatchObject({ coinBalance: 1_001_000, replayed: true });
     const invalid = await storeApp.inject({ ...request, payload: { ...request.payload, transactionId: `tx-${randomUUID()}`, verificationToken: "forged" } });
     expect(invalid.statusCode).toBe(422);
@@ -395,7 +396,10 @@ describe("spin API", () => {
     });
     expect(status.statusCode).toBe(200);
     expect(status.json()).toMatchObject({ entryPoints: 20_000, active: false, eligible: false });
-    expect(status.json().sources).toHaveLength(10);
+    expect(status.json().sources).toHaveLength(11);
+    expect(status.json().sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "platform_purchase", available: true }),
+    ]));
     expect(status.json().benefits).toHaveLength(5);
     expect(activation.json()).toEqual({ code: "HIGH_ROLLER_NOT_ELIGIBLE" });
   });

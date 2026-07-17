@@ -369,7 +369,8 @@ databaseSuite("PostgresSpinStore integration", () => {
     } };
     const first = await store.grantStorePurchase(command);
     const replay = await store.grantStorePurchase(command);
-    expect(first).toMatchObject({ coins: 5_000_000, gems: 150, coinBalance: 5_001_000, gemBalance: 470, replayed: false });
+    expect(first).toMatchObject({ coins: 5_000_000, gems: 150, coinBalance: 5_001_000, gemBalance: 470,
+      highRollerPoints: 6_000, highRollerPointBalance: 6_000, replayed: false });
     expect(replay).toMatchObject({ coinBalance: 5_001_000, replayed: true });
     const persisted = await pool.query<{ verification_hash: string }>(
       "SELECT verification_hash FROM verified_store_purchases WHERE platform='ios' AND transaction_id=$1", [transactionId],
@@ -379,9 +380,10 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(await store.refundStorePurchase({ eventId, platform: "ios", transactionId, occurredAt: new Date(), providerPayloadHash: "c".repeat(64) })).toBe(true);
     expect(await store.refundStorePurchase({ eventId, platform: "ios", transactionId, occurredAt: new Date(), providerPayloadHash: "c".repeat(64) })).toBe(false);
     expect(await store.getProfile(storePlayerId)).toMatchObject({ coinBalance: 1000, gemBalance: 320 });
+    expect(await store.getHighRollerClub(storePlayerId, new Date())).toMatchObject({ points: 0 });
     const ledger = await pool.query<{ count: string }>(
       "SELECT count(*) FROM wallet_ledger WHERE player_id=$1 AND source IN ('store_purchase','store_refund')", [storePlayerId],
     );
-    expect(ledger.rows[0]?.count).toBe("4");
+    expect(ledger.rows[0]?.count).toBe("6");
   });
 });

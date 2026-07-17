@@ -58,8 +58,10 @@ export interface StorePurchaseSettlement {
   readonly transactionId: string;
   readonly coins: number;
   readonly gems: number;
+  readonly highRollerPoints: number;
   readonly coinBalance: number;
   readonly gemBalance: number;
+  readonly highRollerPointBalance: number;
   readonly replayed: boolean;
 }
 export interface StoreRefundCommand {

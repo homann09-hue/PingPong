@@ -4,6 +4,7 @@ import type { SpinResult } from "@aurora/slot-engine";
 import { InMemorySpinStore } from "./in-memory-spin-store.js";
 import { HighRollerAlreadyActiveError } from "./spin-store.js";
 import { activeShopOffers } from "../shop/shop-catalog.js";
+import { storeProducts } from "../monetization/store-products.js";
 
 function result(totalWin: number): SpinResult {
   return {
@@ -35,6 +36,31 @@ describe("InMemorySpinStore High Roller Club", () => {
     ]));
     expect((await store.listWalletTransactions(playerId, 100))
       .filter((entry) => entry.reason === "high_roller_source")).toHaveLength(3);
+  });
+
+  it("grants platform purchase points once and reverses them on refund", async () => {
+    const store = new InMemorySpinStore(100_000);
+    const playerId = randomUUID();
+    const product = storeProducts.find((item) => item.key === "fortune-chest")!;
+    const transactionId = `high-roller-${randomUUID()}`;
+    const command = { playerId, product, verificationHash: "a".repeat(64), verified: {
+      platform: "ios" as const, storeProductId: product.storeProductIds.ios, transactionId,
+      originalTransactionId: transactionId, accountId: playerId, environment: "sandbox" as const,
+      purchasedAt: new Date(), quantity: 1 as const, purchaseState: "purchased" as const, revokedAt: null,
+    } };
+    const first = await store.grantStorePurchase(command);
+    const replay = await store.grantStorePurchase(command);
+    expect(first).toMatchObject({ highRollerPoints: 6_000, highRollerPointBalance: 6_000, replayed: false });
+    expect(replay).toEqual({ ...first, replayed: true });
+
+    const eventId = randomUUID();
+    expect(await store.refundStorePurchase({ eventId, platform: "ios", transactionId,
+      occurredAt: new Date(), providerPayloadHash: "b".repeat(64) })).toBe(true);
+    expect(await store.refundStorePurchase({ eventId, platform: "ios", transactionId,
+      occurredAt: new Date(), providerPayloadHash: "b".repeat(64) })).toBe(false);
+    expect(await store.getHighRollerClub(playerId, new Date())).toMatchObject({ points: 0 });
+    expect((await store.listWalletTransactions(playerId, 100))
+      .filter((entry) => entry.currency === "high_roller_point")).toHaveLength(2);
   });
 
   it("activates seven-day access once and applies member spin benefits", async () => {

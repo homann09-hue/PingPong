@@ -415,6 +415,7 @@ class StoreProductView {
     required this.featured,
     required this.grantCoins,
     required this.grantGems,
+    required this.grantHighRollerPoints,
     required this.purchaseLimit,
     required this.storeKind,
     required this.storeProductId,
@@ -427,7 +428,7 @@ class StoreProductView {
       storeKind,
       storeProductId;
   final bool featured;
-  final int grantCoins, grantGems;
+  final int grantCoins, grantGems, grantHighRollerPoints;
 }
 
 class PurchasableStoreProductView {
@@ -445,9 +446,12 @@ class VerifiedStorePurchaseView {
     required this.gems,
     required this.coinBalance,
     required this.gemBalance,
+    required this.highRollerPoints,
+    required this.highRollerPointBalance,
     required this.replayed,
   });
   final int coins, gems, coinBalance, gemBalance;
+  final int highRollerPoints, highRollerPointBalance;
   final bool replayed;
 }
 
@@ -1234,6 +1238,7 @@ class CasinoApi {
             featured: item['featured'] as bool,
             grantCoins: item['grantCoins'] as int,
             grantGems: item['grantGems'] as int,
+            grantHighRollerPoints: item['grantHighRollerPoints'] as int,
             purchaseLimit: item['purchaseLimit'] as String,
             storeKind: item['storeKind'] as String,
             storeProductId: item['storeProductId'] as String,
@@ -1272,6 +1277,8 @@ class CasinoApi {
       gems: data['gems'] as int,
       coinBalance: data['coinBalance'] as int,
       gemBalance: data['gemBalance'] as int,
+      highRollerPoints: data['highRollerPoints'] as int,
+      highRollerPointBalance: data['highRollerPointBalance'] as int,
       replayed: data['replayed'] as bool,
     );
   }

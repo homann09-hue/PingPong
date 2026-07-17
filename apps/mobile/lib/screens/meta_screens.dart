@@ -2836,7 +2836,7 @@ class _StoreOfferCard extends StatelessWidget {
               ),
               Text(package.product.title, style: MetaStyle.title),
               Text(
-                '${ShopScreen._coins(package.product.grantCoins)} COINS  •  ${ShopScreen._coins(package.product.grantGems)} GEMS',
+                '${ShopScreen._coins(package.product.grantCoins)} COINS  •  ${ShopScreen._coins(package.product.grantGems)} GEMS  •  +${ShopScreen._coins(package.product.grantHighRollerPoints)} HR',
                 style: MetaStyle.caption,
               ),
             ],

@@ -17,7 +17,7 @@ describe("high roller club", () => {
   });
 
   it("publishes versioned fixed source awards", () => {
-    expect(highRollerClubRules.version).toBe(2);
+    expect(highRollerClubRules.version).toBe(3);
     expect(highRollerSourcePoints("daily_store_bonus")).toBe(750);
     expect(highRollerSourcePoints("lobby_express")).toBe(100);
     expect(highRollerSourcePoints("wheel")).toBe(250);

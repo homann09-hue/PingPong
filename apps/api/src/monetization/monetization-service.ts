@@ -28,6 +28,7 @@ export class MonetizationService {
     return storeProducts.map((product) => ({
       key: product.key, title: product.title, description: product.description, badge: product.badge,
       featured: product.featured, grantCoins: product.grantCoins, grantGems: product.grantGems,
+      grantHighRollerPoints: product.grantHighRollerPoints,
       purchaseLimit: product.purchaseLimit, storeKind: product.storeKind, storeProductId: product.storeProductIds[platform],
     }));
   }

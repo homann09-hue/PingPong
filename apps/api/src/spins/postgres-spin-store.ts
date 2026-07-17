@@ -44,6 +44,7 @@ interface TimedRewardRow { level: number; last_claimed_at: Date | null; streak: 
 interface StorePurchaseRow {
   id: string; player_id: string; product_key: string; store_product_id: string; transaction_id: string;
   coins_granted: string; gems_granted: string; coin_balance_after: string; gem_balance_after: string;
+  high_roller_points_granted: string; high_roller_point_balance_after: string;
 }
 
 /** Atomically settles wagers, wins, ledger entries, spin audit and outbox event. */
@@ -361,7 +362,7 @@ export class PostgresSpinStore implements SpinStore {
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [transactionKey]);
       const existing = await client.query<StorePurchaseRow>(
         `SELECT id,player_id,product_key,store_product_id,transaction_id,coins_granted,gems_granted,
-                coin_balance_after,gem_balance_after FROM verified_store_purchases
+                coin_balance_after,gem_balance_after,high_roller_points_granted,high_roller_point_balance_after FROM verified_store_purchases
           WHERE platform=$1 AND transaction_id=$2`, [command.verified.platform, command.verified.transactionId],
       );
       if (existing.rows[0]) {
@@ -376,7 +377,7 @@ export class PostgresSpinStore implements SpinStore {
       );
       if (revoked.rowCount) throw new StorePurchaseRevokedError();
       const debt = await client.query(
-        "SELECT 1 FROM verified_store_purchases WHERE player_id=$1 AND status='refunded' AND (unrecovered_coins>0 OR unrecovered_gems>0) LIMIT 1",
+        "SELECT 1 FROM verified_store_purchases WHERE player_id=$1 AND status='refunded' AND (unrecovered_coins>0 OR unrecovered_gems>0 OR unrecovered_high_roller_points>0) LIMIT 1",
         [command.playerId],
       );
       if (debt.rowCount) throw new StorePurchaseDebtError();
@@ -388,36 +389,45 @@ export class PostgresSpinStore implements SpinStore {
         );
         if (limited.rowCount) throw new StoreProductLimitReachedError();
       }
-      const wallets = await client.query<{ currency: "coin" | "gem"; balance: string }>(
-        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','gem') ORDER BY currency FOR UPDATE",
+      await client.query(
+        "INSERT INTO wallets(player_id,currency,balance) VALUES ($1,'high_roller_point',0) ON CONFLICT (player_id,currency) DO NOTHING",
+        [command.playerId],
+      );
+      const wallets = await client.query<{ currency: "coin" | "gem" | "high_roller_point"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','gem','high_roller_point') ORDER BY currency FOR UPDATE",
         [command.playerId],
       );
       const coinRow = wallets.rows.find((row) => row.currency === "coin");
       const gemRow = wallets.rows.find((row) => row.currency === "gem");
-      if (!coinRow || !gemRow) throw new Error("Player store wallets do not exist");
+      const highRollerRow = wallets.rows.find((row) => row.currency === "high_roller_point");
+      if (!coinRow || !gemRow || !highRollerRow) throw new Error("Player store wallets do not exist");
       const coinBefore = this.safeInteger(coinRow.balance, "Store coin balance");
       const gemBefore = this.safeInteger(gemRow.balance, "Store gem balance");
+      const highRollerBefore = this.safeInteger(highRollerRow.balance, "Store High Roller point balance");
       const purchaseId = randomUUID();
       const settlement: StorePurchaseSettlement = {
         purchaseId, productKey: command.product.key, storeProductId: command.verified.storeProductId,
         transactionId: command.verified.transactionId, coins: command.product.grantCoins, gems: command.product.grantGems,
         coinBalance: coinBefore + command.product.grantCoins, gemBalance: gemBefore + command.product.grantGems, replayed: false,
+        highRollerPoints: command.product.grantHighRollerPoints,
+        highRollerPointBalance: highRollerBefore + command.product.grantHighRollerPoints,
       };
       await client.query(
         `INSERT INTO verified_store_purchases
           (id,player_id,platform,product_key,store_product_id,store_kind,transaction_id,original_transaction_id,environment,
            purchased_at,verification_hash,provider_state,purchase_limit_key,coins_granted,gems_granted,
-           coin_balance_after,gem_balance_after)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+           coin_balance_after,gem_balance_after,high_roller_points_granted,high_roller_point_balance_after)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
         [purchaseId, command.playerId, command.verified.platform, command.product.key, command.verified.storeProductId,
           command.product.storeKind, command.verified.transactionId, command.verified.originalTransactionId, command.verified.environment,
           command.verified.purchasedAt, command.verificationHash, command.verified.purchaseState, purchaseLimitKey,
-          settlement.coins, settlement.gems, settlement.coinBalance, settlement.gemBalance],
+          settlement.coins, settlement.gems, settlement.coinBalance, settlement.gemBalance,
+          settlement.highRollerPoints, settlement.highRollerPointBalance],
       );
       await client.query(
-        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint ELSE $2::bigint END, version=version+1
-          WHERE player_id=$3 AND currency IN ('coin','gem')`,
-        [settlement.coinBalance, settlement.gemBalance, command.playerId],
+        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint WHEN 'gem' THEN $2::bigint ELSE $3::bigint END, version=version+1
+          WHERE player_id=$4 AND currency IN ('coin','gem','high_roller_point')`,
+        [settlement.coinBalance, settlement.gemBalance, settlement.highRollerPointBalance, command.playerId],
       );
       await this.ledger(client, { playerId: command.playerId, amount: settlement.coins, reason: "verified_store_purchase",
         source: "store_purchase", referenceId: purchaseId, idempotencyKey: `store:${transactionKey}:coins`,
@@ -427,6 +437,11 @@ export class PostgresSpinStore implements SpinStore {
         reason: "verified_store_purchase", source: "store_purchase", referenceId: purchaseId,
         idempotencyKey: `store:${transactionKey}:gems`, balanceBefore: gemBefore, balanceAfter: settlement.gemBalance,
         metadata: { productKey: command.product.key, platform: command.verified.platform, environment: command.verified.environment } });
+      await this.ledger(client, { playerId: command.playerId, currency: "high_roller_point", amount: settlement.highRollerPoints,
+        reason: "high_roller_source", source: "store_purchase", referenceId: purchaseId,
+        idempotencyKey: `store:${transactionKey}:high-roller`, balanceBefore: highRollerBefore,
+        balanceAfter: settlement.highRollerPointBalance,
+        metadata: { productKey: command.product.key, platform: command.verified.platform, sourceId: "platform_purchase" } });
       await client.query("COMMIT");
       return settlement;
     } catch (error) {
@@ -449,25 +464,29 @@ export class PostgresSpinStore implements SpinStore {
       if (event.rowCount !== 1) { await client.query("COMMIT"); return false; }
       const purchases = await client.query<StorePurchaseRow & { status: "granted" | "refunded" }>(
         `SELECT id,player_id,product_key,store_product_id,transaction_id,coins_granted,gems_granted,
-                coin_balance_after,gem_balance_after,status FROM verified_store_purchases
+                coin_balance_after,gem_balance_after,high_roller_points_granted,high_roller_point_balance_after,status FROM verified_store_purchases
           WHERE platform=$1 AND transaction_id=$2 FOR UPDATE`, [command.platform, command.transactionId],
       );
       const purchase = purchases.rows[0];
       if (!purchase || purchase.status === "refunded") { await client.query("COMMIT"); return true; }
-      const wallets = await client.query<{ currency: "coin" | "gem"; balance: string }>(
-        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','gem') ORDER BY currency FOR UPDATE",
+      const wallets = await client.query<{ currency: "coin" | "gem" | "high_roller_point"; balance: string }>(
+        "SELECT currency,balance FROM wallets WHERE player_id=$1 AND currency IN ('coin','gem','high_roller_point') ORDER BY currency FOR UPDATE",
         [purchase.player_id],
       );
       const coinBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "coin")!.balance, "Refund coin balance");
       const gemBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "gem")!.balance, "Refund gem balance");
+      const highRollerBefore = this.safeInteger(wallets.rows.find((row) => row.currency === "high_roller_point")!.balance, "Refund High Roller point balance");
       const grantedCoins = this.safeInteger(purchase.coins_granted, "Granted coins");
       const grantedGems = this.safeInteger(purchase.gems_granted, "Granted gems");
+      const grantedHighRollerPoints = this.safeInteger(purchase.high_roller_points_granted, "Granted High Roller points");
       const recoveredCoins = Math.min(coinBefore, grantedCoins);
       const recoveredGems = Math.min(gemBefore, grantedGems);
+      const recoveredHighRollerPoints = Math.min(highRollerBefore, grantedHighRollerPoints);
       await client.query(
-        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint ELSE $2::bigint END, version=version+1
-          WHERE player_id=$3 AND currency IN ('coin','gem')`,
-        [coinBefore - recoveredCoins, gemBefore - recoveredGems, purchase.player_id],
+        `UPDATE wallets SET balance=CASE currency WHEN 'coin' THEN $1::bigint WHEN 'gem' THEN $2::bigint ELSE $3::bigint END, version=version+1
+          WHERE player_id=$4 AND currency IN ('coin','gem','high_roller_point')`,
+        [coinBefore - recoveredCoins, gemBefore - recoveredGems,
+          highRollerBefore - recoveredHighRollerPoints, purchase.player_id],
       );
       if (recoveredCoins > 0) await this.ledger(client, { playerId: purchase.player_id, amount: -recoveredCoins,
         reason: "store_refund", source: "store_refund", referenceId: purchase.id,
@@ -477,10 +496,16 @@ export class PostgresSpinStore implements SpinStore {
         reason: "store_refund", source: "store_refund", referenceId: purchase.id,
         idempotencyKey: `store-refund:${command.eventId}:gems`, balanceBefore: gemBefore,
         balanceAfter: gemBefore - recoveredGems, metadata: { platform: command.platform, transactionId: command.transactionId } });
+      if (recoveredHighRollerPoints > 0) await this.ledger(client, { playerId: purchase.player_id,
+        currency: "high_roller_point", amount: -recoveredHighRollerPoints, reason: "store_refund", source: "store_refund",
+        referenceId: purchase.id, idempotencyKey: `store-refund:${command.eventId}:high-roller`,
+        balanceBefore: highRollerBefore, balanceAfter: highRollerBefore - recoveredHighRollerPoints,
+        metadata: { platform: command.platform, transactionId: command.transactionId } });
       await client.query(
         `UPDATE verified_store_purchases SET status='refunded',refunded_at=$1,coins_recovered=$2,gems_recovered=$3,
-          unrecovered_coins=coins_granted-$2,unrecovered_gems=gems_granted-$3 WHERE id=$4`,
-        [command.occurredAt, recoveredCoins, recoveredGems, purchase.id],
+          high_roller_points_recovered=$4,unrecovered_coins=coins_granted-$2,unrecovered_gems=gems_granted-$3,
+          unrecovered_high_roller_points=high_roller_points_granted-$4 WHERE id=$5`,
+        [command.occurredAt, recoveredCoins, recoveredGems, recoveredHighRollerPoints, purchase.id],
       );
       await client.query("COMMIT");
       return true;
@@ -1326,7 +1351,10 @@ export class PostgresSpinStore implements SpinStore {
     return { purchaseId: row.id, productKey: row.product_key, storeProductId: row.store_product_id,
       transactionId: row.transaction_id, coins: this.safeInteger(row.coins_granted, "Store coins"),
       gems: this.safeInteger(row.gems_granted, "Store gems"), coinBalance: this.safeInteger(row.coin_balance_after, "Store coin balance"),
-      gemBalance: this.safeInteger(row.gem_balance_after, "Store gem balance"), replayed };
+      gemBalance: this.safeInteger(row.gem_balance_after, "Store gem balance"),
+      highRollerPoints: this.safeInteger(row.high_roller_points_granted, "Store High Roller points"),
+      highRollerPointBalance: this.safeInteger(row.high_roller_point_balance_after, "Store High Roller point balance"),
+      replayed };
   }
 
   private checkWinClaim(row: CheckWinClaimRow, replayed: boolean): CheckWinClaim {

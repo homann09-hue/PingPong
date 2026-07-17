@@ -1,5 +1,5 @@
 export const highRollerClubRules = {
-  version: 2,
+  version: 3,
   entryPoints: 20_000,
   accessDays: 7,
   losingSpinCashbackBasisPoints: 200,
@@ -33,6 +33,7 @@ export const highRollerPointSources = [
   { id: "booster", label: "Booster", points: highRollerClubRules.sourcePoints.booster, available: true },
   { id: "golden_pass", label: "Golden Pass", points: null, available: false },
   { id: "purchase", label: "Käufe", points: highRollerClubRules.sourcePoints.purchase, available: true },
+  { id: "platform_purchase", label: "iOS-/Android-Pakete", points: null, available: true },
 ] as const;
 
 export type HighRollerFixedSource = keyof typeof highRollerClubRules.sourcePoints;
