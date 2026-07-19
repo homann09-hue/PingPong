@@ -28,7 +28,9 @@ class SpinRoundView {
     this.paylineWins = const [],
     this.visualFeature,
     this.featureCells = const {},
+    this.featureNewCells = const {},
     this.featureReels = const {},
+    this.featureMoves = const [],
     this.freeSpinsAwarded = 0,
   });
 
@@ -51,8 +53,21 @@ class SpinRoundView {
   final List<PaylineWinView> paylineWins;
   final String? visualFeature;
   final Set<String> featureCells;
+  final Set<String> featureNewCells;
   final Set<int> featureReels;
+  final List<SymbolFeatureMoveView> featureMoves;
   final int freeSpinsAwarded;
+}
+
+class SymbolFeatureMoveView {
+  const SymbolFeatureMoveView({
+    required this.sourceReel,
+    required this.sourceRow,
+    required this.targetReel,
+    required this.targetRow,
+  });
+
+  final int sourceReel, sourceRow, targetReel, targetRow;
 }
 
 class PaylineWinView {
@@ -1008,7 +1023,9 @@ class CasinoApi {
         }
       }
       final featureCells = <String>{};
+      final featureNewCells = <String>{};
       final featureReels = <int>{};
+      final featureMoves = <SymbolFeatureMoveView>[];
       String? visualFeature;
       if (expandedEvents.isNotEmpty) {
         visualFeature = 'wild.expanded';
@@ -1052,21 +1069,78 @@ class CasinoApi {
             featureCells.add('$reel:$row');
           }
         }
-      } else if (eventTypes.contains('wild.stuck') ||
-          eventTypes.contains('wild.walked')) {
-        visualFeature = eventTypes.contains('wild.stuck')
-            ? 'wild.stuck'
-            : 'wild.walked';
+      } else if (eventTypes.contains('wild.stuck')) {
+        visualFeature = 'wild.stuck';
         final featureEvent = events.firstWhere(
           (event) => event['type'] == visualFeature,
         );
-        final featureSymbol =
-            (featureEvent['data'] as Map<String, dynamic>)['symbol'] as String;
-        for (var reel = 0; reel < roundGrid.length; reel++) {
-          for (var row = 0; row < roundGrid[reel].length; row++) {
-            if (roundGrid[reel][row] != featureSymbol) continue;
-            featureCells.add('$reel:$row');
-            featureReels.add(reel);
+        final data = featureEvent['data'] as Map<String, dynamic>;
+        final positions = (data['positions'] as String? ?? '')
+            .split(',')
+            .where((position) => position.isNotEmpty);
+        for (final position in positions) {
+          featureCells.add(position);
+          final reel = int.tryParse(position.split(':').first);
+          if (reel != null) featureReels.add(reel);
+        }
+        for (final position
+            in (data['newPositions'] as String? ?? '')
+                .split(',')
+                .where((position) => position.isNotEmpty)) {
+          featureNewCells.add(position);
+        }
+        if (featureCells.isEmpty) {
+          final featureSymbol = data['symbol'] as String;
+          for (var reel = 0; reel < roundGrid.length; reel++) {
+            for (var row = 0; row < roundGrid[reel].length; row++) {
+              if (roundGrid[reel][row] != featureSymbol) continue;
+              featureCells.add('$reel:$row');
+              featureNewCells.add('$reel:$row');
+              featureReels.add(reel);
+            }
+          }
+        }
+      } else if (eventTypes.contains('wild.walked')) {
+        visualFeature = 'wild.walked';
+        final featureEvent = events.firstWhere(
+          (event) => event['type'] == visualFeature,
+        );
+        final data = featureEvent['data'] as Map<String, dynamic>;
+        for (final encodedMove
+            in (data['moves'] as String? ?? '')
+                .split(',')
+                .where((move) => move.isNotEmpty)) {
+          final endpoints = encodedMove.split('>');
+          if (endpoints.length != 2) continue;
+          final source = endpoints.first.split(':').map(int.tryParse).toList();
+          final target = endpoints.last.split(':').map(int.tryParse).toList();
+          if (source.length != 2 ||
+              target.length != 2 ||
+              source.contains(null) ||
+              target.contains(null)) {
+            continue;
+          }
+          featureMoves.add(
+            SymbolFeatureMoveView(
+              sourceReel: source[0]!,
+              sourceRow: source[1]!,
+              targetReel: target[0]!,
+              targetRow: target[1]!,
+            ),
+          );
+          featureReels
+            ..add(source[0]!)
+            ..add(target[0]!);
+          featureCells.add('${target[0]}:${target[1]}');
+        }
+        if (featureCells.isEmpty) {
+          final featureSymbol = data['symbol'] as String;
+          for (var reel = 0; reel < roundGrid.length; reel++) {
+            for (var row = 0; row < roundGrid[reel].length; row++) {
+              if (roundGrid[reel][row] != featureSymbol) continue;
+              featureCells.add('$reel:$row');
+              featureReels.add(reel);
+            }
           }
         }
       }
@@ -1152,7 +1226,9 @@ class CasinoApi {
         paylineWins: paylineWins,
         visualFeature: visualFeature,
         featureCells: featureCells,
+        featureNewCells: featureNewCells,
         featureReels: featureReels,
+        featureMoves: featureMoves,
         freeSpinsAwarded: freeSpinsAwarded,
       );
     }).toList();

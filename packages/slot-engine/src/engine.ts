@@ -301,6 +301,7 @@ export class SlotEngine {
     const feature = this.config.features?.stickyWild;
     const grid = input.map((reel) => [...reel]);
     if (!feature) return grid;
+    const previouslySticky = new Set(stickyCells);
     for (const key of stickyCells) {
       const parts = key.split(":");
       const reel = Number(parts[0]!);
@@ -312,7 +313,19 @@ export class SlotEngine {
         if (grid[reel]![row] === feature.symbol) stickyCells.add(`${reel}:${row}`);
       }
     }
-    if (stickyCells.size > 0) events.push({ type: "wild.stuck", data: { count: stickyCells.size, symbol: feature.symbol } });
+    if (stickyCells.size > 0) {
+      const positions = [...stickyCells].sort();
+      const newPositions = positions.filter((position) => !previouslySticky.has(position));
+      events.push({
+        type: "wild.stuck",
+        data: {
+          count: stickyCells.size,
+          symbol: feature.symbol,
+          positions: positions.join(","),
+          newPositions: newPositions.join(","),
+        },
+      });
+    }
     return grid;
   }
 
@@ -321,16 +334,29 @@ export class SlotEngine {
     if (walking) {
       let cells = baseGrid.flatMap((reel, reelIndex) => reel.flatMap((symbol, row) => symbol === walking.symbol ? [[reelIndex, row] as [number, number]] : []));
       for (let step = 1; step <= walking.maxSteps && cells.length > 0; step++) {
-        const moved = cells
-          .map(([reel, row]) => [reel + (walking.direction === "right" ? 1 : -1), row] as [number, number])
-          .filter(([reel]) => reel >= 0 && reel < this.config.reels.length);
-        if (moved.length === 0) break;
-        const events: EngineEvent[] = [{ type: "respin.started", data: { index: step } }, { type: "wild.walked", data: { step, count: cells.length, symbol: walking.symbol } }];
+        const candidateMoves = cells
+          .map(([reel, row]) => ({
+            source: [reel, row] as [number, number],
+            target: [reel + (walking.direction === "right" ? 1 : -1), row] as [number, number],
+          }))
+          .filter(({ target }) => target[0] >= 0 && target[0] < this.config.reels.length);
+        if (candidateMoves.length === 0) break;
+        const events: EngineEvent[] = [{ type: "respin.started", data: { index: step } }];
         const grid = this.revealMystery(this.randomGrid(rng), rng, events);
         this.recordVariableLayout(grid, events);
-        cells = moved.filter(([reel, row]) => row < grid[reel]!.length);
-        if (cells.length === 0) break;
-        events[1] = { type: "wild.walked", data: { step, count: cells.length, symbol: walking.symbol } };
+        const moves = candidateMoves.filter(({ target: [reel, row] }) => row < grid[reel]!.length);
+        cells = moves.map(({ target }) => target);
+        if (moves.length === 0) break;
+        events.push({
+          type: "wild.walked",
+          data: {
+            step,
+            count: moves.length,
+            symbol: walking.symbol,
+            positions: cells.map(([reel, row]) => `${reel}:${row}`).join(","),
+            moves: moves.map(({ source, target }) => `${source[0]}:${source[1]}>${target[0]}:${target[1]}`).join(","),
+          },
+        });
         for (const [reel, row] of cells) grid[reel]![row] = walking.symbol;
         const wins = this.evaluateWins(grid, bet, true, events);
         rounds.push(this.round("respin", step, grid, wins, events));

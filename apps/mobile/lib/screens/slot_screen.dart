@@ -64,7 +64,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   bool featureTriggerActive = false;
   String? activeSymbolFeature;
   Set<String> symbolFeatureCells = {};
+  Set<String> symbolFeatureNewCells = {};
   Set<int> symbolFeatureReels = {};
+  List<SymbolFeatureMoveView> symbolFeatureMoves = const [];
   int freeSpinRetriggerAward = 0;
   int freeSpinRetriggerTotal = 0;
   int freeSpinTotal = 0;
@@ -282,7 +284,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       featureTriggerActive = false;
       activeSymbolFeature = null;
       symbolFeatureCells = {};
+      symbolFeatureNewCells = {};
       symbolFeatureReels = {};
+      symbolFeatureMoves = const [];
       freeSpinRetriggerAward = 0;
       freeSpinRetriggerTotal = 0;
       freeSpinTotal = 0;
@@ -513,7 +517,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       if (!mounted) return null;
       if (exception.code == 'HIGH_ROLLER_MEMBERSHIP_REQUIRED') {
         setState(() {
-          error = 'Deine High-Roller-Mitgliedschaft ist nicht mehr aktiv.';
+          // The blocking dialog already explains the membership state. Keeping
+          // the same message in the fixed slot layout caused a desktop overflow
+          // while the dialog was open.
+          error = null;
           autoplay = false;
           stopAutoplayRequested = true;
         });
@@ -581,7 +588,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           featureTriggerActive = false;
           activeSymbolFeature = null;
           symbolFeatureCells = {};
+          symbolFeatureNewCells = {};
           symbolFeatureReels = {};
+          symbolFeatureMoves = const [];
           freeSpinRetriggerAward = 0;
           freeSpinRetriggerTotal = 0;
           reelsInMotion = List<bool>.filled(max(1, grid.length), false);
@@ -615,7 +624,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       featureTriggerActive = false;
       activeSymbolFeature = null;
       symbolFeatureCells = {};
+      symbolFeatureNewCells = {};
       symbolFeatureReels = {};
+      symbolFeatureMoves = const [];
       freeSpinRetriggerAward = 0;
       freeSpinRetriggerTotal = 0;
     });
@@ -723,7 +734,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     setState(() {
       activeSymbolFeature = round.visualFeature;
       symbolFeatureCells = {...round.featureCells};
+      symbolFeatureNewCells = {...round.featureNewCells};
       symbolFeatureReels = {...round.featureReels};
+      symbolFeatureMoves = [...round.featureMoves];
       featureMode = round.featureLabel ?? 'FEATURE ACTIVE';
     });
     symbolFeatureController.forward(from: 0);
@@ -737,7 +750,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     setState(() {
       activeSymbolFeature = null;
       symbolFeatureCells = {};
+      symbolFeatureNewCells = {};
       symbolFeatureReels = {};
+      symbolFeatureMoves = const [];
     });
   }
 
@@ -1705,7 +1720,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                     kind: activeSymbolFeature!,
                     label: featureMode ?? 'FEATURE ACTIVE',
                     reels: symbolFeatureReels,
+                    moves: symbolFeatureMoves,
                     reelCount: grid.length,
+                    rowCount: grid.isEmpty ? 0 : grid.first.length,
+                    symbolAsset: _symbolPaths[widget.game.symbolSet]?['W'],
                     primary: widget.game.primary,
                     secondary: widget.game.secondary,
                   ),
@@ -1944,6 +1962,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             key: ValueKey('symbol-feature-cell-$reel-$row'),
             animation: symbolFeatureController,
             kind: activeSymbolFeature!,
+            fresh: symbolFeatureNewCells.contains('$reel:$row'),
             primary: widget.game.primary,
             secondary: widget.game.secondary,
             child: cell,
@@ -2981,6 +3000,7 @@ class _SymbolFeatureCell extends StatelessWidget {
     super.key,
     required this.animation,
     required this.kind,
+    required this.fresh,
     required this.primary,
     required this.secondary,
     required this.child,
@@ -2988,6 +3008,7 @@ class _SymbolFeatureCell extends StatelessWidget {
 
   final Animation<double> animation;
   final String kind;
+  final bool fresh;
   final Color primary, secondary;
   final Widget child;
 
@@ -3000,6 +3021,9 @@ class _SymbolFeatureCell extends StatelessWidget {
       final impact = sin(min(1, animation.value * 1.8) * pi).abs();
       final shimmer = sin(animation.value * pi * 4).abs();
       final expanding = kind == 'wild.expanded';
+      final walking = kind == 'wild.walked';
+      final sticky = kind == 'wild.stuck';
+      final targetVisibility = ((progress - .68) / .25).clamp(0.0, 1.0);
       return Transform.scale(
         scaleX: 1 + impact * .07,
         scaleY: expanding
@@ -3027,7 +3051,10 @@ class _SymbolFeatureCell extends StatelessWidget {
                   ),
                 ],
               ),
-              child: child,
+              child: Opacity(
+                opacity: walking ? targetVisibility : 1,
+                child: child,
+              ),
             ),
             Align(
               alignment: Alignment(0, -1.25 + progress * 2.5),
@@ -3048,6 +3075,39 @@ class _SymbolFeatureCell extends StatelessWidget {
                 ),
               ),
             ),
+            if (sticky)
+              Align(
+                alignment: Alignment.topRight,
+                child: Transform.scale(
+                  scale: .72 + progress * .28 + (fresh ? impact * .22 : 0),
+                  child: Container(
+                    key: ValueKey(
+                      fresh ? 'sticky-wild-new-lock' : 'sticky-wild-lock',
+                    ),
+                    margin: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [Colors.white, primary, secondary],
+                      ),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primary,
+                          blurRadius: 10 + impact * 12,
+                          spreadRadius: fresh ? 2 : 0,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.lock_rounded,
+                      color: Color(0xff24022d),
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ),
             for (final particle in const [
               Alignment(-.82, -.82),
               Alignment(.82, -.7),
@@ -3083,7 +3143,10 @@ class _SymbolFeatureSweep extends StatelessWidget {
     required this.kind,
     required this.label,
     required this.reels,
+    required this.moves,
     required this.reelCount,
+    required this.rowCount,
+    required this.symbolAsset,
     required this.primary,
     required this.secondary,
   });
@@ -3091,7 +3154,9 @@ class _SymbolFeatureSweep extends StatelessWidget {
   final Animation<double> animation;
   final String kind, label;
   final Set<int> reels;
-  final int reelCount;
+  final List<SymbolFeatureMoveView> moves;
+  final int reelCount, rowCount;
+  final String? symbolAsset;
   final Color primary, secondary;
 
   @override
@@ -3104,6 +3169,10 @@ class _SymbolFeatureSweep extends StatelessWidget {
           final pulse = sin(animation.value * pi).abs();
           final fade = (1 - progress).clamp(0.0, 1.0);
           final reelWidth = constraints.maxWidth / max(1, reelCount);
+          final rowHeight = constraints.maxHeight / max(1, rowCount);
+          final travel = Curves.easeInOutCubic.transform(
+            (animation.value * 1.18).clamp(0.0, 1.0),
+          );
           return Stack(
             fit: StackFit.expand,
             children: [
@@ -3179,6 +3248,96 @@ class _SymbolFeatureSweep extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (kind == 'wild.walked' && symbolAsset != null)
+                for (final indexedMove in moves.indexed) ...[
+                  Positioned(
+                    key: ValueKey('walking-wild-trail-${indexedMove.$1}'),
+                    left:
+                        min(
+                              indexedMove.$2.sourceReel,
+                              indexedMove.$2.targetReel,
+                            ) *
+                            reelWidth +
+                        reelWidth * .42,
+                    top: indexedMove.$2.targetRow * rowHeight + rowHeight * .45,
+                    width:
+                        (indexedMove.$2.targetReel - indexedMove.$2.sourceReel)
+                                .abs() *
+                            reelWidth +
+                        reelWidth * .16,
+                    height: max(3, rowHeight * .08),
+                    child: Opacity(
+                      opacity: fade * .88,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              secondary.withValues(alpha: .7),
+                              Colors.white,
+                              primary.withValues(alpha: .82),
+                              Colors.transparent,
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primary,
+                              blurRadius: 14,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    key: ValueKey('walking-wild-flight-${indexedMove.$1}'),
+                    left:
+                        ui.lerpDouble(
+                          indexedMove.$2.sourceReel * reelWidth,
+                          indexedMove.$2.targetReel * reelWidth,
+                          travel,
+                        )! +
+                        reelWidth * .13,
+                    top:
+                        ui.lerpDouble(
+                          indexedMove.$2.sourceRow * rowHeight,
+                          indexedMove.$2.targetRow * rowHeight,
+                          travel,
+                        )! +
+                        rowHeight * .08 -
+                        sin(travel * pi) * rowHeight * .16,
+                    width: reelWidth * .74,
+                    height: rowHeight * .84,
+                    child: Transform.rotate(
+                      angle:
+                          sin(travel * pi) *
+                          (indexedMove.$2.targetReel > indexedMove.$2.sourceReel
+                              ? .13
+                              : -.13),
+                      child: Transform.scale(
+                        scale: .86 + sin(travel * pi) * .18,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primary,
+                                blurRadius: 20 + pulse * 12,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Image.asset(
+                            symbolAsset!,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               Align(
                 alignment: const Alignment(0, -.88),
                 child: Transform.scale(
@@ -3219,6 +3378,10 @@ class _SymbolFeatureSweep extends StatelessWidget {
                             Icon(
                               kind == 'mystery.revealed'
                                   ? Icons.help_rounded
+                                  : kind == 'wild.stuck'
+                                  ? Icons.lock_rounded
+                                  : kind == 'wild.walked'
+                                  ? Icons.directions_run_rounded
                                   : Icons.bolt_rounded,
                               size: 17,
                               color: Colors.white,

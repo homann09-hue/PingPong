@@ -956,6 +956,98 @@ void main() {
     expect(find.text('DREH!'), findsOneWidget);
   });
 
+  testWidgets('walking wild travels between authoritative reel positions', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    final neon = games.firstWhere((game) => game.id == 'neon-nights');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: neon,
+          balance: 1000000,
+          level: 25,
+          xp: 0,
+          vipPoints: 22000,
+          api: _WalkingWildPresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedWalk = false;
+    for (var frame = 0; frame < 70; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find
+          .byKey(const ValueKey('walking-wild-flight-0'))
+          .evaluate()
+          .isNotEmpty) {
+        observedWalk = true;
+        expect(find.text('WALKING WILD'), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('walking-wild-trail-0')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('symbol-feature-cell-3-1')),
+          findsOneWidget,
+        );
+        break;
+      }
+    }
+    expect(observedWalk, isTrue);
+    for (var frame = 0; frame < 35; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('walking-wild-flight-0')), findsNothing);
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
+  testWidgets('new sticky wild receives an authoritative lock slam', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    final candy = games.firstWhere((game) => game.id == 'candy-carnival');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: candy,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _StickyWildPresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedLock = false;
+    for (var frame = 0; frame < 110; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find
+          .byKey(const ValueKey('sticky-wild-new-lock'))
+          .evaluate()
+          .isNotEmpty) {
+        observedLock = true;
+        expect(find.text('STICKY WILDS'), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('symbol-feature-cell-1-1')),
+          findsOneWidget,
+        );
+        break;
+      }
+    }
+    expect(observedLock, isTrue);
+    for (var frame = 0; frame < 45; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('sticky-wild-new-lock')), findsNothing);
+    expect(find.text('FREE SPINS COMPLETE'), findsOneWidget);
+  });
+
   testWidgets('high multiplier win escalates through cinematic win tiers', (
     tester,
   ) async {
@@ -1130,6 +1222,32 @@ void main() {
       find.text('Dieser exklusive Slot benötigt eine aktive Mitgliedschaft.'),
       findsOneWidget,
     );
+    expect(find.text('ZUM CLUB'), findsOneWidget);
+  });
+
+  testWidgets('expired High Roller dialog preserves desktop cabinet bounds', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.firstWhere((game) => game.id == 'neon-nights'),
+          balance: 1000000,
+          level: 25,
+          xp: 0,
+          vipPoints: 22000,
+          api: _ExpiredHighRollerApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('HIGH ROLLER CLUB'), findsOneWidget);
     expect(find.text('ZUM CLUB'), findsOneWidget);
   });
 }
@@ -1472,6 +1590,182 @@ class _ExpandingWildPresentationApi extends CasinoApi {
       vipPoints: 1,
       maxWinReached: false,
       winClass: 'SMALL',
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _WalkingWildPresentationApi extends CasinoApi {
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final base = SpinRoundView(
+      phase: 'base',
+      index: 0,
+      grid: const [
+        ['A', 'Q', 'J'],
+        ['K', 'A', 'Q'],
+        ['J', 'Q', 'A'],
+        ['A', 'K', 'Q'],
+        ['J', 'W', 'K'],
+      ],
+      win: 0,
+      bonusMultiplier: null,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: null,
+      winningCells: const {},
+      winLabel: null,
+    );
+    final respin = SpinRoundView(
+      phase: 'respin',
+      index: 1,
+      grid: const [
+        ['A', 'Q', 'J'],
+        ['K', 'A', 'Q'],
+        ['J', 'Q', 'A'],
+        ['A', 'W', 'Q'],
+        ['J', 'A', 'K'],
+      ],
+      win: 0,
+      bonusMultiplier: null,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: 'WALKING WILD',
+      winningCells: const {},
+      winLabel: null,
+      visualFeature: 'wild.walked',
+      featureCells: const {'3:1'},
+      featureReels: const {3, 4},
+      featureMoves: const [
+        SymbolFeatureMoveView(
+          sourceReel: 4,
+          sourceRow: 1,
+          targetReel: 3,
+          targetRow: 1,
+        ),
+      ],
+    );
+    return SpinResponse(
+      grid: respin.grid,
+      balance: 999900,
+      win: 0,
+      freeSpins: 0,
+      rounds: [base, respin],
+      level: 25,
+      xp: 10,
+      spins: 1,
+      totalWon: 0,
+      totalFreeSpins: 0,
+      vipPoints: 22001,
+      maxWinReached: false,
+      winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _StickyWildPresentationApi extends CasinoApi {
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final base = SpinRoundView(
+      phase: 'base',
+      index: 0,
+      grid: const [
+        ['S', 'A', 'K'],
+        ['S', 'Q', 'J'],
+        ['S', 'K', 'Q'],
+        ['J', 'Q', 'A'],
+        ['K', 'A', 'Q'],
+      ],
+      win: 0,
+      bonusMultiplier: null,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: null,
+      winningCells: const {},
+      winLabel: null,
+      freeSpinsAwarded: 1,
+    );
+    final freeSpin = SpinRoundView(
+      phase: 'free_spin',
+      index: 1,
+      grid: const [
+        ['A', 'Q', 'J'],
+        ['K', 'W', 'Q'],
+        ['J', 'Q', 'A'],
+        ['A', 'K', 'Q'],
+        ['J', 'A', 'K'],
+      ],
+      win: 0,
+      bonusMultiplier: 1,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: 'STICKY WILDS',
+      winningCells: const {},
+      winLabel: null,
+      visualFeature: 'wild.stuck',
+      featureCells: const {'1:1'},
+      featureNewCells: const {'1:1'},
+      featureReels: const {1},
+    );
+    return SpinResponse(
+      grid: freeSpin.grid,
+      balance: 999900,
+      win: 0,
+      freeSpins: 1,
+      rounds: [base, freeSpin],
+      level: 12,
+      xp: 10,
+      spins: 1,
+      totalWon: 0,
+      totalFreeSpins: 1,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: null,
       jackpots: const [
         JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
         JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),

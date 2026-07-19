@@ -287,6 +287,12 @@ describe("configuration-driven layouts", () => {
     const freeRounds = result.rounds.filter((round) => round.phase === "free_spin");
     expect(freeRounds).toHaveLength(2);
     expect(freeRounds.every((round) => round.events.some((event) => event.type === "wild.stuck"))).toBe(true);
+    const stickyEvents = freeRounds.map((round) => round.events.find((event) => event.type === "wild.stuck")!);
+    const firstPositions = new Set(String(stickyEvents[0]!.data.positions).split(",").filter(Boolean));
+    const secondPositions = new Set(String(stickyEvents[1]!.data.positions).split(",").filter(Boolean));
+    expect(firstPositions.size).toBe(stickyEvents[0]!.data.count);
+    expect([...firstPositions].every((position) => secondPositions.has(position))).toBe(true);
+    expect(String(stickyEvents[0]!.data.newPositions).split(",").filter(Boolean)).toEqual([...firstPositions]);
     expect(freeRounds[1]!.grid.flat().filter((symbol) => symbol === "W").length).toBeGreaterThanOrEqual(3);
   });
 
@@ -303,6 +309,15 @@ describe("configuration-driven layouts", () => {
     expect(respins).toHaveLength(4);
     expect(respins.map((round) => round.grid.findIndex((reel) => reel[0] === "W"))).toEqual([3, 2, 1, 0]);
     expect(respins.every((round) => round.events.some((event) => event.type === "wild.walked"))).toBe(true);
+    expect(respins.map((round) => round.events.find((event) => event.type === "wild.walked")!.data.moves)).toEqual([
+      "4:0>3:0",
+      "3:0>2:0",
+      "2:0>1:0",
+      "1:0>0:0",
+    ]);
+    expect(respins.map((round) => round.events.find((event) => event.type === "wild.walked")!.data.positions)).toEqual([
+      "3:0", "2:0", "1:0", "0:0",
+    ]);
   });
 
   it("awards a configured fixed number of symbol-triggered respins", () => {

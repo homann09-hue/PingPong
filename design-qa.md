@@ -43,6 +43,12 @@
 - Free-spin retrigger mobile live spin: `/private/tmp/aurora-retrigger-mobile-spin.png`
 - Deterministic free-spin retrigger state: `/private/tmp/aurora-retrigger-deterministic.png`
 - Free-spin retrigger reference comparison: `/private/tmp/aurora-retrigger-reference-comparison.png`
+- Sticky/Walking Wild desktop idle implementation: `/private/tmp/aurora-neon-repaired-desktop.png`
+- Sticky/Walking Wild live reel-motion implementation: `/private/tmp/aurora-sticky-desktop-spin-final.png`
+- Sticky/Walking Wild mobile implementation: `/private/tmp/aurora-sticky-mobile-final.png`
+- Deterministic Walking Wild path: `/private/tmp/aurora-walking-deterministic.png`
+- Sticky/Walking Wild reference comparison: `/private/tmp/aurora-wild-motion-reference-comparison.png`
+- High Roller post-fix browser evidence: `/private/tmp/aurora-walking-high-roller-fixed.png`
 
 ## Visual comparison
 
@@ -190,6 +196,22 @@ The base game and each free-spin round now use continuous vertical reel strips w
 - Accessibility and performance: one finite animation controller drives the retrigger wave and particles; no repeating effect or additional network request is introduced. Desktop and mobile browser checks found no clipping, overflow or obstructed controls, and console inspection contained only Flutter bootstrap debug output.
 - Comparison history: the prior implementation displayed the response's final free-spin total as the initial award and had no dedicated retrigger transition. The revised deterministic evidence shows the correct initial `1 FREE SPIN`, a later `+1 FREE SPIN` impact with `2 TOTAL`, and the server-provided `×2` HUD multiplier. Post-fix desktop/mobile browser evidence and the deterministic widget flow contain no actionable P0/P1/P2 regression.
 
+## Authoritative Sticky and Walking Wild comparison gate
+
+- Source visual truth: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4` and its contact sheet `/private/tmp/aurora-video-contact-sheet.png`.
+- Implementation state: Candy Carnival live reel motion, deterministic Neon Nights Walking Wild source-to-target travel, Sticky Wild lock slam, and the Neon Nights High Roller gate after its overflow fix.
+- Viewports: `1280 × 591` desktop and `390 × 844` mobile.
+- Full-view comparison evidence: `/private/tmp/aurora-wild-motion-reference-comparison.png` places the supplied multi-state slot recording, the browser-rendered Aurora reel motion with original raster assets, and the deterministic Walking Wild path in one normalized comparison input.
+- Focused-region evidence: the same artifact preserves the complete reel cabinet, moving reels, movement trail, target cell, jackpot tower and persistent controls at readable scale. Production asset fidelity is judged from `/private/tmp/aurora-sticky-desktop-spin-final.png`; the deterministic headless frame is used only to verify otherwise non-repeatable movement geometry because a random server spin cannot guarantee Walking or Sticky Wild during capture.
+- Fonts and typography: browser-rendered AuroraSans and Material icons retain the established compact casino hierarchy at both viewports. `WALKING WILD`, `STICKY WILDS`, wallet, jackpot and control labels do not wrap or truncate. The headless fixture's reduced raster fidelity is excluded from production font/asset judgment and is not shipped.
+- Spacing and layout rhythm: Walking Wild travel and Sticky Wild lock effects stay inside the existing clipped reel bounds. Neither effect moves the cabinet, jackpot tower, bet controls or primary spin target. Desktop and mobile captures preserve the established spacing and touch targets.
+- Colors and visual tokens: trail, beam, lock glow and impact particles derive from each slot's primary/secondary palette. Candy keeps its pink/purple treatment and Neon keeps its cyan/magenta treatment while using white highlights for readable motion.
+- Image quality and asset fidelity: live browser evidence renders Aurora's original sharp raster background and symbol assets. The moving Wild code path uses the slot's real `W` raster asset; no protected source art, custom SVG substitute, emoji or placeholder image was introduced.
+- Copy and content: Sticky and Walking labels originate from the authoritative engine event. Sticky events preserve all locked positions plus only newly locked positions; Walking events carry exact `sourceReel:sourceRow > targetReel:targetRow` movement data.
+- States and interactions: a real Candy spin exercised clipped continuous motion, sequential settlement, wallet update and control recovery. The deterministic Walking fixture asserts the moving Wild, trail and authoritative target cell; the deterministic Sticky fixture asserts the new-lock slam and server-selected cell. Browser console checks after desktop, High Roller modal and mobile flows returned no warnings or errors.
+- Accessibility and performance: both overlays ignore pointer input, run on the existing finite shared feature controller and repaint only the affected cabinet layer. Persistent spin and bet controls remain visible; mobile controls retain practical touch size.
+- Comparison history: the initial implementation collapsed Sticky and Walking Wild to generic/static affected-cell emphasis. The revision adds complete sticky/new-position data, exact walking moves, a real moving Wild raster, glow trail and distinct lock-slam state. QA then found one P2 desktop issue: the High Roller rejection message duplicated beneath its modal and overflowed the fixed cabinet by `9 px`. The duplicate in-cabinet error was removed because the modal already communicates the blocking state. `/private/tmp/aurora-walking-high-roller-fixed.png` and the clean browser console are the post-fix evidence; the modal and cabinet now remain within `1280 × 591`.
+
 ## Open visual issues
 
 - P0: none
@@ -199,7 +221,7 @@ The base game and each free-spin round now use continuous vertical reel strips w
 
 The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `49` Flutter tests passed, including deterministic free-spin retrigger extension, Expanding Wild reveal, authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed API mapper, slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
+Automated verification: `52` Flutter tests passed, including deterministic Walking Wild travel, Sticky Wild new-lock slam, the desktop High Roller overflow regression, free-spin retrigger extension, Expanding Wild reveal, authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. `42` slot-engine tests passed, including exact Walking Wild movement and Sticky Wild persistence assertions. Focused Flutter analysis for the changed API mapper, slot screen and widget suite reported `No issues found`; root production build and Flutter web debug compilation completed successfully. The macOS cloud-backed workspace initially copied the compiled dataless `main.dart.js` as a zero-byte build artifact; the generated output was re-materialized through a byte-streamed fresh file and verified in the in-app browser at desktop and mobile viewports.
 
 The final browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
