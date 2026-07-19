@@ -28,6 +28,10 @@
 - Reel-motion mobile spin state: `/private/tmp/aurora-reel-motion-mobile.png`
 - Reel-motion mobile settled state: `/private/tmp/aurora-reel-motion-mobile-settled.png`
 - Reel-motion reference comparison: `/private/tmp/aurora-reel-motion-reference-comparison.png`
+- Feature-trigger desktop implementation: `/private/tmp/aurora-feature-trigger-desktop.png`
+- Feature-trigger desktop spin state: `/private/tmp/aurora-feature-trigger-spin.png`
+- Feature-trigger mobile implementation: `/private/tmp/aurora-feature-trigger-mobile.png`
+- Feature-trigger reference comparison: `/private/tmp/aurora-feature-trigger-reference-comparison.png`
 
 ## Visual comparison
 
@@ -72,6 +76,7 @@ The base game and each free-spin round now use continuous vertical reel strips w
 - A deterministic widget flow lands exactly two trigger symbols on the first two reels, verifies that only reel three enters the finite anticipation state, and verifies that the state clears when the spin settles. A separate authoritative free-spin flow verifies the persistent HUD and completion state.
 - A real Dragon Peak desktop spin was captured at `1280 × 591` during continuous reel motion and after settlement. All five reels showed vertical travel and motion blur, then stopped independently without moving the cabinet, jackpot tower or control bar.
 - The same real flow was captured at `390 × 844`. Reel motion stayed clipped inside the mobile cabinet, the primary spin control remained visible, and the final grid returned without overlap or horizontal overflow.
+- The current Dragon Peak build was rechecked at `1280 × 591` and `390 × 844` after adding the third-trigger slam. Real spins confirmed continuous clipped reel motion, sequential recovery and persistent controls; a deterministic server-response fixture confirms that the trigger overlay and all three landed trigger cells appear only when the authoritative grid reaches its third scatter/bonus symbol.
 
 ## Motion comparison gate
 
@@ -125,6 +130,22 @@ The base game and each free-spin round now use continuous vertical reel strips w
 - Accessibility and performance: the effect uses one shared animation controller and isolated reel repaint boundaries; persistent controls remain visible at the mobile breakpoint. Turbo mode reuses the same motion with a shorter minimum duration.
 - Comparison history: the first widget pass found a P2 `232 px` internal reel-strip overflow because the two-height strip inherited the cabinet's one-height constraint. The strip now uses a clipped `OverflowBox`, and the revised deterministic test, desktop capture and mobile capture show no overflow or exposed content outside the cabinet.
 
+## Authoritative feature-trigger comparison gate
+
+- Source visual truth: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4` and its multi-frame contact sheet `/private/tmp/aurora-video-contact-sheet.png`.
+- Implementation state: Dragon Peak idle, real live reel motion, and deterministic third-trigger landing presentation.
+- Viewports: `1280 × 591` desktop and `390 × 844` mobile.
+- Full-view comparison evidence: `/private/tmp/aurora-feature-trigger-reference-comparison.png` places the complete supplied slot-motion contact sheet and the current browser-rendered Aurora cabinet in one normalized comparison image.
+- Focused-region evidence: no additional crop was required because the combined artifact keeps the reference feature transitions and Aurora's complete cabinet, HUD, jackpot tower and controls legible. The transient third-trigger overlay is additionally asserted by a deterministic widget flow because a live server spin cannot guarantee the required symbol outcome for a browser screenshot.
+- Fonts and typography: the finite `FEATURE TRIGGERED` callout uses the existing compact uppercase slot-display treatment. Existing wallet, jackpot and control labels retain stable size, weight and wrapping at both viewports.
+- Spacing and layout rhythm: the trigger flash and cell charges paint inside the existing clipped cabinet, use the reserved status region and do not move the reels, side rail, jackpot tower or controls.
+- Colors and visual tokens: the flash, radial wave and particles derive from each slot's primary and secondary colors with a white impact highlight; Dragon Peak therefore keeps its established orange/gold treatment.
+- Image quality and asset fidelity: the landing treatment preserves Aurora's original raster symbols and background. It uses the established Material icon family only for finite sparkle particles and does not introduce source-brand imagery, custom SVGs or placeholder art.
+- Copy and content: `FEATURE TRIGGERED` appears only on the transition from fewer than three to at least three server-delivered scatter/bonus symbols. No result, reward or feature trigger is manufactured by the client.
+- States and interactions: the third trigger cancels the pending two-symbol anticipation, charges every authoritative trigger cell, runs one finite cabinet light wave and heavy-impact hook, then clears before the spin continues. Desktop and mobile real-spin checks showed no clipping, control obstruction or runtime error.
+- Accessibility and performance: the overlay is non-interactive and finite, shares one animation controller, and remains isolated from the persistent controls. Haptic output is a presentation hook only and does not affect game state.
+- Comparison history: this pass found no new actionable P0/P1/P2 mismatch. The prior build stopped at a two-trigger `FEATURE?` anticipation state; the revised deterministic render adds the missing third-trigger landing phase while preserving the post-animation cabinet geometry and responsive layout.
+
 ## Open visual issues
 
 - P0: none
@@ -134,7 +155,7 @@ The base game and each free-spin round now use continuous vertical reel strips w
 
 The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `46` Flutter tests passed, including deterministic continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
+Automated verification: `47` Flutter tests passed, including deterministic authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
 
 The final browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 

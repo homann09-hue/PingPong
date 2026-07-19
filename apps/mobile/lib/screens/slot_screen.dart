@@ -31,6 +31,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final AnimationController winController;
   late final AnimationController paylineController;
   late final AnimationController anticipationController;
+  late final AnimationController featureTriggerController;
   late final AnimationController reelMotionController;
   Timer? welcomePresentationTimer;
   final random = Random();
@@ -57,6 +58,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   Set<String> clearingCells = {};
   List<PaylineWinView> winningPaylines = const [];
   int? anticipationReel;
+  Set<String> featureTriggerCells = {};
+  bool featureTriggerActive = false;
   int freeSpinTotal = 0;
   int freeSpinPlayed = 0;
   int freeSpinRemaining = 0;
@@ -89,6 +92,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 680),
     );
+    featureTriggerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 820),
+    );
     reelMotionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 310),
@@ -115,6 +122,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     winController.dispose();
     paylineController.dispose();
     anticipationController.dispose();
+    featureTriggerController.dispose();
     reelMotionController.dispose();
     super.dispose();
   }
@@ -229,6 +237,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     anticipationController
       ..stop()
       ..value = 0;
+    featureTriggerController
+      ..stop()
+      ..value = 0;
     reelMotionController
       ..stop()
       ..repeat();
@@ -244,6 +255,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       clearingCells = {};
       winningPaylines = const [];
       anticipationReel = null;
+      featureTriggerCells = {};
+      featureTriggerActive = false;
       freeSpinTotal = 0;
       freeSpinPlayed = 0;
       freeSpinRemaining = 0;
@@ -491,6 +504,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       anticipationController
         ..stop()
         ..value = 0;
+      featureTriggerController
+        ..stop()
+        ..value = 0;
       reelMotionController
         ..stop()
         ..value = 0;
@@ -499,6 +515,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           spinning = false;
           clearingCells = {};
           anticipationReel = null;
+          featureTriggerCells = {};
+          featureTriggerActive = false;
           reelsInMotion = List<bool>.filled(max(1, grid.length), false);
         });
       }
@@ -526,19 +544,37 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       winningCells = {};
       clearingCells = {};
       winningPaylines = const [];
+      featureTriggerCells = {};
+      featureTriggerActive = false;
     });
   }
 
   Future<void> _revealGrid(List<List<String>> target) async {
     for (var reel = 0; reel < target.length; reel++) {
       if (!mounted) return;
+      final priorTriggerCount = target
+          .take(reel)
+          .expand((column) => column)
+          .where((symbol) => symbol == 'S' || symbol == 'B')
+          .length;
       final triggerCount = target
           .take(reel + 1)
           .expand((column) => column)
           .where((symbol) => symbol == 'S' || symbol == 'B')
           .length;
-      final anticipation = reel < target.length - 1 && triggerCount >= 2;
+      final featureTriggered = priorTriggerCount < 3 && triggerCount >= 3;
+      final anticipation =
+          !featureTriggered && reel < target.length - 1 && triggerCount >= 2;
       final nextAnticipationReel = anticipation ? reel + 1 : null;
+      final landedTriggerCells = featureTriggered
+          ? {
+              for (var landedReel = 0; landedReel <= reel; landedReel++)
+                for (var row = 0; row < target[landedReel].length; row++)
+                  if (target[landedReel][row] == 'S' ||
+                      target[landedReel][row] == 'B')
+                    '$landedReel:$row',
+            }
+          : const <String>{};
       setState(() {
         final next = [
           for (final column in grid) [...column],
@@ -557,11 +593,20 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         reelsInMotion[reel] = false;
         reelStopEpochs[reel]++;
         anticipationReel = nextAnticipationReel;
-        if (anticipation) {
+        if (featureTriggered) {
+          featureTriggerCells = landedTriggerCells;
+          featureTriggerActive = true;
+          featureMode = 'FEATURE TRIGGERED';
+        } else if (anticipation) {
           featureMode = 'FEATURE CHANCE • REEL ${reel + 2}';
         }
       });
-      if (nextAnticipationReel != null) {
+      if (featureTriggered) {
+        anticipationController
+          ..stop()
+          ..value = 0;
+        featureTriggerController.forward(from: 0);
+      } else if (nextAnticipationReel != null) {
         if (!anticipationController.isAnimating) {
           anticipationController.repeat(reverse: true);
         }
@@ -571,11 +616,20 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           ..value = 0;
       }
       unawaited(
-        anticipation
+        featureTriggered
+            ? HapticFeedback.heavyImpact()
+            : anticipation
             ? HapticFeedback.mediumImpact()
             : HapticFeedback.selectionClick(),
       );
-      if (reel < target.length - 1) {
+      if (featureTriggered) {
+        await Future<void>.delayed(Duration(milliseconds: turbo ? 170 : 620));
+        if (!mounted) return;
+        setState(() {
+          featureTriggerActive = false;
+          featureTriggerCells = {};
+        });
+      } else if (reel < target.length - 1) {
         await Future<void>.delayed(
           Duration(
             milliseconds: turbo
@@ -1435,12 +1489,16 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   );
   Widget _reels({required bool desktop}) => Center(
     child: AnimatedScale(
-      scale: win > 0
+      scale: featureTriggerActive
+          ? 1.035
+          : win > 0
           ? 1.018
           : spinning
           ? .985
           : 1,
-      duration: Duration(milliseconds: spinning ? 120 : 280),
+      duration: Duration(
+        milliseconds: featureTriggerActive ? 90 : (spinning ? 120 : 280),
+      ),
       curve: Curves.easeOutBack,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
@@ -1509,6 +1567,15 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
+                  ),
+                ),
+              if (featureTriggerActive)
+                Positioned.fill(
+                  child: _FeatureTriggerWave(
+                    key: const ValueKey('feature-trigger-overlay'),
+                    animation: featureTriggerController,
+                    primary: widget.game.primary,
+                    secondary: widget.game.secondary,
                   ),
                 ),
             ],
@@ -1614,6 +1681,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     );
     final winning = winningCells.contains('$reel:$row');
     final clearing = clearingCells.contains('$reel:$row');
+    final featureTrigger = featureTriggerCells.contains('$reel:$row');
     final cell = Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
@@ -1727,10 +1795,19 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         ],
       ),
     );
+    final featureCell = featureTrigger
+        ? _FeatureTriggerCell(
+            key: ValueKey('feature-trigger-cell-$reel-$row'),
+            animation: featureTriggerController,
+            primary: widget.game.primary,
+            secondary: widget.game.secondary,
+            child: cell,
+          )
+        : cell;
     final animatedCell = winning
         ? AnimatedBuilder(
             animation: winController,
-            child: cell,
+            child: featureCell,
             builder: (context, child) {
               final pulse = sin(winController.value * pi * 3).abs();
               return Transform.scale(
@@ -1756,7 +1833,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
               );
             },
           )
-        : cell;
+        : featureCell;
     final cascadeCell = Stack(
       key: key,
       fit: StackFit.expand,
@@ -2739,6 +2816,198 @@ class _TriggerCharge extends StatelessWidget {
               ),
             ),
           ),
+        );
+      },
+    ),
+  );
+}
+
+class _FeatureTriggerCell extends StatelessWidget {
+  const _FeatureTriggerCell({
+    super.key,
+    required this.animation,
+    required this.primary,
+    required this.secondary,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Color primary, secondary;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: animation,
+    child: child,
+    builder: (context, child) {
+      final progress = Curves.easeOutCubic.transform(animation.value);
+      final impact = sin(min(1, animation.value * 1.7) * pi).abs();
+      final sparkle = sin(animation.value * pi * 5).abs();
+      return Transform.scale(
+        scale: 1 + impact * .13,
+        child: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Color.lerp(Colors.white, primary, progress)!,
+                  width: 2 + impact * 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withValues(alpha: .9 - progress * .32),
+                    blurRadius: 18 + impact * 34,
+                    spreadRadius: 2 + impact * 5,
+                  ),
+                  BoxShadow(
+                    color: secondary.withValues(alpha: .65 - progress * .25),
+                    blurRadius: 10 + sparkle * 24,
+                    spreadRadius: sparkle * 3,
+                  ),
+                ],
+              ),
+              child: child,
+            ),
+            for (final particle in const [
+              (Alignment(-.9, -.82), -1.0),
+              (Alignment(.92, -.72), 1.0),
+              (Alignment(-.82, .88), -.7),
+              (Alignment(.86, .82), .75),
+            ])
+              Align(
+                alignment: particle.$1,
+                child: Transform.translate(
+                  offset: Offset(particle.$2 * progress * 8, -progress * 10),
+                  child: Opacity(
+                    opacity: (1 - progress).clamp(0, 1),
+                    child: Transform.scale(
+                      scale: .65 + impact * .75,
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.white,
+                        size: 16,
+                        shadows: [Shadow(color: primary, blurRadius: 9)],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _FeatureTriggerWave extends StatelessWidget {
+  const _FeatureTriggerWave({
+    super.key,
+    required this.animation,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final Animation<double> animation;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(animation.value);
+        final flash = (1 - progress).clamp(0.0, 1.0);
+        final pulse = sin(animation.value * pi).abs();
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  radius: .25 + progress * 1.15,
+                  colors: [
+                    Colors.white.withValues(alpha: flash * .72),
+                    primary.withValues(alpha: flash * .5),
+                    secondary.withValues(alpha: flash * .12),
+                    Colors.transparent,
+                  ],
+                  stops: const [0, .28, .65, 1],
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: flash * .9),
+                  width: 2 + flash * 4,
+                ),
+              ),
+            ),
+            Center(
+              child: Transform.scale(
+                scale: .72 + progress * .32,
+                child: Opacity(
+                  opacity: pulse.clamp(0, 1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xf21a062f),
+                          primary.withValues(alpha: .94),
+                          const Color(0xf21a062f),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primary,
+                          blurRadius: 28,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'FEATURE TRIGGERED',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        shadows: [
+                          Shadow(color: Colors.black, blurRadius: 5),
+                          Shadow(color: Color(0xffffd24a), blurRadius: 9),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            for (var index = 0; index < 10; index++)
+              Align(
+                alignment: Alignment(
+                  cos(index * pi * .2) * (.2 + progress * .72),
+                  sin(index * pi * .2) * (.2 + progress * .78),
+                ),
+                child: Opacity(
+                  opacity: flash,
+                  child: Transform.rotate(
+                    angle: index * pi * .2 + progress,
+                    child: Icon(
+                      index.isEven
+                          ? Icons.auto_awesome_rounded
+                          : Icons.brightness_7_rounded,
+                      color: index.isEven ? Colors.white : primary,
+                      size: 10 + pulse * 11,
+                      shadows: [Shadow(color: secondary, blurRadius: 8)],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     ),

@@ -800,6 +800,57 @@ void main() {
     expect(find.text('DREH!'), findsOneWidget);
   });
 
+  testWidgets('third authoritative trigger lands with a feature slam', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _FeatureTriggerPresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedTrigger = false;
+    for (var frame = 0; frame < 45; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find
+          .byKey(const ValueKey('feature-trigger-overlay'))
+          .evaluate()
+          .isNotEmpty) {
+        observedTrigger = true;
+        expect(find.text('FEATURE TRIGGERED'), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('feature-trigger-cell-0-0')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('feature-trigger-cell-1-0')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('feature-trigger-cell-2-0')),
+          findsOneWidget,
+        );
+        break;
+      }
+    }
+    expect(observedTrigger, isTrue);
+    for (var frame = 0; frame < 35; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('feature-trigger-overlay')), findsNothing);
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
   testWidgets('high multiplier win escalates through cinematic win tiers', (
     tester,
   ) async {
@@ -1092,6 +1143,61 @@ class _AnticipationPresentationApi extends CasinoApi {
       bonusRespinSteps: const [],
       bonusCoins: const [],
       featureLabel: null,
+      winningCells: const {},
+      winLabel: null,
+    );
+    return SpinResponse(
+      grid: round.grid,
+      balance: 999900,
+      win: 0,
+      freeSpins: 0,
+      rounds: [round],
+      level: 12,
+      xp: 10,
+      spins: 1,
+      totalWon: 0,
+      totalFreeSpins: 0,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _FeatureTriggerPresentationApi extends CasinoApi {
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final round = SpinRoundView(
+      phase: 'base',
+      index: 1,
+      grid: const [
+        ['S', 'A', 'K'],
+        ['B', 'Q', 'J'],
+        ['S', 'K', 'Q'],
+        ['J', 'Q', 'A'],
+        ['K', 'A', 'Q'],
+      ],
+      win: 0,
+      bonusMultiplier: null,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: 'FREE SPINS',
       winningCells: const {},
       winLabel: null,
     );
