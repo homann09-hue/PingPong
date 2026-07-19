@@ -29,6 +29,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final AnimationController ambientController;
   late final AnimationController winController;
   late final AnimationController paylineController;
+  late final AnimationController anticipationController;
   Timer? welcomePresentationTimer;
   final random = Random();
   late int balance, level, xp, vipPoints;
@@ -53,6 +54,11 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   Set<String> winningCells = {};
   Set<String> clearingCells = {};
   List<PaylineWinView> winningPaylines = const [];
+  int? anticipationReel;
+  int freeSpinTotal = 0;
+  int freeSpinPlayed = 0;
+  int freeSpinRemaining = 0;
+  int freeSpinMultiplier = 1;
   List<int> reelStopEpochs = List<int>.filled(5, 0);
   List<List<String>> grid = [
     ['A', 'K', 'Q'],
@@ -76,6 +82,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 480),
     );
+    anticipationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 680),
+    );
     api = widget.api ?? CasinoApi();
     balance = widget.balance;
     level = widget.level;
@@ -97,6 +107,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     ambientController.dispose();
     winController.dispose();
     paylineController.dispose();
+    anticipationController.dispose();
     super.dispose();
   }
 
@@ -207,6 +218,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     paylineController
       ..stop()
       ..value = 0;
+    anticipationController
+      ..stop()
+      ..value = 0;
     setState(() {
       spinning = true;
       win = 0;
@@ -218,6 +232,11 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       winningCells = {};
       clearingCells = {};
       winningPaylines = const [];
+      anticipationReel = null;
+      freeSpinTotal = 0;
+      freeSpinPlayed = 0;
+      freeSpinRemaining = 0;
+      freeSpinMultiplier = 1;
       reelStopEpochs = List<int>.filled(max(1, grid.length), 0);
     });
     SpinResponse? response;
@@ -253,6 +272,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           .length;
       var displayedWin = 0;
       var freeSpinsIntroduced = false;
+      var presentedFreeSpins = 0;
       var respinsIntroduced = false;
       for (
         var roundPosition = 0;
@@ -288,6 +308,12 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         } else {
           if (round.phase == 'free_spin' && !freeSpinsIntroduced) {
             freeSpinsIntroduced = true;
+            setState(() {
+              freeSpinTotal = freeRounds;
+              freeSpinRemaining = freeRounds;
+              freeSpinPlayed = 0;
+              freeSpinMultiplier = round.bonusMultiplier ?? 1;
+            });
             await _showFeaturePresentation(
               title: '$freeRounds FREE SPINS',
               subtitle: 'SPECIAL REELS • EXTRA WILDS • MULTIPLIKATOREN',
@@ -300,6 +326,14 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
               subtitle: '3 RESPINS • LOCKED COINS • JACKPOT CHANCE',
               icon: Icons.lock_clock_rounded,
             );
+          }
+          if (round.phase == 'free_spin') {
+            presentedFreeSpins++;
+            setState(() {
+              freeSpinPlayed = presentedFreeSpins;
+              freeSpinRemaining = freeRounds - presentedFreeSpins + 1;
+              freeSpinMultiplier = round.bonusMultiplier ?? 1;
+            });
           }
           displayedWin += round.win;
           await _revealGrid(round.grid);
@@ -349,6 +383,11 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             await Future<void>.delayed(
               Duration(milliseconds: turbo ? 120 : 520),
             );
+          }
+          if (round.phase == 'free_spin' && mounted) {
+            setState(() {
+              freeSpinRemaining = max(0, freeRounds - presentedFreeSpins);
+            });
           }
         }
       }
@@ -442,10 +481,14 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       ambientController
         ..stop()
         ..value = 0;
+      anticipationController
+        ..stop()
+        ..value = 0;
       if (mounted) {
         setState(() {
           spinning = false;
           clearingCells = {};
+          anticipationReel = null;
         });
       }
     }
@@ -460,6 +503,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           .where((symbol) => symbol == 'S' || symbol == 'B')
           .length;
       final anticipation = reel < target.length - 1 && triggerCount >= 2;
+      final nextAnticipationReel = anticipation ? reel + 1 : null;
       setState(() {
         final next = [
           for (final column in grid) [...column],
@@ -473,10 +517,20 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           reelStopEpochs.add(0);
         }
         reelStopEpochs[reel]++;
+        anticipationReel = nextAnticipationReel;
         if (anticipation) {
           featureMode = 'FEATURE CHANCE • REEL ${reel + 2}';
         }
       });
+      if (nextAnticipationReel != null) {
+        if (!anticipationController.isAnimating) {
+          anticipationController.repeat(reverse: true);
+        }
+      } else {
+        anticipationController
+          ..stop()
+          ..value = 0;
+      }
       unawaited(
         anticipation
             ? HapticFeedback.mediumImpact()
@@ -773,6 +827,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final desktop = constraints.maxWidth >= 900;
+                    final statusVisible =
+                        freeSpinTotal > 0 || featureMode != null;
                     return Stack(
                       fit: StackFit.expand,
                       children: [
@@ -886,10 +942,22 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                                 SizedBox(
                                   height: desktop
                                       ? 42
-                                      : (featureMode == null ? 0 : 42),
+                                      : (statusVisible ? 42 : 0),
                                   child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 220),
-                                    child: featureMode == null
+                                    child: freeSpinTotal > 0
+                                        ? _FreeSpinHud(
+                                            key: ValueKey(
+                                              'free-spins-$freeSpinPlayed-$freeSpinRemaining-$freeSpinMultiplier',
+                                            ),
+                                            total: freeSpinTotal,
+                                            played: freeSpinPlayed,
+                                            remaining: freeSpinRemaining,
+                                            multiplier: freeSpinMultiplier,
+                                            primary: widget.game.primary,
+                                            secondary: widget.game.secondary,
+                                          )
+                                        : featureMode == null
                                         ? const SizedBox.shrink()
                                         : Container(
                                             key: ValueKey(featureMode),
@@ -1414,46 +1482,71 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       ],
     );
     final epoch = reel < reelStopEpochs.length ? reelStopEpochs[reel] : 0;
-    if (epoch == 0) return column;
-    return TweenAnimationBuilder<double>(
-      key: ValueKey('reel-stop-$reel-$epoch'),
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: turbo ? 110 : 260),
-      curve: Curves.easeOutCubic,
-      child: column,
-      builder: (context, progress, child) {
-        final impulse = sin(progress * pi);
-        return Transform.translate(
-          offset: Offset(0, impulse * 5),
-          child: Transform.scale(
-            scale: 1 + impulse * .025,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                child!,
-                IgnorePointer(
-                  child: Opacity(
-                    opacity: impulse * .32,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .08),
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: widget.game.primary,
-                            blurRadius: 18,
-                            spreadRadius: 2,
+    final stoppedReel = epoch == 0
+        ? column
+        : TweenAnimationBuilder<double>(
+            key: ValueKey('reel-stop-$reel-$epoch'),
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: Duration(milliseconds: turbo ? 110 : 260),
+            curve: Curves.easeOutCubic,
+            child: column,
+            builder: (context, progress, child) {
+              final impulse = sin(progress * pi);
+              return Transform.translate(
+                offset: Offset(0, impulse * 5),
+                child: Transform.scale(
+                  scale: 1 + impulse * .025,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      child!,
+                      IgnorePointer(
+                        child: Opacity(
+                          opacity: impulse * .32,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .08),
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: widget.game.primary,
+                                  blurRadius: 18,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        );
-      },
+              );
+            },
+          );
+    final anticipated = anticipationReel == reel;
+    final dimmed = anticipationReel != null && !anticipated;
+    return AnimatedOpacity(
+      opacity: dimmed ? .48 : 1,
+      duration: const Duration(milliseconds: 180),
+      child: AnimatedScale(
+        scale: anticipated ? 1.035 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutBack,
+        child: Stack(
+          key: anticipated ? ValueKey('reel-anticipation-$reel') : null,
+          fit: StackFit.expand,
+          children: [
+            stoppedReel,
+            if (anticipated)
+              _ReelAnticipation(
+                animation: anticipationController,
+                primary: widget.game.primary,
+                secondary: widget.game.secondary,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1567,6 +1660,13 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+            ),
+          if ((symbol == 'S' || symbol == 'B') &&
+              anticipationReel != null &&
+              reel < anticipationReel!)
+            _TriggerCharge(
+              animation: anticipationController,
+              primary: widget.game.primary,
             ),
         ],
       ),
@@ -2316,6 +2416,217 @@ class _FeatureCurtain extends StatelessWidget {
         ],
       );
     },
+  );
+}
+
+class _FreeSpinHud extends StatelessWidget {
+  const _FreeSpinHud({
+    super.key,
+    required this.total,
+    required this.played,
+    required this.remaining,
+    required this.multiplier,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final int total, played, remaining, multiplier;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) {
+    final complete = remaining <= 0 && played >= total;
+    final progress = total <= 0 ? 0.0 : (played / total).clamp(0.0, 1.0);
+    return Container(
+      key: const ValueKey('free-spin-hud'),
+      height: 36,
+      margin: const EdgeInsets.only(top: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xee11031e),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: primary, width: 2),
+        boxShadow: [
+          BoxShadow(color: primary.withValues(alpha: .58), blurRadius: 14),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bolt_rounded, color: primary, size: 20),
+          const SizedBox(width: 5),
+          Text(
+            complete
+                ? 'FREE SPINS COMPLETE'
+                : played == 0
+                ? '$total FREE SPINS'
+                : 'FREE SPIN $played / $total',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 72,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: progress),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) => LinearProgressIndicator(
+                value: value,
+                minHeight: 7,
+                borderRadius: BorderRadius.circular(6),
+                backgroundColor: Colors.white12,
+                valueColor: AlwaysStoppedAnimation<Color>(primary),
+              ),
+            ),
+          ),
+          const SizedBox(width: 7),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: secondary.withValues(alpha: .78),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: primary),
+            ),
+            child: Text(
+              complete ? 'DONE' : '$remaining LEFT',
+              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+            ),
+          ),
+          if (multiplier > 1) ...[
+            const SizedBox(width: 5),
+            Text(
+              '×$multiplier',
+              style: TextStyle(
+                color: primary,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: primary, blurRadius: 9)],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReelAnticipation extends StatelessWidget {
+  const _ReelAnticipation({
+    required this.animation,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final Animation<double> animation;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final pulse = Curves.easeInOut.transform(animation.value);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: secondary.withValues(alpha: .05 + pulse * .1),
+                border: Border.all(
+                  color: Color.lerp(primary, Colors.white, pulse)!,
+                  width: 3 + pulse * 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withValues(alpha: .5 + pulse * .4),
+                    blurRadius: 16 + pulse * 24,
+                    spreadRadius: 1 + pulse * 3,
+                  ),
+                ],
+              ),
+            ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                margin: const EdgeInsets.only(top: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xe6160325),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: primary),
+                ),
+                child: const Text(
+                  'FEATURE?',
+                  style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+            for (final alignment in const [
+              Alignment(-.82, -.72),
+              Alignment(.82, -.72),
+              Alignment(-.82, .72),
+              Alignment(.82, .72),
+            ])
+              Align(
+                alignment: alignment,
+                child: Transform.scale(
+                  scale: .75 + pulse * .55,
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: primary,
+                    size: 17,
+                    shadows: const [Shadow(color: Colors.white, blurRadius: 8)],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _TriggerCharge extends StatelessWidget {
+  const _TriggerCharge({required this.animation, required this.primary});
+
+  final Animation<double> animation;
+  final Color primary;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final pulse = sin(animation.value * pi).abs();
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Colors.white.withValues(alpha: .55 + pulse * .45),
+              width: 2 + pulse * 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: .48 + pulse * .42),
+                blurRadius: 12 + pulse * 22,
+                spreadRadius: pulse * 3,
+              ),
+            ],
+          ),
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                Icons.bolt_rounded,
+                color: primary,
+                size: 14 + pulse * 4,
+                shadows: const [Shadow(color: Colors.white, blurRadius: 7)],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
   );
 }
 

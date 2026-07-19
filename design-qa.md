@@ -19,6 +19,10 @@
 - Payline implementation screenshot: `/private/tmp/aurora-payline-desktop.png`
 - Payline responsive screenshot: `/private/tmp/aurora-payline-mobile.png`
 - Payline comparison artifact: `/private/tmp/aurora-payline-reference-comparison.png`
+- Feature-anticipation desktop implementation: `/private/tmp/aurora-anticipation-desktop-final.png`
+- Feature-anticipation mobile implementation: `/private/tmp/aurora-anticipation-mobile.png`
+- Feature-anticipation mobile spin result: `/private/tmp/aurora-anticipation-mobile-spin.png`
+- Current slot-to-slot comparison artifact: `/private/tmp/aurora-anticipation-reference-comparison.png`
 
 ## Visual comparison
 
@@ -33,6 +37,8 @@ The shared reel presentation now adds a finite stop impulse and flash per reel, 
 Cascade transitions now have an explicit three-step rhythm: authoritative winning cells charge, shrink and burst into finite slot-colored particles; only after that clear window does the next authoritative round grid drop into the cabinet. The presentation never manufactures replacement symbols or rewards client-side, and turbo mode uses the same sequence with compressed timings.
 
 Line wins now preserve the server-provided payline number, amount and exact cell coordinates through the mobile API model. The reel cabinet renders those coordinates as a finite illuminated path with a traveling highlight, while the matching line numbers activate in the side rail. Multiple lines reveal sequentially; cascade clears remove the path before the next authoritative grid arrives.
+
+Feature anticipation is now tied to the authoritative target grid rather than a random presentation cue. After two scatter or bonus symbols land, already stopped triggers receive a finite charge treatment, non-target reels dim, and the next reel receives a pulsing slot-colored frame, particles and a `FEATURE?` callout until it stops. Free-spin sequences now retain an in-cabinet HUD with current/total spin, remaining count, progress and the authoritative round multiplier throughout the sequence.
 
 ## Interaction and responsive checks
 
@@ -55,6 +61,8 @@ Line wins now preserve the server-provided payline number, amount and exact cell
 - Responsive stability was rechecked at `390 × 844` over three additional real spins, including sequential reel stops and feature anticipation. No clipping, overflow or control obstruction appeared. The exact clear/refill ordering is additionally locked by a deterministic widget test at the desktop viewport.
 - A live multi-line Dragon Peak win was exercised at `1280 × 591`. Server line numbers 3 and 6 activated in the rail, the path drew through the authoritative winning coordinates, the win meter advanced, and the same spin continued through cascades without stale overlays.
 - A live line win and cascade were exercised at `390 × 844`. Winning-cell emphasis, line detail, clear state, coin/diamond celebration and persistent controls remained visible without clipping or horizontal overflow.
+- The current Dragon Peak build was rechecked at `1280 × 591` and `390 × 844` after adding anticipation and the free-spin HUD. The desktop cabinet and bottom controls remain stable; the mobile cabinet, jackpot row, bet controls and primary spin action remain fully visible without overlap or clipping.
+- A deterministic widget flow lands exactly two trigger symbols on the first two reels, verifies that only reel three enters the finite anticipation state, and verifies that the state clears when the spin settles. A separate authoritative free-spin flow verifies the persistent HUD and completion state.
 
 ## Motion comparison gate
 
@@ -77,6 +85,21 @@ Line wins now preserve the server-provided payline number, amount and exact cell
 - Image quality and asset fidelity: original symbol rasters remain unobscured except during their intentional win emphasis; no source artwork was replaced or approximated.
 - Copy and content: line detail, line identifiers and win totals originate from authoritative round data rather than presentation-only labels.
 
+## Feature-anticipation comparison gate
+
+- Source visual truth: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4`.
+- Implementation state: Dragon Peak cabinet after the anticipation/free-spin presentation update.
+- Viewports: `1280 × 591` desktop and `390 × 844` mobile.
+- Full-view comparison evidence: `/private/tmp/aurora-anticipation-reference-comparison.png` places one supplied active-slot recording frame and the current browser-rendered Aurora cabinet in the same normalized image.
+- Focused-region evidence: a separate crop was not required because the comparison keeps the complete reel cabinet, top wallet, jackpot tower, bet controls and primary spin action legible. Trigger-state details are additionally locked at widget level because a random live spin cannot be used as deterministic visual evidence.
+- Fonts and typography: the compact HUD weight, display hierarchy and short uppercase feature labels remain legible at both viewports; no wrapping or truncation was observed.
+- Spacing and layout rhythm: the anticipation overlay paints inside reel bounds and the free-spin HUD occupies the existing reserved status region, so cabinet and control-bar geometry do not move between states.
+- Colors and visual tokens: reel glow, trigger charge and multiplier badge derive from the active slot's primary/secondary colors and preserve Aurora's established orange/gold contrast.
+- Image quality and asset fidelity: Dragon Peak's original raster background and symbol art remain sharp and unobscured; effects use the established Material icon family and finite composited animation layers.
+- Copy and content: `FEATURE?`, remaining spins, progress and multiplier labels map to authoritative spin data; no reward or trigger is fabricated client-side.
+- States and interactions: a real desktop spin and a real mobile spin completed with wallet/control recovery; desktop and mobile browser captures showed no overflow. Deterministic widget tests cover the otherwise non-repeatable two-trigger anticipation and free-spin sequence.
+- Comparison history: the prior build exposed only a text `FEATURE CHANCE` message after two triggers. The revised implementation adds a clear target-reel focus, charged landed triggers, surrounding-reel dimming and a persistent free-spin status surface. The post-change desktop/mobile evidence contains no actionable P0/P1/P2 regression.
+
 ## Open visual issues
 
 - P0: none
@@ -86,6 +109,8 @@ Line wins now preserve the server-provided payline number, amount and exact cell
 
 The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `44` Flutter tests passed, including deterministic authoritative-payline rendering, cascade clear-before-refill ordering, BIG/SUPER/MEGA escalation, welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage. Flutter analysis reported no errors or warnings; seven existing brace-style info notices remain outside this change.
+Automated verification: `45` Flutter tests passed, including deterministic authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
+
+The final browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
 final result: passed
