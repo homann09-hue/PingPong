@@ -694,10 +694,7 @@ void main() {
     );
     await tester.pump();
     expect(find.textContaining('WELCOME TO'), findsOneWidget);
-    expect(
-      find.text('WILD POWER • BONUS FEATURES • JACKPOTS'),
-      findsOneWidget,
-    );
+    expect(find.text('WILD POWER • BONUS FEATURES • JACKPOTS'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 2100));
     await tester.pumpAndSettle();
     expect(find.textContaining('WELCOME TO'), findsNothing);
@@ -730,6 +727,39 @@ void main() {
     }
   });
 
+  testWidgets('hold and win runs as a full-screen bonus experience', (
+    tester,
+  ) async {
+    await _openBonusExperience(tester, 'hold_and_win');
+    expect(find.text('HOLD & WIN'), findsOneWidget);
+    expect(find.text('LOCK & RESPIN FEATURE'), findsOneWidget);
+    expect(find.text('COINS EINSAMMELN'), findsOneWidget);
+    await tester.tap(find.text('COINS EINSAMMELN'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('wheel bonus reveals the server-selected reward', (tester) async {
+    await _openBonusExperience(tester, 'wheel');
+    expect(find.text('TEMPLE WHEEL'), findsOneWidget);
+    expect(find.text('WHEEL BONUS'), findsOneWidget);
+    expect(find.textContaining('500 COINS'), findsOneWidget);
+    await tester.tap(find.text('GEWINN EINSAMMELN'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('pick bonus requires every authoritative pick', (tester) async {
+    await _openBonusExperience(tester, 'pick');
+    expect(find.text('TREASURE PICK'), findsOneWidget);
+    expect(find.text('PICK & WIN BONUS'), findsOneWidget);
+    for (var pick = 0; pick < 3; pick++) {
+      await tester.tap(find.byIcon(Icons.lock_rounded).first);
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.text('×5  •  500 COINS'), findsOneWidget);
+    await tester.tap(find.text('COINS EINSAMMELN'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('expired High Roller access stops an open exclusive slot', (
     tester,
   ) async {
@@ -758,6 +788,28 @@ void main() {
     );
     expect(find.text('ZUM CLUB'), findsOneWidget);
   });
+}
+
+Future<void> _openBonusExperience(WidgetTester tester, String mode) async {
+  await tester.binding.setSurfaceSize(const Size(1280, 591));
+  await tester.pumpWidget(
+    MaterialApp(
+      home: SlotScreen(
+        game: games.first,
+        balance: 1000000,
+        level: 12,
+        xp: 0,
+        vipPoints: 0,
+        api: _BonusPresentationApi(mode),
+      ),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 2100));
+  await tester.tap(find.text('DREH!'));
+  for (var frame = 0; frame < 50; frame++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
 
 class _ExpiredHighRollerApi extends CasinoApi {
@@ -811,6 +863,84 @@ class _FreeSpinPresentationApi extends CasinoApi {
       spins: 1,
       totalWon: 500,
       totalFreeSpins: 2,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _BonusPresentationApi extends CasinoApi {
+  _BonusPresentationApi(this.mode);
+
+  final String mode;
+
+  SpinRoundView _round({
+    required String phase,
+    required int win,
+    String? bonusMode,
+  }) => SpinRoundView(
+    phase: phase,
+    index: 1,
+    grid: [
+      ['A', 'K', 'Q'],
+      ['A', 'W', 'Q'],
+      ['A', 'K', 'S'],
+      ['J', 'K', 'Q'],
+      ['A', 'K', 'Q'],
+    ],
+    win: win,
+    bonusMultiplier: bonusMode == null ? null : 5,
+    bonusMode: bonusMode,
+    bonusTier: null,
+    bonusSpots: bonusMode == 'hold_and_win' ? 3 : null,
+    bonusSegment: bonusMode == 'wheel' ? 3 : null,
+    bonusBoardSize: bonusMode == 'hold_and_win'
+        ? 15
+        : bonusMode == 'pick'
+        ? 9
+        : null,
+    bonusPickMultipliers: bonusMode == 'pick' ? const [1, 2, 2] : const [],
+    bonusInitialSpots: bonusMode == 'hold_and_win'
+        ? const [
+            HoldAndWinSpotView(position: 0, multiplier: 2),
+            HoldAndWinSpotView(position: 6, multiplier: 1),
+            HoldAndWinSpotView(position: 14, multiplier: 2),
+          ]
+        : const [],
+    bonusRespinSteps: const [],
+    bonusCoins: const [],
+    featureLabel: bonusMode == null ? null : 'BONUS FEATURE',
+    winningCells: const {},
+    winLabel: null,
+  );
+
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final rounds = [
+      _round(phase: 'base', win: 0),
+      _round(phase: 'bonus', win: 500, bonusMode: mode),
+    ];
+    return SpinResponse(
+      grid: rounds.first.grid,
+      balance: 1000400,
+      win: 500,
+      freeSpins: 0,
+      rounds: rounds,
+      level: 12,
+      xp: 50,
+      spins: 1,
+      totalWon: 500,
+      totalFreeSpins: 0,
       vipPoints: 1,
       maxWinReached: false,
       winClass: null,

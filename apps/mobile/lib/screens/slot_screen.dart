@@ -588,6 +588,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         multiplier: round.bonusMultiplier ?? 1,
         segment: round.bonusSegment ?? 0,
         color: widget.game.primary,
+        secondary: widget.game.secondary,
+        backgroundAsset: widget.game.asset,
       ),
       'hold_and_win' => _HoldAndWinDialog(
         reward: round.win,
@@ -596,29 +598,51 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         boardSize: round.bonusBoardSize ?? 15,
         initialSpots: round.bonusInitialSpots,
         steps: round.bonusRespinSteps,
+        primary: widget.game.primary,
+        secondary: widget.game.secondary,
+        backgroundAsset: widget.game.asset,
       ),
       'coin_collect' => _CoinCollectDialog(
         reward: round.win,
         multiplier: round.bonusMultiplier ?? 1,
         coins: round.bonusCoins,
         color: widget.game.primary,
+        secondary: widget.game.secondary,
+        backgroundAsset: widget.game.asset,
       ),
       'jackpot' => _JackpotDialog(
         reward: round.win,
         tier: round.bonusTier ?? 'MINI',
         color: widget.game.primary,
+        secondary: widget.game.secondary,
+        backgroundAsset: widget.game.asset,
       ),
       _ => _TreasurePickDialog(
         reward: round.win,
         multiplier: round.bonusMultiplier ?? 1,
         picks: round.bonusPickMultipliers,
         boardSize: round.bonusBoardSize ?? 3,
+        primary: widget.game.primary,
+        secondary: widget.game.secondary,
+        backgroundAsset: widget.game.asset,
       ),
     };
-    return showDialog<void>(
+    return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => dialog,
+      barrierColor: Colors.black,
+      barrierLabel: 'Bonus feature',
+      transitionDuration: const Duration(milliseconds: 420),
+      pageBuilder: (_, _, _) => dialog,
+      transitionBuilder: (_, animation, _, child) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: .94, end: 1).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 
@@ -2135,97 +2159,275 @@ class _PaytableRow extends StatelessWidget {
   }
 }
 
+class _BonusExperience extends StatelessWidget {
+  const _BonusExperience({
+    required this.title,
+    required this.eyebrow,
+    required this.backgroundAsset,
+    required this.primary,
+    required this.secondary,
+    required this.icon,
+    required this.child,
+    required this.footer,
+  });
+
+  final String title, eyebrow, backgroundAsset;
+  final Color primary, secondary;
+  final IconData icon;
+  final Widget child, footer;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: const Color(0xff050009),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= 800;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              backgroundAsset,
+              fit: BoxFit.cover,
+              color: const Color(0xaa11000c),
+              colorBlendMode: BlendMode.multiply,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  radius: .95,
+                  colors: [
+                    primary.withValues(alpha: .28),
+                    secondary.withValues(alpha: .72),
+                    const Color(0xf205000a),
+                  ],
+                  stops: const [0, .62, 1],
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  desktop ? 28 : 12,
+                  desktop ? 18 : 8,
+                  desktop ? 28 : 12,
+                  desktop ? 18 : 10,
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: desktop ? 22 : 14,
+                        vertical: desktop ? 13 : 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xdd130018),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: primary, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primary.withValues(alpha: .45),
+                            blurRadius: 24,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: desktop ? 48 : 40,
+                            height: desktop ? 48 : 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [Colors.white, primary, secondary],
+                              ),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: const Color(0xff24022d),
+                              size: desktop ? 28 : 23,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  eyebrow,
+                                  style: TextStyle(
+                                    color: primary,
+                                    fontSize: desktop ? 11 : 9,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: const Color(0xfffff1a8),
+                                    fontSize: desktop ? 28 : 20,
+                                    fontWeight: FontWeight.w900,
+                                    shadows: [
+                                      Shadow(color: primary, blurRadius: 12),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _PulseBadge(color: primary),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: desktop ? 14 : 8),
+                    Expanded(child: child),
+                    SizedBox(height: desktop ? 14 : 8),
+                    SizedBox(
+                      width: min(constraints.maxWidth, desktop ? 440 : 330),
+                      height: desktop ? 58 : 52,
+                      child: footer,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _PulseBadge extends StatelessWidget {
+  const _PulseBadge({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: .2, end: 1),
+    duration: const Duration(milliseconds: 850),
+    curve: Curves.easeOutCubic,
+    builder: (_, progress, _) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .16 + progress * .18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: progress * .5),
+            blurRadius: 14,
+          ),
+        ],
+      ),
+      child: const Text(
+        'FEATURE ACTIVE',
+        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+      ),
+    ),
+  );
+}
+
 class _CoinCollectDialog extends StatelessWidget {
   const _CoinCollectDialog({
     required this.reward,
     required this.multiplier,
     required this.coins,
     required this.color,
+    required this.secondary,
+    required this.backgroundAsset,
   });
 
   final int reward, multiplier;
   final List<HoldAndWinSpotView> coins;
-  final Color color;
+  final Color color, secondary;
+  final String backgroundAsset;
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    backgroundColor: Colors.transparent,
-    child: Container(
-      constraints: const BoxConstraints(maxWidth: 430),
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xff402000), Color(0xff140515)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color, width: 3),
-        boxShadow: [BoxShadow(color: color, blurRadius: 32, spreadRadius: 3)],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.monetization_on_rounded,
-            color: Color(0xffffd438),
-            size: 58,
+  Widget build(BuildContext context) => _BonusExperience(
+    title: 'COIN COLLECT',
+    eyebrow: 'MULTIPLIER FEATURE',
+    backgroundAsset: backgroundAsset,
+    primary: color,
+    secondary: secondary,
+    icon: Icons.monetization_on_rounded,
+    footer: FilledButton.icon(
+      onPressed: () => Navigator.pop(context),
+      icon: const Icon(Icons.savings_rounded),
+      label: const Text('COINS EINSAMMELN'),
+    ),
+    child: Center(
+      child: SingleChildScrollView(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 880),
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: const Color(0xdd160318),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: color, width: 2),
           ),
-          const Text(
-            'COIN COLLECT',
-            style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              for (final coin in coins)
-                Container(
-                  width: 54,
-                  height: 54,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const RadialGradient(
-                      colors: [Color(0xfffff4a8), Color(0xffffa000)],
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final coin in coins)
+                    Container(
+                      width: 72,
+                      height: 72,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const RadialGradient(
+                          colors: [Color(0xfffff4a8), Color(0xffffa000)],
+                        ),
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0xaaff9800), blurRadius: 18),
+                        ],
+                      ),
+                      child: Text(
+                        '×${coin.multiplier}',
+                        style: const TextStyle(
+                          color: Color(0xff5b2500),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: Text(
-                    '×${coin.multiplier}',
-                    style: const TextStyle(
-                      color: Color(0xff5b2500),
-                      fontWeight: FontWeight.w900,
-                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '${coins.length} COINS  •  TOTAL ×$multiplier',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TweenAnimationBuilder<int>(
+                tween: IntTween(begin: 0, end: reward),
+                duration: const Duration(milliseconds: 900),
+                builder: (_, value, _) => Text(
+                  _formatCoins(value),
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            '${coins.length} COINS  •  TOTAL ×$multiplier',
-            style: TextStyle(color: color, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          TweenAnimationBuilder<int>(
-            tween: IntTween(begin: 0, end: reward),
-            duration: const Duration(milliseconds: 900),
-            builder: (_, value, _) => Text(
-              value.toString().replaceAllMapped(
-                RegExp(r'\B(?=(\d{3})+(?!\d))'),
-                (_) => '.',
-              ),
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('EINSAMMELN'),
-          ),
-        ],
+        ),
       ),
     ),
   );
@@ -2236,11 +2438,14 @@ class _JackpotDialog extends StatefulWidget {
     required this.reward,
     required this.tier,
     required this.color,
+    required this.secondary,
+    required this.backgroundAsset,
   });
 
   final int reward;
   final String tier;
-  final Color color;
+  final Color color, secondary;
+  final String backgroundAsset;
 
   @override
   State<_JackpotDialog> createState() => _JackpotDialogState();
@@ -2265,72 +2470,71 @@ class _JackpotDialogState extends State<_JackpotDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xff160622),
-    title: Text(
-      '${widget.tier} JACKPOT',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color: widget.color,
-        fontSize: 27,
-        fontWeight: FontWeight.w900,
-      ),
+  Widget build(BuildContext context) => _BonusExperience(
+    title: '${widget.tier} JACKPOT',
+    eyebrow: 'PROGRESSIVE FEATURE',
+    backgroundAsset: widget.backgroundAsset,
+    primary: widget.color,
+    secondary: widget.secondary,
+    icon: Icons.emoji_events_rounded,
+    footer: FilledButton.icon(
+      onPressed: revealed ? () => Navigator.pop(context) : null,
+      icon: const Icon(Icons.savings),
+      label: const Text('JACKPOT EINSAMMELN'),
     ),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedScale(
-          scale: revealed ? 1 : .35,
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.elasticOut,
-          child: Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [widget.color, const Color(0xffff8a00)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.color.withValues(alpha: .7),
-                  blurRadius: 32,
-                  spreadRadius: 5,
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            scale: revealed ? 1 : .35,
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.elasticOut,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Colors.white, widget.color, const Color(0xffff8a00)],
                 ),
-              ],
-            ),
-            child: const Icon(
-              Icons.emoji_events,
-              color: Colors.white,
-              size: 82,
-            ),
-          ),
-        ),
-        const SizedBox(height: 22),
-        AnimatedOpacity(
-          opacity: revealed ? 1 : 0,
-          duration: const Duration(milliseconds: 350),
-          child: Text(
-            '${_formatCoins(widget.reward)} COINS',
-            style: TextStyle(
-              color: widget.color,
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: .75),
+                    blurRadius: 52,
+                    spreadRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.emoji_events,
+                color: Colors.white,
+                size: 118,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 6),
-        const Text('SCATTER JACKPOT GEWONNEN'),
-      ],
-    ),
-    actionsAlignment: MainAxisAlignment.center,
-    actions: [
-      FilledButton.icon(
-        onPressed: revealed ? () => Navigator.pop(context) : null,
-        icon: const Icon(Icons.savings),
-        label: const Text('JACKPOT EINSAMMELN'),
+          const SizedBox(height: 22),
+          AnimatedOpacity(
+            opacity: revealed ? 1 : 0,
+            duration: const Duration(milliseconds: 350),
+            child: Text(
+              '${_formatCoins(widget.reward)} COINS',
+              style: TextStyle(
+                color: widget.color,
+                fontSize: 36,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: widget.color, blurRadius: 20)],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'SCATTER JACKPOT GEWONNEN',
+            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.4),
+          ),
+        ],
       ),
-    ],
+    ),
   );
 }
 
@@ -2340,11 +2544,16 @@ class _TreasurePickDialog extends StatefulWidget {
     required this.multiplier,
     required this.picks,
     required this.boardSize,
+    required this.primary,
+    required this.secondary,
+    required this.backgroundAsset,
   });
 
   final int reward, multiplier;
   final List<int> picks;
   final int boardSize;
+  final Color primary, secondary;
+  final String backgroundAsset;
 
   @override
   State<_TreasurePickDialog> createState() => _TreasurePickDialogState();
@@ -2361,82 +2570,131 @@ class _TreasurePickDialogState extends State<_TreasurePickDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xff052f62),
-    title: const Text(
-      'TREASURE PICK BONUS',
-      textAlign: TextAlign.center,
-      style: TextStyle(color: Color(0xffffd45c), fontWeight: FontWeight.w900),
+  Widget build(BuildContext context) => _BonusExperience(
+    title: 'TREASURE PICK',
+    eyebrow: 'PICK & WIN BONUS',
+    backgroundAsset: widget.backgroundAsset,
+    primary: widget.primary,
+    secondary: widget.secondary,
+    icon: Icons.diamond_rounded,
+    footer: FilledButton.icon(
+      onPressed: complete ? () => Navigator.pop(context) : null,
+      icon: const Icon(Icons.inventory_2_rounded),
+      label: Text(
+        complete
+            ? 'COINS EINSAMMELN'
+            : '${widget.picks.length - revealed.length} PICKS OFFEN',
+      ),
     ),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          revealed.isEmpty
-              ? 'Öffne ${widget.picks.length} Schatztruhen'
-              : !complete
-              ? '${widget.picks.length - revealed.length} PICKS VERBLEIBEN'
-              : 'x${widget.multiplier}  •  ${_format(widget.reward)} COINS',
+    child: Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 820),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xdd07182f),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: widget.primary, width: 2),
         ),
-        const SizedBox(height: 14),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          children: List.generate(widget.boardSize, (index) {
-            final value = revealed[index];
-            return GestureDetector(
-              onTap: value == null && !complete ? () => reveal(index) : null,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 260),
-                scale: value != null ? 1.08 : 1,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ColorFiltered(
-                      colorFilter: value != null
-                          ? const ColorFilter.mode(
-                              Colors.transparent,
-                              BlendMode.dst,
-                            )
-                          : const ColorFilter.mode(
-                              Color(0xff152b55),
-                              BlendMode.modulate,
+        child: Column(
+          children: [
+            Text(
+              revealed.isEmpty
+                  ? 'ÖFFNE ${widget.picks.length} SCHATZTRUHEN'
+                  : !complete
+                  ? '${widget.picks.length - revealed.length} PICKS VERBLEIBEN'
+                  : '×${widget.multiplier}  •  ${_format(widget.reward)} COINS',
+              style: TextStyle(
+                color: widget.primary,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: GridView.count(
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: MediaQuery.sizeOf(context).width >= 800
+                    ? 2.45
+                    : 1,
+                children: List.generate(widget.boardSize, (index) {
+                  final value = revealed[index];
+                  return GestureDetector(
+                    onTap: value == null && !complete
+                        ? () => reveal(index)
+                        : null,
+                    child: AnimatedScale(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutBack,
+                      scale: value != null ? 1.08 : 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xcc051020),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: value == null
+                                ? widget.secondary
+                                : widget.primary,
+                            width: value == null ? 2 : 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.primary.withValues(
+                                alpha: value == null ? .15 : .55,
+                              ),
+                              blurRadius: value == null ? 8 : 20,
                             ),
-                      child: Image.asset('assets/symbols/pirate/scatter.png'),
-                    ),
-                    if (value == null)
-                      const Icon(
-                        Icons.lock,
-                        color: Color(0xffffd45c),
-                        size: 28,
-                      ),
-                    if (value != null)
-                      Text(
-                        '×$value',
-                        style: const TextStyle(
-                          color: Color(0xffffd45c),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ColorFiltered(
+                              colorFilter: value != null
+                                  ? const ColorFilter.mode(
+                                      Colors.transparent,
+                                      BlendMode.dst,
+                                    )
+                                  : const ColorFilter.mode(
+                                      Color(0xff152b55),
+                                      BlendMode.modulate,
+                                    ),
+                              child: Image.asset(
+                                'assets/symbols/pirate/scatter.png',
+                              ),
+                            ),
+                            if (value == null)
+                              const Icon(
+                                Icons.lock_rounded,
+                                color: Color(0xffffd45c),
+                                size: 34,
+                              ),
+                            if (value != null)
+                              Text(
+                                '×$value',
+                                style: const TextStyle(
+                                  color: Color(0xffffd45c),
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  shadows: [
+                                    Shadow(color: Colors.black, blurRadius: 5),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                  );
+                }),
               ),
-            );
-          }),
+            ),
+          ],
         ),
-      ],
-    ),
-    actionsAlignment: MainAxisAlignment.center,
-    actions: [
-      FilledButton(
-        onPressed: complete ? () => Navigator.pop(context) : null,
-        child: const Text('COINS EINSAMMELN'),
       ),
-    ],
+    ),
   );
 
   static String _format(int value) => value.toString().replaceAllMapped(
@@ -2451,10 +2709,13 @@ class _WheelBonusDialog extends StatefulWidget {
     required this.multiplier,
     required this.segment,
     required this.color,
+    required this.secondary,
+    required this.backgroundAsset,
   });
 
   final int reward, multiplier, segment;
-  final Color color;
+  final Color color, secondary;
+  final String backgroundAsset;
 
   @override
   State<_WheelBonusDialog> createState() => _WheelBonusDialogState();
@@ -2462,59 +2723,82 @@ class _WheelBonusDialog extends StatefulWidget {
 
 class _WheelBonusDialogState extends State<_WheelBonusDialog> {
   bool revealed = false;
+  Timer? timer;
 
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 1700), () {
+    timer = Timer(const Duration(milliseconds: 1700), () {
       if (mounted) setState(() => revealed = true);
     });
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xff082f28),
-    title: const Text(
-      'TEMPLE WHEEL BONUS',
-      textAlign: TextAlign.center,
-      style: TextStyle(color: Color(0xffffd45c), fontWeight: FontWeight.w900),
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _BonusExperience(
+    title: 'TEMPLE WHEEL',
+    eyebrow: 'WHEEL BONUS',
+    backgroundAsset: widget.backgroundAsset,
+    primary: widget.color,
+    secondary: widget.secondary,
+    icon: Icons.casino_rounded,
+    footer: FilledButton.icon(
+      onPressed: revealed ? () => Navigator.pop(context) : null,
+      icon: const Icon(Icons.savings_rounded),
+      label: Text(revealed ? 'GEWINN EINSAMMELN' : 'RAD DREHT …'),
     ),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedRotation(
-          turns: revealed ? 2 + widget.segment / 8 : 0,
-          duration: const Duration(milliseconds: 1500),
-          curve: Curves.easeOutQuart,
-          child: Image.asset(
-            'assets/symbols/jungle/scatter.png',
-            width: 210,
-            height: 210,
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedRotation(
+                turns: revealed ? 3 + widget.segment / 8 : 0,
+                duration: const Duration(milliseconds: 1500),
+                curve: Curves.easeOutQuart,
+                child: Image.asset(
+                  'assets/ui/aurora_temple_wheel.png',
+                  width: 330,
+                  height: 330,
+                ),
+              ),
+              Positioned(
+                top: 0,
+                child: Icon(
+                  Icons.arrow_drop_down_rounded,
+                  size: 58,
+                  color: widget.color,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 7)],
+                ),
+              ),
+            ],
           ),
-        ),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 260),
-          child: Text(
-            revealed
-                ? 'x${widget.multiplier}  •  ${_formatCoins(widget.reward)} COINS'
-                : 'DAS RAD DREHT SICH …',
-            key: ValueKey(revealed),
-            style: TextStyle(
-              color: widget.color,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
+          const SizedBox(height: 18),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            child: Text(
+              revealed
+                  ? '×${widget.multiplier}  •  ${_formatCoins(widget.reward)} COINS'
+                  : 'DAS RAD DREHT SICH …',
+              key: ValueKey(revealed),
+              style: TextStyle(
+                color: widget.color,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: widget.color, blurRadius: 16)],
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-    actionsAlignment: MainAxisAlignment.center,
-    actions: [
-      FilledButton(
-        onPressed: revealed ? () => Navigator.pop(context) : null,
-        child: const Text('GEWINN EINSAMMELN'),
+        ],
       ),
-    ],
+    ),
   );
 }
 
@@ -2526,11 +2810,16 @@ class _HoldAndWinDialog extends StatefulWidget {
     required this.boardSize,
     required this.initialSpots,
     required this.steps,
+    required this.primary,
+    required this.secondary,
+    required this.backgroundAsset,
   });
 
   final int reward, multiplier, spots, boardSize;
   final List<HoldAndWinSpotView> initialSpots;
   final List<HoldAndWinStepView> steps;
+  final Color primary, secondary;
+  final String backgroundAsset;
 
   @override
   State<_HoldAndWinDialog> createState() => _HoldAndWinDialogState();
@@ -2584,112 +2873,151 @@ class _HoldAndWinDialogState extends State<_HoldAndWinDialog> {
   @override
   Widget build(BuildContext context) {
     final columns = widget.boardSize % 5 == 0 ? 5 : 3;
-    return AlertDialog(
-      backgroundColor: const Color(0xff250409),
-      title: const Text(
-        'HOLD & WIN BONUS',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: Color(0xffffd45c), fontWeight: FontWeight.w900),
+    return _BonusExperience(
+      title: 'HOLD & WIN',
+      eyebrow: 'LOCK & RESPIN FEATURE',
+      backgroundAsset: widget.backgroundAsset,
+      primary: widget.primary,
+      secondary: widget.secondary,
+      icon: Icons.lock_clock_rounded,
+      footer: FilledButton.icon(
+        onPressed: complete ? () => Navigator.pop(context) : null,
+        icon: const Icon(Icons.savings_rounded),
+        label: Text(
+          complete ? 'COINS EINSAMMELN' : '$lives RESPINS VERBLEIBEN',
+        ),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('RESPINS  '),
-              for (var index = 0; index < 3; index++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Icon(
-                    Icons.bolt,
-                    size: 22,
-                    color: index < lives
-                        ? const Color(0xffffd45c)
-                        : const Color(0xff5c3d31),
-                  ),
-                ),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 760),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xdd210309),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: widget.primary, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: widget.primary.withValues(alpha: .3),
+                blurRadius: 24,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 270,
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                mainAxisSpacing: 4,
-                crossAxisSpacing: 4,
-              ),
-              itemCount: widget.boardSize,
-              itemBuilder: (_, index) => AnimatedScale(
-                key: ValueKey('hold-$index-${revealed[index]}'),
-                duration: const Duration(milliseconds: 420),
-                curve: Curves.elasticOut,
-                scale: revealed.containsKey(index) ? 1 : .72,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xffffc52f)),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'RESPINS  ',
+                    style: TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  child: revealed[index] != null
-                      ? Stack(
-                          fit: StackFit.expand,
-                          alignment: Alignment.center,
-                          children: [
-                            Image.asset('assets/symbols/vegas/scatter.png'),
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
+                  for (var index = 0; index < 3; index++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 260),
+                        scale: index < lives ? 1 : .72,
+                        child: Icon(
+                          Icons.bolt_rounded,
+                          size: 29,
+                          color: index < lives
+                              ? widget.primary
+                              : const Color(0xff5c3d31),
+                          shadows: index < lives
+                              ? [Shadow(color: widget.primary, blurRadius: 12)]
+                              : null,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: widget.boardSize,
+                  itemBuilder: (_, index) => AnimatedScale(
+                    key: ValueKey('hold-$index-${revealed[index]}'),
+                    duration: const Duration(milliseconds: 420),
+                    curve: Curves.elasticOut,
+                    scale: revealed.containsKey(index) ? 1 : .78,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xdd090107),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: revealed[index] == null
+                              ? const Color(0xff70511c)
+                              : widget.primary,
+                          width: revealed[index] == null ? 1 : 3,
+                        ),
+                        boxShadow: revealed[index] == null
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: widget.primary.withValues(alpha: .55),
+                                  blurRadius: 18,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '×${revealed[index]}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
+                              ],
+                      ),
+                      child: revealed[index] != null
+                          ? Stack(
+                              fit: StackFit.expand,
+                              alignment: Alignment.center,
+                              children: [
+                                Image.asset('assets/symbols/vegas/scatter.png'),
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: widget.primary),
+                                    ),
+                                    child: Text(
+                                      '×${revealed[index]}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
+                            )
+                          : const Icon(
+                              Icons.lock_outline_rounded,
+                              color: Color(0xff70511c),
+                              size: 32,
                             ),
-                          ],
-                        )
-                      : const Icon(
-                          Icons.lock_outline,
-                          color: Color(0xff70511c),
-                        ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                complete
+                    ? '×${widget.multiplier}  •  ${_formatCoins(widget.reward)} COINS'
+                    : '${revealed.length} / ${widget.spots} GOLD COINS LOCKED',
+                style: TextStyle(
+                  color: widget.primary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            complete
-                ? 'x${widget.multiplier}  •  ${_formatCoins(widget.reward)} COINS'
-                : '${revealed.length} / ${widget.spots} GOLD COINS LOCKED',
-            style: const TextStyle(
-              color: Color(0xffffd45c),
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-      actionsAlignment: MainAxisAlignment.center,
-      actions: [
-        FilledButton(
-          onPressed: complete ? () => Navigator.pop(context) : null,
-          child: const Text('COINS EINSAMMELN'),
         ),
-      ],
+      ),
     );
   }
 }
