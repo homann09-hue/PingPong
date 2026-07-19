@@ -29,6 +29,7 @@ class SpinRoundView {
     this.visualFeature,
     this.featureCells = const {},
     this.featureReels = const {},
+    this.freeSpinsAwarded = 0,
   });
 
   final String phase;
@@ -51,6 +52,7 @@ class SpinRoundView {
   final String? visualFeature;
   final Set<String> featureCells;
   final Set<int> featureReels;
+  final int freeSpinsAwarded;
 }
 
 class PaylineWinView {
@@ -917,6 +919,14 @@ class CasinoApi {
       final multiplierData = multiplierEvents.isEmpty
           ? null
           : multiplierEvents.last['data'] as Map<String, dynamic>;
+      final bonusMultiplier = bonusData?['multiplier'] as int?;
+      final eventMultiplier = multiplierData?['multiplier'] as int?;
+      final freeSpinsAwarded = events
+          .where((event) => event['type'] == 'free_spins.awarded')
+          .fold<int>(0, (total, event) {
+            final data = event['data'] as Map<String, dynamic>;
+            return total + (data['count'] as int? ?? 0);
+          });
       final upgradeEvents = events
           .where((event) => event['type'] == 'symbol.upgraded')
           .toList();
@@ -1088,7 +1098,7 @@ class CasinoApi {
         index: round['index'] as int,
         grid: roundGrid,
         win: round['totalWin'] as int,
-        bonusMultiplier: bonusData?['multiplier'] as int?,
+        bonusMultiplier: bonusMultiplier ?? eventMultiplier,
         bonusMode: bonusData?['mode'] as String?,
         bonusTier: bonusData?['tier'] as String?,
         bonusSpots: bonusData?['spots'] as int?,
@@ -1143,6 +1153,7 @@ class CasinoApi {
         visualFeature: visualFeature,
         featureCells: featureCells,
         featureReels: featureReels,
+        freeSpinsAwarded: freeSpinsAwarded,
       );
     }).toList();
     return SpinResponse(

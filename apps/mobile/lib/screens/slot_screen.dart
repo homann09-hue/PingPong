@@ -33,6 +33,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final AnimationController anticipationController;
   late final AnimationController featureTriggerController;
   late final AnimationController symbolFeatureController;
+  late final AnimationController freeSpinRetriggerController;
   late final AnimationController reelMotionController;
   Timer? welcomePresentationTimer;
   final random = Random();
@@ -64,6 +65,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   String? activeSymbolFeature;
   Set<String> symbolFeatureCells = {};
   Set<int> symbolFeatureReels = {};
+  int freeSpinRetriggerAward = 0;
+  int freeSpinRetriggerTotal = 0;
   int freeSpinTotal = 0;
   int freeSpinPlayed = 0;
   int freeSpinRemaining = 0;
@@ -104,6 +107,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 940),
     );
+    freeSpinRetriggerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 980),
+    );
     reelMotionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 310),
@@ -132,6 +139,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     anticipationController.dispose();
     featureTriggerController.dispose();
     symbolFeatureController.dispose();
+    freeSpinRetriggerController.dispose();
     reelMotionController.dispose();
     super.dispose();
   }
@@ -252,6 +260,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     symbolFeatureController
       ..stop()
       ..value = 0;
+    freeSpinRetriggerController
+      ..stop()
+      ..value = 0;
     reelMotionController
       ..stop()
       ..repeat();
@@ -272,6 +283,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       activeSymbolFeature = null;
       symbolFeatureCells = {};
       symbolFeatureReels = {};
+      freeSpinRetriggerAward = 0;
+      freeSpinRetriggerTotal = 0;
       freeSpinTotal = 0;
       freeSpinPlayed = 0;
       freeSpinRemaining = 0;
@@ -300,9 +313,15 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       final freeRounds = r.rounds
           .where((round) => round.phase == 'free_spin')
           .length;
+      final initialFreeSpinAward = r.rounds
+          .takeWhile((round) => round.phase != 'free_spin')
+          .fold<int>(0, (total, round) => total + round.freeSpinsAwarded);
       var displayedWin = 0;
       var freeSpinsIntroduced = false;
       var presentedFreeSpins = 0;
+      var availableFreeSpins = initialFreeSpinAward > 0
+          ? min(initialFreeSpinAward, freeRounds)
+          : freeRounds;
       var respinsIntroduced = false;
       for (
         var roundPosition = 0;
@@ -339,13 +358,14 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           if (round.phase == 'free_spin' && !freeSpinsIntroduced) {
             freeSpinsIntroduced = true;
             setState(() {
-              freeSpinTotal = freeRounds;
-              freeSpinRemaining = freeRounds;
+              freeSpinTotal = availableFreeSpins;
+              freeSpinRemaining = availableFreeSpins;
               freeSpinPlayed = 0;
               freeSpinMultiplier = round.bonusMultiplier ?? 1;
             });
             await _showFeaturePresentation(
-              title: '$freeRounds FREE SPINS',
+              title:
+                  '$availableFreeSpins ${availableFreeSpins == 1 ? 'FREE SPIN' : 'FREE SPINS'}',
               subtitle: 'SPECIAL REELS • EXTRA WILDS • MULTIPLIKATOREN',
               icon: Icons.bolt_rounded,
             );
@@ -361,7 +381,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             presentedFreeSpins++;
             setState(() {
               freeSpinPlayed = presentedFreeSpins;
-              freeSpinRemaining = freeRounds - presentedFreeSpins + 1;
+              freeSpinRemaining = max(
+                0,
+                availableFreeSpins - presentedFreeSpins + 1,
+              );
               freeSpinMultiplier = round.bonusMultiplier ?? 1;
             });
             _startRoundReelMotion();
@@ -381,7 +404,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             winningPaylines = round.paylineWins;
             winDetail = round.winLabel;
             featureMode = switch (round.phase) {
-              'free_spin' => 'FREE SPIN ${round.index} / $freeRounds',
+              'free_spin' =>
+                'FREE SPIN $presentedFreeSpins / $availableFreeSpins',
               'cascade' =>
                 round.featureLabel == null
                     ? 'CASCADE ${round.index}'
@@ -390,6 +414,18 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
               _ => round.featureLabel,
             };
           });
+          if (round.phase == 'free_spin' && round.freeSpinsAwarded > 0) {
+            availableFreeSpins = min(
+              freeRounds,
+              availableFreeSpins + round.freeSpinsAwarded,
+            );
+            await _showFreeSpinRetrigger(
+              award: round.freeSpinsAwarded,
+              total: availableFreeSpins,
+              played: presentedFreeSpins,
+            );
+            if (!mounted) return null;
+          }
           if (round.win > 0) {
             unawaited(winController.forward(from: 0));
             if (round.paylineWins.isNotEmpty) {
@@ -423,7 +459,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           }
           if (round.phase == 'free_spin' && mounted) {
             setState(() {
-              freeSpinRemaining = max(0, freeRounds - presentedFreeSpins);
+              freeSpinRemaining = max(
+                0,
+                availableFreeSpins - presentedFreeSpins,
+              );
             });
           }
         }
@@ -527,6 +566,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       symbolFeatureController
         ..stop()
         ..value = 0;
+      freeSpinRetriggerController
+        ..stop()
+        ..value = 0;
       reelMotionController
         ..stop()
         ..value = 0;
@@ -540,6 +582,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           activeSymbolFeature = null;
           symbolFeatureCells = {};
           symbolFeatureReels = {};
+          freeSpinRetriggerAward = 0;
+          freeSpinRetriggerTotal = 0;
           reelsInMotion = List<bool>.filled(max(1, grid.length), false);
         });
       }
@@ -572,6 +616,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       activeSymbolFeature = null;
       symbolFeatureCells = {};
       symbolFeatureReels = {};
+      freeSpinRetriggerAward = 0;
+      freeSpinRetriggerTotal = 0;
     });
   }
 
@@ -692,6 +738,30 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       activeSymbolFeature = null;
       symbolFeatureCells = {};
       symbolFeatureReels = {};
+    });
+  }
+
+  Future<void> _showFreeSpinRetrigger({
+    required int award,
+    required int total,
+    required int played,
+  }) async {
+    if (award <= 0) return;
+    setState(() {
+      freeSpinRetriggerAward = award;
+      freeSpinRetriggerTotal = total;
+      freeSpinTotal = total;
+      freeSpinRemaining = max(0, total - played);
+      featureMode =
+          'RETRIGGER • +$award ${award == 1 ? 'FREE SPIN' : 'FREE SPINS'}';
+    });
+    freeSpinRetriggerController.forward(from: 0);
+    unawaited(HapticFeedback.heavyImpact());
+    await Future<void>.delayed(Duration(milliseconds: turbo ? 210 : 820));
+    if (!mounted) return;
+    setState(() {
+      freeSpinRetriggerAward = 0;
+      freeSpinRetriggerTotal = 0;
     });
   }
 
@@ -1636,6 +1706,17 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                     label: featureMode ?? 'FEATURE ACTIVE',
                     reels: symbolFeatureReels,
                     reelCount: grid.length,
+                    primary: widget.game.primary,
+                    secondary: widget.game.secondary,
+                  ),
+                ),
+              if (freeSpinRetriggerAward > 0)
+                Positioned.fill(
+                  child: _FreeSpinRetriggerOverlay(
+                    key: const ValueKey('free-spin-retrigger-overlay'),
+                    animation: freeSpinRetriggerController,
+                    award: freeSpinRetriggerAward,
+                    total: freeSpinRetriggerTotal,
                     primary: widget.game.primary,
                     secondary: widget.game.secondary,
                   ),
@@ -3351,6 +3432,190 @@ class _FeatureTriggerWave extends StatelessWidget {
                       color: index.isEven ? Colors.white : primary,
                       size: 10 + pulse * 11,
                       shadows: [Shadow(color: secondary, blurRadius: 8)],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _FreeSpinRetriggerOverlay extends StatelessWidget {
+  const _FreeSpinRetriggerOverlay({
+    super.key,
+    required this.animation,
+    required this.award,
+    required this.total,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final Animation<double> animation;
+  final int award, total;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(animation.value);
+        final enter = (animation.value * 5).clamp(0.0, 1.0);
+        final exit = ((1 - animation.value) * 4).clamp(0.0, 1.0);
+        final visibility = min(enter, exit);
+        final pulse = sin(animation.value * pi * 3).abs();
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Opacity(
+              opacity: visibility * .72,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: .22 + progress * 1.05,
+                    colors: [
+                      Colors.white,
+                      primary.withValues(alpha: .86),
+                      secondary.withValues(alpha: .42),
+                      Colors.transparent,
+                    ],
+                    stops: const [0, .22, .58, 1],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: visibility),
+                    width: 2 + pulse * 3,
+                  ),
+                ),
+              ),
+            ),
+            Center(
+              child: Opacity(
+                opacity: visibility,
+                child: Transform.scale(
+                  scale: .62 + enter * .38 + pulse * .055,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 330),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xf20b0317),
+                          primary.withValues(alpha: .98),
+                          secondary.withValues(alpha: .92),
+                          const Color(0xf20b0317),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(17),
+                      border: Border.all(color: Colors.white, width: 2.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primary,
+                          blurRadius: 28 + pulse * 18,
+                          spreadRadius: 5 + pulse * 3,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.bolt_rounded,
+                              color: Colors.white,
+                              size: 25,
+                              shadows: [
+                                Shadow(color: Color(0xffffd44a), blurRadius: 9),
+                              ],
+                            ),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '+$award ${award == 1 ? 'FREE SPIN' : 'FREE SPINS'}',
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: .9,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 5,
+                                      ),
+                                      Shadow(
+                                        color: Color(0xffffd44a),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.bolt_rounded,
+                              color: Colors.white,
+                              size: 25,
+                              shadows: [
+                                Shadow(color: Color(0xffffd44a), blurRadius: 9),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xc9100324),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: .7),
+                            ),
+                          ),
+                          child: Text(
+                            '$total TOTAL',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            for (var index = 0; index < 12; index++)
+              Align(
+                alignment: Alignment(
+                  cos(index * pi / 6) * (.18 + progress * .78),
+                  sin(index * pi / 6) * (.16 + progress * .76),
+                ),
+                child: Opacity(
+                  opacity: visibility * (1 - progress * .55),
+                  child: Transform.rotate(
+                    angle: index * pi / 6 + progress * 1.7,
+                    child: Icon(
+                      index.isEven
+                          ? Icons.auto_awesome_rounded
+                          : Icons.bolt_rounded,
+                      color: index.isEven ? Colors.white : primary,
+                      size: 12 + pulse * 12,
+                      shadows: [Shadow(color: secondary, blurRadius: 9)],
                     ),
                   ),
                 ),

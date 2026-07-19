@@ -729,6 +729,60 @@ void main() {
     expect(find.text('FREE SPINS COMPLETE'), findsOneWidget);
   });
 
+  testWidgets('free-spin retrigger extends the authoritative HUD total', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _FreeSpinRetriggerApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedInitialAward = false;
+    for (var frame = 0; frame < 55; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.text('1 FREE SPIN').evaluate().isNotEmpty) {
+        observedInitialAward = true;
+        break;
+      }
+    }
+    expect(observedInitialAward, isTrue);
+    var observedRetrigger = false;
+    for (var frame = 0; frame < 100; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find
+          .byKey(const ValueKey('free-spin-retrigger-overlay'))
+          .evaluate()
+          .isNotEmpty) {
+        observedRetrigger = true;
+        expect(find.text('+1 FREE SPIN'), findsOneWidget);
+        expect(find.text('2 TOTAL'), findsOneWidget);
+        expect(find.byKey(const ValueKey('free-spin-hud')), findsOneWidget);
+        expect(find.text('×2'), findsWidgets);
+        break;
+      }
+    }
+    expect(observedRetrigger, isTrue);
+    for (var frame = 0; frame < 70; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      find.byKey(const ValueKey('free-spin-retrigger-overlay')),
+      findsNothing,
+    );
+    expect(find.text('FREE SPINS COMPLETE'), findsOneWidget);
+  });
+
   testWidgets('all reels run continuously before authoritative stops', (
     tester,
   ) async {
@@ -1152,6 +1206,100 @@ class _FreeSpinPresentationApi extends CasinoApi {
       xp: 50,
       spins: 1,
       totalWon: 500,
+      totalFreeSpins: 2,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _FreeSpinRetriggerApi extends CasinoApi {
+  SpinRoundView _round({
+    required String phase,
+    required int index,
+    required List<List<String>> grid,
+    required int awarded,
+  }) => SpinRoundView(
+    phase: phase,
+    index: index,
+    grid: grid,
+    win: 0,
+    bonusMultiplier: phase == 'free_spin' ? 2 : null,
+    bonusMode: null,
+    bonusTier: null,
+    bonusSpots: null,
+    bonusSegment: null,
+    bonusBoardSize: null,
+    bonusPickMultipliers: const [],
+    bonusInitialSpots: const [],
+    bonusRespinSteps: const [],
+    bonusCoins: const [],
+    featureLabel: phase == 'free_spin' ? 'FREE SPINS ×2' : null,
+    winningCells: const {},
+    winLabel: null,
+    freeSpinsAwarded: awarded,
+  );
+
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final rounds = [
+      _round(
+        phase: 'base',
+        index: 1,
+        grid: const [
+          ['S', 'A', 'K'],
+          ['S', 'Q', 'J'],
+          ['S', 'K', 'Q'],
+          ['J', 'Q', 'A'],
+          ['K', 'A', 'Q'],
+        ],
+        awarded: 1,
+      ),
+      _round(
+        phase: 'free_spin',
+        index: 1,
+        grid: const [
+          ['S', 'A', 'K'],
+          ['S', 'Q', 'J'],
+          ['S', 'K', 'Q'],
+          ['J', 'Q', 'A'],
+          ['K', 'A', 'Q'],
+        ],
+        awarded: 1,
+      ),
+      _round(
+        phase: 'free_spin',
+        index: 2,
+        grid: const [
+          ['A', 'Q', 'K'],
+          ['K', 'Q', 'J'],
+          ['Q', 'K', 'A'],
+          ['J', 'Q', 'A'],
+          ['K', 'A', 'Q'],
+        ],
+        awarded: 0,
+      ),
+    ];
+    return SpinResponse(
+      grid: rounds.last.grid,
+      balance: 999900,
+      win: 0,
+      freeSpins: 2,
+      rounds: rounds,
+      level: 12,
+      xp: 20,
+      spins: 1,
+      totalWon: 0,
       totalFreeSpins: 2,
       vipPoints: 1,
       maxWinReached: false,

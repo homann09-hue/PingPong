@@ -37,6 +37,12 @@
 - Wild-feature mobile implementation: `/private/tmp/aurora-wild-feature-mobile.png`
 - Wild-feature mobile spin state: `/private/tmp/aurora-wild-feature-mobile-spin.png`
 - Wild-feature reference comparison: `/private/tmp/aurora-wild-feature-reference-comparison.png`
+- Free-spin retrigger desktop implementation: `/private/tmp/aurora-retrigger-desktop.png`
+- Free-spin retrigger desktop live spin: `/private/tmp/aurora-retrigger-desktop-spin.png`
+- Free-spin retrigger mobile implementation: `/private/tmp/aurora-retrigger-mobile.png`
+- Free-spin retrigger mobile live spin: `/private/tmp/aurora-retrigger-mobile-spin.png`
+- Deterministic free-spin retrigger state: `/private/tmp/aurora-retrigger-deterministic.png`
+- Free-spin retrigger reference comparison: `/private/tmp/aurora-retrigger-reference-comparison.png`
 
 ## Visual comparison
 
@@ -168,6 +174,22 @@ The base game and each free-spin round now use continuous vertical reel strips w
 - Accessibility and performance: one finite shared controller drives the symbol-feature layer, and only server-identified reels/cells repaint. The visual overlay ignores pointer input and cannot obstruct the persistent spin controls.
 - Comparison history: this pass found no actionable P0/P1/P2 issue. Previously these engine events were collapsed into static text or generic win-cell emphasis. The revised implementation preserves their exact positions and adds a dedicated finite reveal before the normal win animation.
 
+## Free-spin retrigger comparison gate
+
+- Source visual truth: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4` and its multi-state contact sheet `/private/tmp/aurora-video-contact-sheet.png`.
+- Implementation state: Frozen Kingdom browser-rendered idle/live-spin states plus a deterministic server-authoritative Pharaoh Oasis free-spin retrigger. The deterministic fixture is necessary because an actual random server spin cannot guarantee a retrigger during visual capture.
+- Viewports: `1280 × 591` desktop and `390 × 844` mobile.
+- Full-view comparison evidence: `/private/tmp/aurora-retrigger-reference-comparison.png` places the complete supplied slot-motion contact sheet and the deterministic Aurora retrigger state in one normalized image. Production browser evidence is preserved separately at `/private/tmp/aurora-retrigger-desktop.png`, `/private/tmp/aurora-retrigger-desktop-spin.png`, `/private/tmp/aurora-retrigger-mobile.png` and `/private/tmp/aurora-retrigger-mobile-spin.png`.
+- Focused-region evidence: no separate crop was required because the combined artifact keeps the complete reel cabinet, centered `+1 FREE SPIN` impact card, updated `2 TOTAL` badge, free-spin progress HUD, jackpot tower and persistent controls legible at the target desktop viewport.
+- Fonts and typography: AuroraSans is loaded explicitly in the deterministic render, and the retrigger title, total badge and `×2` multiplier maintain the established compact uppercase hierarchy without wrapping or truncation. Material-icon fallback squares visible only in the headless golden renderer are excluded from production fidelity judgment; the browser-rendered desktop and mobile captures show the real icon font correctly.
+- Spacing and layout rhythm: the finite impact card remains centered inside the reel cabinet, particles stay clipped to the reel region, and the existing free-spin HUD updates without shifting the cabinet, jackpot tower, bottom meter or primary spin control.
+- Colors and visual tokens: the radial wave, gold edge light and purple core derive from the active slot palette. White display copy and the dark total badge preserve readable contrast over the bright reel flash.
+- Image quality and asset fidelity: the effect is composited over Aurora's original raster reel/symbol surfaces without replacing them. The browser captures remain sharp at both breakpoints, and no protected reference art, logo or slot identity is used.
+- Copy and content: the initial intro reports only the server's initial award; `+1 FREE SPIN`, `2 TOTAL`, remaining count and `×2` multiplier all map to authoritative round events. Singular/plural copy is handled explicitly.
+- States and interactions: the base trigger opens one initial free spin, the first free-spin result adds the authoritative retrigger, the HUD total and remaining count increase, and the second free spin completes before `FREE SPINS COMPLETE`. The overlay ignores pointer input and clears after its finite presentation.
+- Accessibility and performance: one finite animation controller drives the retrigger wave and particles; no repeating effect or additional network request is introduced. Desktop and mobile browser checks found no clipping, overflow or obstructed controls, and console inspection contained only Flutter bootstrap debug output.
+- Comparison history: the prior implementation displayed the response's final free-spin total as the initial award and had no dedicated retrigger transition. The revised deterministic evidence shows the correct initial `1 FREE SPIN`, a later `+1 FREE SPIN` impact with `2 TOTAL`, and the server-provided `×2` HUD multiplier. Post-fix desktop/mobile browser evidence and the deterministic widget flow contain no actionable P0/P1/P2 regression.
+
 ## Open visual issues
 
 - P0: none
@@ -177,7 +199,7 @@ The base game and each free-spin round now use continuous vertical reel strips w
 
 The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `48` Flutter tests passed, including deterministic Expanding Wild reveal, authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed API mapper, slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
+Automated verification: `49` Flutter tests passed, including deterministic free-spin retrigger extension, Expanding Wild reveal, authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed API mapper, slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
 
 The final browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
