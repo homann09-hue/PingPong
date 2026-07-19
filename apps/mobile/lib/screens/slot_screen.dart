@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/game_definition.dart';
 import '../services/casino_api.dart';
 import '../widgets/top_hud.dart';
@@ -23,8 +24,10 @@ class SlotScreen extends StatefulWidget {
   State<SlotScreen> createState() => _SlotScreenState();
 }
 
-class _SlotScreenState extends State<SlotScreen> {
+class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final CasinoApi api;
+  late final AnimationController ambientController;
+  late final AnimationController winController;
   final random = Random();
   late int balance, level, xp, vipPoints;
   int bet = 100, win = 0, free = 0;
@@ -52,6 +55,14 @@ class _SlotScreenState extends State<SlotScreen> {
   @override
   void initState() {
     super.initState();
+    ambientController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+    winController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1350),
+    );
     api = widget.api ?? CasinoApi();
     balance = widget.balance;
     level = widget.level;
@@ -62,6 +73,13 @@ class _SlotScreenState extends State<SlotScreen> {
     unawaited(
       api.trackEvent('screen.viewed', screen: 'slot', slotId: widget.game.id),
     );
+  }
+
+  @override
+  void dispose() {
+    ambientController.dispose();
+    winController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadJackpots() async {
@@ -101,6 +119,8 @@ class _SlotScreenState extends State<SlotScreen> {
       }
       return null;
     }
+    unawaited(HapticFeedback.mediumImpact());
+    ambientController.repeat(reverse: true);
     setState(() {
       spinning = true;
       win = 0;
@@ -148,8 +168,9 @@ class _SlotScreenState extends State<SlotScreen> {
           await _showBonus(round);
         } else {
           displayedWin += round.win;
+          await _revealGrid(round.grid);
+          if (!mounted) return null;
           setState(() {
-            grid = round.grid;
             win = displayedWin;
             winningCells = round.winningCells;
             winDetail = round.winLabel;
@@ -191,6 +212,10 @@ class _SlotScreenState extends State<SlotScreen> {
         totalFreeSpins = r.totalFreeSpins;
         vipPoints = r.vipPoints;
       });
+      if (r.win > 0) {
+        unawaited(HapticFeedback.heavyImpact());
+        unawaited(winController.forward(from: 0));
+      }
       unawaited(
         api.trackEvent(
           'slot.presentation_completed',
@@ -244,7 +269,30 @@ class _SlotScreenState extends State<SlotScreen> {
       }
       return null;
     } finally {
+      ambientController
+        ..stop()
+        ..value = 0;
       if (mounted) setState(() => spinning = false);
+    }
+  }
+
+  Future<void> _revealGrid(List<List<String>> target) async {
+    for (var reel = 0; reel < target.length; reel++) {
+      if (!mounted) return;
+      setState(() {
+        final next = [
+          for (final column in grid) [...column],
+        ];
+        while (next.length <= reel) {
+          next.add([...target[reel]]);
+        }
+        next[reel] = [...target[reel]];
+        grid = next;
+      });
+      unawaited(HapticFeedback.selectionClick());
+      if (reel < target.length - 1) {
+        await Future<void>.delayed(Duration(milliseconds: turbo ? 24 : 105));
+      }
     }
   }
 
@@ -492,132 +540,194 @@ class _SlotScreenState extends State<SlotScreen> {
       }
     },
     child: Scaffold(
+      backgroundColor: const Color(0xff040817),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
+          constraints: const BoxConstraints(maxWidth: 1320),
           child: Column(
             children: [
               TopHud(balance: balance, level: level, xp: xp, gems: widget.gems),
               Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.asset(widget.game.asset, fit: BoxFit.cover),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x66000000), Color(0xff080318)],
-                        ),
-                      ),
-                    ),
-                    SafeArea(
-                      top: false,
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              IconButton(
-                                onPressed: spinning || autoplay
-                                    ? null
-                                    : () => Navigator.pop(context, {
-                                        'balance': balance,
-                                        'level': level,
-                                        'xp': xp,
-                                        'spins': spins,
-                                        'totalWon': totalWon,
-                                        'totalFreeSpins': totalFreeSpins,
-                                        'vipPoints': vipPoints,
-                                      }),
-                                icon: const Icon(Icons.arrow_back),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  widget.game.name,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _showGameInfo,
-                                icon: const Icon(Icons.info_outline),
-                              ),
-                            ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final desktop = constraints.maxWidth >= 900;
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(widget.game.asset, fit: BoxFit.cover),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0x66000000), Color(0xff080318)],
+                            ),
                           ),
-                          _jackpots(),
-                          if (featureMode != null)
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
-                              child: Container(
-                                key: ValueKey(featureMode),
-                                margin: const EdgeInsets.only(top: 8),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: widget.game.secondary.withValues(
-                                    alpha: .92,
+                        ),
+                        AnimatedBuilder(
+                          animation: ambientController,
+                          builder: (context, child) => IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment(
+                                    -1 + ambientController.value * .7,
+                                    -1,
                                   ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: widget.game.primary,
-                                    width: 2,
+                                  end: Alignment(
+                                    1 - ambientController.value * .7,
+                                    1,
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: widget.game.primary.withValues(
-                                        alpha: .5,
-                                      ),
-                                      blurRadius: 12,
+                                  colors: [
+                                    widget.game.primary.withValues(alpha: .18),
+                                    Colors.transparent,
+                                    widget.game.secondary.withValues(
+                                      alpha: .24,
                                     ),
                                   ],
+                                  stops: const [0, .48, 1],
                                 ),
-                                child: Text(
-                                  featureMode!,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        AnimatedBuilder(
+                          animation: winController,
+                          builder: (context, child) => IgnorePointer(
+                            child: _WinCelebration(
+                              progress: winController.value,
+                              primary: widget.game.primary,
+                              secondary: widget.game.secondary,
+                            ),
+                          ),
+                        ),
+                        SafeArea(
+                          top: false,
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: spinning || autoplay
+                                        ? null
+                                        : () => Navigator.pop(context, {
+                                            'balance': balance,
+                                            'level': level,
+                                            'xp': xp,
+                                            'spins': spins,
+                                            'totalWon': totalWon,
+                                            'totalFreeSpins': totalFreeSpins,
+                                            'vipPoints': vipPoints,
+                                          }),
+                                    icon: const Icon(Icons.arrow_back),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      widget.game.name,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: _showGameInfo,
+                                    icon: const Icon(Icons.info_outline),
+                                  ),
+                                ],
+                              ),
+                              if (desktop) _featureMasthead() else _jackpots(),
+                              SizedBox(
+                                height: desktop
+                                    ? 42
+                                    : (featureMode == null ? 0 : 42),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 220),
+                                  child: featureMode == null
+                                      ? const SizedBox.shrink()
+                                      : Container(
+                                          key: ValueKey(featureMode),
+                                          margin: const EdgeInsets.only(top: 6),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 18,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: widget.game.secondary
+                                                .withValues(alpha: .92),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: widget.game.primary,
+                                              width: 2,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: widget.game.primary
+                                                    .withValues(alpha: .5),
+                                                blurRadius: 12,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Text(
+                                            featureMode!,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const Spacer(),
+                              _cabinet(desktop: desktop),
+                              const SizedBox(height: 10),
+                              if (!desktop && win > 0)
+                                TweenAnimationBuilder<int>(
+                                  tween: IntTween(begin: 0, end: win),
+                                  duration: const Duration(milliseconds: 850),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, value, child) => Text(
+                                    'WIN  ${_fmt(value)}',
+                                    style: TextStyle(
+                                      fontSize: desktop ? 34 : 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: widget.game.primary,
+                                      shadows: [
+                                        Shadow(
+                                          color: widget.game.primary,
+                                          blurRadius: 18,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          const Spacer(),
-                          _reels(),
-                          const SizedBox(height: 10),
-                          if (win > 0)
-                            Text(
-                              'WIN  ${_fmt(win)}',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: widget.game.primary,
-                              ),
-                            ),
-                          if (winDetail != null)
-                            Text(
-                              winDetail!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.1,
-                              ),
-                            ),
-                          if (error != null)
-                            Text(
-                              error!,
-                              style: const TextStyle(color: Colors.redAccent),
-                            ),
-                          const Spacer(),
-                          _controls(),
-                          const SizedBox(height: 18),
-                        ],
-                      ),
-                    ),
-                  ],
+                              if (!desktop && winDetail != null)
+                                Text(
+                                  winDetail!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                              if (error != null)
+                                Text(
+                                  error!,
+                                  style: const TextStyle(
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              const Spacer(),
+                              _controls(desktop: desktop),
+                              SizedBox(height: desktop ? 0 : 18),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -626,6 +736,220 @@ class _SlotScreenState extends State<SlotScreen> {
       ),
     ),
   );
+
+  Widget _featureMasthead() => Container(
+    height: 54,
+    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    padding: const EdgeInsets.symmetric(horizontal: 14),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          const Color(0xee150323),
+          widget.game.secondary.withValues(alpha: .9),
+          const Color(0xee150323),
+        ],
+      ),
+      border: Border.all(color: widget.game.primary, width: 2),
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: [
+        BoxShadow(
+          color: widget.game.primary.withValues(alpha: .34),
+          blurRadius: 15,
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.local_fire_department, color: widget.game.primary, size: 30),
+        const SizedBox(width: 8),
+        Text(
+          widget.game.name.toUpperCase(),
+          style: TextStyle(
+            color: const Color(0xffffec9a),
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.1,
+            shadows: [
+              Shadow(color: widget.game.secondary, blurRadius: 10),
+              const Shadow(color: Colors.black, blurRadius: 4),
+            ],
+          ),
+        ),
+        const Spacer(),
+        for (final feature in const [
+          ('WILD POWER', Icons.auto_awesome),
+          ('MEGA JACKPOT', Icons.workspace_premium),
+          ('FREE SPINS', Icons.casino),
+        ]) ...[
+          Container(
+            margin: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xcc08020f),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: widget.game.primary.withValues(alpha: .8),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(feature.$2, size: 15, color: widget.game.primary),
+                const SizedBox(width: 5),
+                Text(
+                  feature.$1,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  Widget _cabinet({required bool desktop}) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      if (desktop) ...[
+        SizedBox(width: 74, height: 260, child: _paylineRail()),
+        const SizedBox(width: 7),
+      ],
+      Expanded(child: _reels(desktop: desktop)),
+      if (desktop) ...[
+        const SizedBox(width: 7),
+        SizedBox(width: 142, height: 260, child: _jackpotTower()),
+      ],
+    ],
+  );
+
+  Widget _paylineRail() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xe8110324),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: widget.game.primary, width: 2),
+      boxShadow: [
+        BoxShadow(
+          color: widget.game.secondary.withValues(alpha: .55),
+          blurRadius: 14,
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Text(
+          evaluationLabel,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 5),
+        for (var index = 1; index <= 5; index++)
+          Expanded(
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [widget.game.primary, widget.game.secondary],
+                  ),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Text(
+                  '$index',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  Widget _jackpotTower() {
+    final tiers = [
+      ('GRAND', jackpotPools['GRAND'] ?? 50000000),
+      ('MAJOR', jackpotPools['MAJOR'] ?? 15000000),
+      ('MINOR', jackpotPools['MINOR'] ?? 5000000),
+      ('MINI', jackpotPools['MINI'] ?? 500000),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xe8110324),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: widget.game.primary, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: widget.game.secondary.withValues(alpha: .55),
+            blurRadius: 14,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            'JACKPOTS',
+            style: TextStyle(
+              color: widget.game.primary,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .8,
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final tier in tiers)
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xff22032d), Color(0xff06010c)],
+                  ),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: widget.game.primary.withValues(alpha: .7),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      tier.$1,
+                      style: TextStyle(
+                        color: widget.game.primary,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    FittedBox(
+                      child: Text(
+                        _fmt(tier.$2),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _jackpots() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
     children: [
@@ -670,46 +994,70 @@ class _SlotScreenState extends State<SlotScreen> {
         ),
     ],
   );
-  Widget _reels() => AnimatedContainer(
-    duration: const Duration(milliseconds: 250),
-    height: 300,
-    margin: const EdgeInsets.symmetric(horizontal: 10),
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          widget.game.primary,
-          const Color(0xffffe29a),
-          widget.game.primary,
-        ],
-      ),
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: [
-        BoxShadow(
-          color: widget.game.primary.withValues(alpha: win > 0 ? .9 : .55),
-          blurRadius: win > 0 ? 38 : 24,
-          spreadRadius: win > 0 ? 4 : 0,
-        ),
-      ],
-    ),
-    child: Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xff13082d),
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Row(
-        children: [
-          for (var reel = 0; reel < grid.length; reel++)
-            Expanded(
-              child: Column(
-                children: [
-                  for (var row = 0; row < grid[reel].length; row++)
-                    Expanded(child: _symbol(grid[reel][row], reel, row)),
-                ],
-              ),
+  Widget _reels({required bool desktop}) => Center(
+    child: AnimatedScale(
+      scale: win > 0
+          ? 1.018
+          : spinning
+          ? .985
+          : 1,
+      duration: Duration(milliseconds: spinning ? 120 : 280),
+      curve: Curves.easeOutBack,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        constraints: BoxConstraints(maxWidth: desktop ? 960 : 760),
+        height: desktop ? 260 : 300,
+        margin: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              widget.game.primary,
+              const Color(0xfffff1b7),
+              widget.game.primary,
+              widget.game.secondary,
+            ],
+            stops: const [0, .34, .72, 1],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: .65),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: widget.game.primary.withValues(alpha: win > 0 ? .95 : .62),
+              blurRadius: win > 0 ? 46 : 27,
+              spreadRadius: win > 0 ? 6 : 1,
             ),
-        ],
+            BoxShadow(
+              color: widget.game.secondary.withValues(alpha: .62),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: const Color(0xff13082d),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: const Color(0xff3f176c), width: 2),
+          ),
+          child: Row(
+            children: [
+              for (var reel = 0; reel < grid.length; reel++)
+                Expanded(
+                  child: Column(
+                    children: [
+                      for (var row = 0; row < grid[reel].length; row++)
+                        Expanded(child: _symbol(grid[reel][row], reel, row)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -841,90 +1189,401 @@ class _SlotScreenState extends State<SlotScreen> {
     );
   }
 
-  Widget _controls() => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      if (widget.game.bonusBuyMultiplier case final multiplier?) ...[
-        OutlinedButton.icon(
-          onPressed: spinning || autoplay ? null : _buyBonus,
-          icon: const Icon(Icons.auto_awesome),
-          label: Text('BUY BONUS  ${_fmt(bet * multiplier)}'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: widget.game.primary,
-            side: BorderSide(color: widget.game.primary),
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FilterChip(
-            selected: turbo,
-            onSelected: autoplay
-                ? null
-                : (value) => setState(() => turbo = value),
-            avatar: const Icon(Icons.bolt, size: 16),
-            label: const Text('TURBO'),
-          ),
-          const SizedBox(width: 8),
-          PopupMenuButton<int>(
-            enabled: !spinning && !autoplay,
-            onSelected: _startAutoplay,
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 10, child: Text('10 AUTO SPINS')),
-              PopupMenuItem(value: 25, child: Text('25 AUTO SPINS')),
-              PopupMenuItem(value: 50, child: Text('50 AUTO SPINS')),
-            ],
-            child: Chip(
-              avatar: const Icon(Icons.autorenew, size: 16),
-              label: Text(autoplay ? 'AUTO $autoSpinsRemaining' : 'AUTO'),
+  Widget _controls({required bool desktop}) {
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.game.bonusBuyMultiplier case final multiplier?) ...[
+          OutlinedButton.icon(
+            onPressed: spinning || autoplay ? null : _buyBonus,
+            icon: const Icon(Icons.auto_awesome),
+            label: Text('BUY BONUS  ${_fmt(bet * multiplier)}'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: widget.game.primary,
+              side: BorderSide(color: widget.game.primary),
             ),
           ),
+          const SizedBox(height: 8),
         ],
-      ),
-      const SizedBox(height: 6),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton.filled(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 42),
-            onPressed: spinning || autoplay || betSteps.indexOf(bet) <= 0
-                ? null
-                : () =>
-                      setState(() => bet = betSteps[betSteps.indexOf(bet) - 1]),
-            icon: const Icon(Icons.remove),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Column(
-              children: [
-                Text(
-                  '$evaluationLabel • BET',
-                  style: const TextStyle(fontSize: 9),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FilterChip(
+              selected: turbo,
+              onSelected: autoplay
+                  ? null
+                  : (value) => setState(() => turbo = value),
+              avatar: const Icon(Icons.bolt, size: 16),
+              label: const Text('TURBO'),
+              selectedColor: widget.game.primary,
+              backgroundColor: const Color(0xdd19082e),
+              side: BorderSide(color: widget.game.primary),
+              labelStyle: TextStyle(
+                color: turbo ? Colors.black : Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 8),
+            PopupMenuButton<int>(
+              enabled: !spinning && !autoplay,
+              onSelected: _startAutoplay,
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 10, child: Text('10 AUTO SPINS')),
+                PopupMenuItem(value: 25, child: Text('25 AUTO SPINS')),
+                PopupMenuItem(value: 50, child: Text('50 AUTO SPINS')),
+              ],
+              child: Chip(
+                avatar: const Icon(Icons.autorenew, size: 16),
+                label: Text(autoplay ? 'AUTO $autoSpinsRemaining' : 'AUTO'),
+                backgroundColor: const Color(0xdd19082e),
+                side: BorderSide(color: widget.game.primary),
+                labelStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton.filled(
+              constraints: const BoxConstraints.tightFor(width: 42, height: 42),
+              onPressed: spinning || autoplay || betSteps.indexOf(bet) <= 0
+                  ? null
+                  : () => setState(
+                      () => bet = betSteps[betSteps.indexOf(bet) - 1],
+                    ),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xff3c1763),
+                foregroundColor: const Color(0xffffdf58),
+                side: BorderSide(color: widget.game.primary, width: 2),
+              ),
+              icon: const Icon(Icons.remove_rounded),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                children: [
+                  Text(
+                    '$evaluationLabel • BET',
+                    style: const TextStyle(fontSize: 9),
+                  ),
+                  Text(
+                    _fmt(bet),
+                    style: TextStyle(
+                      color: widget.game.primary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      shadows: [
+                        Shadow(color: widget.game.primary, blurRadius: 9),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton.filled(
+              constraints: const BoxConstraints.tightFor(width: 42, height: 42),
+              onPressed:
+                  spinning ||
+                      autoplay ||
+                      betSteps.indexOf(bet) >= betSteps.length - 1
+                  ? null
+                  : () => setState(
+                      () => bet = betSteps[betSteps.indexOf(bet) + 1],
+                    ),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xff3c1763),
+                foregroundColor: const Color(0xffffdf58),
+                side: BorderSide(color: widget.game.primary, width: 2),
+              ),
+              icon: const Icon(Icons.add_rounded),
+            ),
+            const SizedBox(width: 8),
+            AnimatedScale(
+              scale: spinning
+                  ? .92
+                  : win > 0
+                  ? 1.06
+                  : 1,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              child: Container(
+                width: 136,
+                height: 66,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xfffff5a6),
+                      widget.game.primary,
+                      widget.game.secondary,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.game.primary.withValues(alpha: .85),
+                      blurRadius: spinning ? 28 : 18,
+                      spreadRadius: spinning ? 5 : 2,
+                    ),
+                  ],
                 ),
-                Text(
-                  _fmt(bet),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                child: FilledButton(
+                  onPressed: autoplay
+                      ? _stopAutoplay
+                      : spinning
+                      ? null
+                      : () => spin(),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff35cf42),
+                    disabledBackgroundColor: const Color(0xff1d7135),
+                    foregroundColor: Colors.white,
+                    shape: const StadiumBorder(),
+                    side: const BorderSide(color: Colors.white, width: 2),
+                  ),
+                  child: spinning && !autoplay
+                      ? const SizedBox.square(
+                          dimension: 25,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          autoplay ? 'STOP $autoSpinsRemaining' : 'SPIN',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 4),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    if (!desktop) return content;
+    return _desktopControls();
+  }
+
+  Widget _desktopControls() => Container(
+    width: double.infinity,
+    height: 82,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xff8b189e), Color(0xff3b075f), Color(0xff170328)],
+      ),
+      border: Border(
+        top: BorderSide(color: widget.game.primary, width: 2),
+        bottom: BorderSide(color: widget.game.secondary, width: 2),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: widget.game.primary.withValues(alpha: .38),
+          blurRadius: 18,
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        if (widget.game.bonusBuyMultiplier case final multiplier?) ...[
+          SizedBox(
+            width: 165,
+            child: OutlinedButton.icon(
+              onPressed: spinning || autoplay ? null : _buyBonus,
+              icon: const Icon(Icons.auto_awesome, size: 17),
+              label: Text('BUY BONUS  ${_fmt(bet * multiplier)}'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: widget.game.primary,
+                side: BorderSide(color: widget.game.primary, width: 2),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        FilterChip(
+          selected: turbo,
+          onSelected: autoplay
+              ? null
+              : (value) => setState(() => turbo = value),
+          avatar: const Icon(Icons.bolt, size: 16),
+          label: const Text('TURBO'),
+          selectedColor: widget.game.primary,
+          backgroundColor: const Color(0xdd19082e),
+          side: BorderSide(color: widget.game.primary),
+          labelStyle: TextStyle(
+            color: turbo ? Colors.black : Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(width: 7),
+        PopupMenuButton<int>(
+          enabled: !spinning && !autoplay,
+          onSelected: _startAutoplay,
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 10, child: Text('10 AUTO SPINS')),
+            PopupMenuItem(value: 25, child: Text('25 AUTO SPINS')),
+            PopupMenuItem(value: 50, child: Text('50 AUTO SPINS')),
+          ],
+          child: Chip(
+            avatar: const Icon(Icons.autorenew, size: 16),
+            label: Text(autoplay ? 'AUTO $autoSpinsRemaining' : 'AUTO'),
+            backgroundColor: const Color(0xdd19082e),
+            side: BorderSide(color: widget.game.primary),
+            labelStyle: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xcc090111),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: widget.game.primary, width: 2),
+          ),
+          child: Row(
+            children: [
+              IconButton.filled(
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 40,
+                ),
+                onPressed: spinning || autoplay || betSteps.indexOf(bet) <= 0
+                    ? null
+                    : () => setState(
+                        () => bet = betSteps[betSteps.indexOf(bet) - 1],
+                      ),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xff44156c),
+                  foregroundColor: const Color(0xffffdf58),
+                ),
+                icon: const Icon(Icons.remove_rounded),
+              ),
+              SizedBox(
+                width: 126,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$evaluationLabel • BET',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      _fmt(bet),
+                      style: TextStyle(
+                        color: widget.game.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton.filled(
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 40,
+                ),
+                onPressed:
+                    spinning ||
+                        autoplay ||
+                        betSteps.indexOf(bet) >= betSteps.length - 1
+                    ? null
+                    : () => setState(
+                        () => bet = betSteps[betSteps.indexOf(bet) + 1],
+                      ),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xff44156c),
+                  foregroundColor: const Color(0xffffdf58),
+                ),
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            height: 58,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xcc08010e),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: widget.game.primary.withValues(alpha: .7),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'GEWINN',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                TweenAnimationBuilder<int>(
+                  tween: IntTween(begin: 0, end: win),
+                  duration: const Duration(milliseconds: 850),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) => Text(
+                    _fmt(value),
+                    style: TextStyle(
+                      color: win > 0 ? widget.game.primary : Colors.white70,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton.filled(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 42),
-            onPressed:
-                spinning ||
-                    autoplay ||
-                    betSteps.indexOf(bet) >= betSteps.length - 1
-                ? null
-                : () =>
-                      setState(() => bet = betSteps[betSteps.indexOf(bet) + 1]),
-            icon: const Icon(Icons.add),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 125,
-            height: 60,
+        ),
+        const SizedBox(width: 12),
+        AnimatedScale(
+          scale: spinning
+              ? .94
+              : win > 0
+              ? 1.04
+              : 1,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutBack,
+          child: Container(
+            width: 174,
+            height: 66,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xfffff5a6),
+                  widget.game.primary,
+                  widget.game.secondary,
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.game.primary.withValues(alpha: .8),
+                  blurRadius: spinning ? 28 : 17,
+                  spreadRadius: spinning ? 4 : 1,
+                ),
+              ],
+            ),
             child: FilledButton(
               onPressed: autoplay
                   ? _stopAutoplay
@@ -932,27 +1591,37 @@ class _SlotScreenState extends State<SlotScreen> {
                   ? null
                   : () => spin(),
               style: FilledButton.styleFrom(
-                backgroundColor: widget.game.primary,
-                foregroundColor: Colors.black,
+                backgroundColor: const Color(0xffef4b2c),
+                disabledBackgroundColor: const Color(0xff6d261f),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(15),
                 ),
+                side: const BorderSide(color: Colors.white, width: 2),
               ),
               child: spinning && !autoplay
-                  ? const CircularProgressIndicator()
+                  ? const SizedBox.square(
+                      dimension: 25,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
                   : Text(
-                      autoplay ? 'STOP $autoSpinsRemaining' : 'SPIN',
-                      style: TextStyle(
-                        fontSize: 22,
+                      autoplay ? 'STOP $autoSpinsRemaining' : 'DREH!',
+                      style: const TextStyle(
+                        fontSize: 24,
                         fontWeight: FontWeight.w900,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                       ),
                     ),
             ),
           ),
-        ],
-      ),
-    ],
+        ),
+      ],
+    ),
   );
+
   String _fmt(int v) => v.toString().replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (_) => '.',
@@ -1032,6 +1701,62 @@ class _SlotScreenState extends State<SlotScreen> {
       'B': 'assets/symbols/vegas/scatter.png',
     },
   };
+}
+
+class _WinCelebration extends StatelessWidget {
+  const _WinCelebration({
+    required this.progress,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final double progress;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) {
+    if (progress <= 0) return const SizedBox.shrink();
+    final opacity = sin(progress * pi).clamp(0.0, 1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var index = 0; index < 28; index++)
+            Positioned(
+              left:
+                  ((index * 97) % 100) /
+                  100 *
+                  max(0, constraints.maxWidth - 34),
+              top:
+                  constraints.maxHeight * (1.03 - progress * .92) +
+                  sin(index * 1.7 + progress * pi * 4) * 32 +
+                  (index % 5) * 16,
+              child: Opacity(
+                opacity: opacity,
+                child: Transform.rotate(
+                  angle: progress * pi * (2 + index % 4),
+                  child: Icon(
+                    index.isEven
+                        ? Icons.monetization_on_rounded
+                        : Icons.auto_awesome,
+                    color: index % 3 == 0
+                        ? Colors.white
+                        : index.isEven
+                        ? primary
+                        : secondary,
+                    size: 18 + (index % 4) * 5,
+                    shadows: [
+                      Shadow(color: primary, blurRadius: 10),
+                      const Shadow(color: Colors.black54, blurRadius: 3),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PaytableRow extends StatelessWidget {

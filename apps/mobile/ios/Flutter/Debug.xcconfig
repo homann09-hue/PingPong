@@ -1,1 +1,4 @@
 #include "Generated.xcconfig"
+// Xcode 27 beta reports a dual-architecture placeholder destination. Aurora's
+// supported iOS simulator development hosts are Apple Silicon.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64

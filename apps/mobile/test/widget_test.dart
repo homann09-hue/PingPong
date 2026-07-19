@@ -97,13 +97,13 @@ void main() {
     await tester.pumpWidget(const AuroraApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('QUESTS'));
+    await tester.tap(find.text('MISSIONEN'));
     await tester.pumpAndSettle();
     expect(find.text('MISSION CONTROL'), findsOneWidget);
     expect(find.text('DAILY MISSIONS'), findsOneWidget);
     expect(find.text('WÖCHENTLICHE MISSIONSLEISTE'), findsOneWidget);
 
-    await tester.tap(find.text('CLUB'));
+    await tester.tap(find.text('CLAN'));
     await tester.pumpAndSettle();
     expect(find.text('FORTUNE CLUB'), findsOneWidget);
 
@@ -111,7 +111,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('LIVE EVENTS'), findsOneWidget);
 
-    await tester.tap(find.text('SHOP'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('SHOP'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('COIN SHOP'), findsOneWidget);
   });

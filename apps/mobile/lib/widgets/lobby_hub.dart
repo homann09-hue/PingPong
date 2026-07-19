@@ -54,6 +54,37 @@ class LobbyHub extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final featured = games.where((game) => game.featured).toList();
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth >= 900
+          ? _DesktopLobbyStage(
+              level: level,
+              now: now,
+              games: games,
+              featured: featured,
+              highRollerActive: highRollerActive,
+              packageManager: packageManager,
+              missions: missions,
+              events: events,
+              shopOffers: shopOffers,
+              social: social,
+              campaign: campaign,
+              hourlyReward: hourlyReward,
+              dailyReward: dailyReward,
+              wheel: wheel,
+              onPlay: onPlay,
+              onPrepare: onPrepare,
+              onNavigate: onNavigate,
+              onOpenRewards: onOpenRewards,
+              onOpenInbox: onOpenInbox,
+              onOpenBoosts: onOpenBoosts,
+              onOpenSettings: onOpenSettings,
+              onOpenShop: onOpenShop,
+            )
+          : _buildMobile(featured),
+    );
+  }
+
+  Widget _buildMobile(List<GameDefinition> featured) {
     return RefreshIndicator(
       onRefresh: onRefresh,
       color: const Color(0xffffc52f),
@@ -171,6 +202,799 @@ class LobbyHub extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DesktopLobbyStage extends StatelessWidget {
+  const _DesktopLobbyStage({
+    required this.level,
+    required this.now,
+    required this.games,
+    required this.featured,
+    required this.highRollerActive,
+    required this.packageManager,
+    required this.missions,
+    required this.events,
+    required this.shopOffers,
+    required this.social,
+    required this.campaign,
+    required this.hourlyReward,
+    required this.dailyReward,
+    required this.wheel,
+    required this.onPlay,
+    required this.onPrepare,
+    required this.onNavigate,
+    required this.onOpenRewards,
+    required this.onOpenInbox,
+    required this.onOpenBoosts,
+    required this.onOpenSettings,
+    required this.onOpenShop,
+  });
+
+  final int level;
+  final DateTime now;
+  final List<GameDefinition> games, featured;
+  final bool highRollerActive;
+  final SlotPackageManager packageManager;
+  final List<MissionView> missions;
+  final List<LiveEventView> events;
+  final List<ShopOfferView> shopOffers;
+  final SocialOverviewView? social;
+  final LiveOpsCampaignView? campaign;
+  final TimedRewardView? hourlyReward, dailyReward;
+  final WheelView? wheel;
+  final ValueChanged<GameDefinition> onPlay, onPrepare;
+  final ValueChanged<int> onNavigate;
+  final VoidCallback onOpenRewards, onOpenInbox, onOpenBoosts;
+  final VoidCallback onOpenSettings, onOpenShop;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = featured.isNotEmpty ? featured.first : games.first;
+    final promoOne = featured.length > 1 ? featured[1] : games[1];
+    final promoTwo = featured.length > 2 ? featured[2] : games[2];
+    final inboxCount =
+        (social?.incomingRequests.length ?? 0) +
+        (social?.incomingClanInvitations.length ?? 0) +
+        missions.where((item) => item.completed && !item.claimed).length;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/ui/aurora_festival_lobby.png',
+          fit: BoxFit.cover,
+          cacheWidth: 2048,
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x22020c28), Color(0x66040a24), Color(0xa60b0426)],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Column(
+            children: [
+              _JackpotTicker(
+                event: events.firstOrNull,
+                campaign: campaign,
+                now: now,
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CasinoSideRail(
+                      bonusReady:
+                          dailyReward?.claimable == true ||
+                          hourlyReward?.claimable == true,
+                      wheelSpins: wheel?.availableSpins ?? 0,
+                      missionCount: missions
+                          .where((item) => item.completed && !item.claimed)
+                          .length,
+                      inboxCount: inboxCount,
+                      onRewards: onOpenRewards,
+                      onMissions: () => onNavigate(1),
+                      onClub: () => onNavigate(2),
+                      onInbox: onOpenInbox,
+                      onBoosts: onOpenBoosts,
+                      onSettings: onOpenSettings,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 25,
+                      child: _LiveEventFeature(
+                        game: primary,
+                        event: events.firstOrNull,
+                        campaign: campaign,
+                        now: now,
+                        onTap: () => onNavigate(3),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 42,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: _PromoFeature(
+                              game: promoOne,
+                              level: level,
+                              highRollerActive: highRollerActive,
+                              packageManager: packageManager,
+                              eyebrow: 'FEATURED JACKPOT',
+                              onPlay: onPlay,
+                              onPrepare: onPrepare,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: _PromoFeature(
+                              game: promoTwo,
+                              level: level,
+                              highRollerActive: highRollerActive,
+                              packageManager: packageManager,
+                              eyebrow: 'NEW SLOT',
+                              onPlay: onPlay,
+                              onPrepare: onPrepare,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 30,
+                      child: _RecentlyPlayed(
+                        games: games,
+                        level: level,
+                        highRollerActive: highRollerActive,
+                        packageManager: packageManager,
+                        onPlay: onPlay,
+                        onPrepare: onPrepare,
+                        onShop: onOpenShop,
+                        offer: shopOffers.firstOrNull,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _JackpotTicker extends StatelessWidget {
+  const _JackpotTicker({
+    required this.event,
+    required this.campaign,
+    required this.now,
+  });
+
+  final LiveEventView? event;
+  final LiveOpsCampaignView? campaign;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 46,
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    decoration: BoxDecoration(
+      color: const Color(0xe80d031d),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xffffd94a), width: 2),
+      boxShadow: const [
+        BoxShadow(color: Color(0xaae72bff), blurRadius: 15, spreadRadius: 1),
+      ],
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.auto_awesome, color: Color(0xffffdd54), size: 22),
+        const SizedBox(width: 8),
+        const Text(
+          'AURORA MEGA PRIZE POOL',
+          style: TextStyle(
+            color: Color(0xff63edff),
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            letterSpacing: .8,
+          ),
+        ),
+        const SizedBox(width: 14),
+        const Text(
+          '97.089.018.605',
+          style: TextStyle(
+            color: Color(0xffffd94a),
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          campaign?.title ?? event?.title ?? 'STARLIGHT SEASON',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          _remaining(campaign?.endsAt ?? event?.endsAt, now),
+          style: const TextStyle(
+            color: Color(0xffffd94a),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CasinoSideRail extends StatelessWidget {
+  const _CasinoSideRail({
+    required this.bonusReady,
+    required this.wheelSpins,
+    required this.missionCount,
+    required this.inboxCount,
+    required this.onRewards,
+    required this.onMissions,
+    required this.onClub,
+    required this.onInbox,
+    required this.onBoosts,
+    required this.onSettings,
+  });
+
+  final bool bonusReady;
+  final int wheelSpins, missionCount, inboxCount;
+  final VoidCallback onRewards, onMissions, onClub, onInbox, onBoosts;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 82,
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xffd72ee9), Color(0xff7410a8), Color(0xff29045d)],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xffff83ff), width: 2),
+      boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 14)],
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final itemHeight = (constraints.maxHeight / 7).clamp(44.0, 62.0);
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _RailButton(
+              Icons.local_fire_department,
+              'BONUS',
+              bonusReady ? 1 : 0,
+              onRewards,
+              height: itemHeight,
+            ),
+            _RailButton(
+              Icons.casino,
+              'WHEEL',
+              wheelSpins,
+              onRewards,
+              height: itemHeight,
+            ),
+            _RailButton(
+              Icons.track_changes,
+              'MISSIONS',
+              missionCount,
+              onMissions,
+              height: itemHeight,
+            ),
+            _RailButton(Icons.groups_2, 'CLAN', 0, onClub, height: itemHeight),
+            _RailButton(
+              Icons.mail,
+              'INBOX',
+              inboxCount,
+              onInbox,
+              height: itemHeight,
+            ),
+            _RailButton(Icons.bolt, 'BOOST', 0, onBoosts, height: itemHeight),
+            _RailButton(Icons.menu, 'MENU', 0, onSettings, height: itemHeight),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _RailButton extends StatelessWidget {
+  const _RailButton(
+    this.icon,
+    this.label,
+    this.badge,
+    this.onTap, {
+    required this.height,
+  });
+  final IconData icon;
+  final String label;
+  final int badge;
+  final VoidCallback onTap;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: label,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: 68,
+        height: height,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: Colors.white, size: height < 54 ? 24 : 29),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: height < 54 ? 7 : 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            if (badge > 0)
+              Positioned(
+                right: 1,
+                top: 2,
+                child: CircleAvatar(
+                  radius: 9,
+                  backgroundColor: const Color(0xffff325f),
+                  child: Text(
+                    '$badge',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _LiveEventFeature extends StatelessWidget {
+  const _LiveEventFeature({
+    required this.game,
+    required this.event,
+    required this.campaign,
+    required this.now,
+    required this.onTap,
+  });
+
+  final GameDefinition game;
+  final LiveEventView? event;
+  final LiveOpsCampaignView? campaign;
+  final DateTime now;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: const Color(0xff2c075b),
+    borderRadius: BorderRadius.circular(24),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(game.asset, fit: BoxFit.cover, cacheWidth: 720),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x22000000),
+                  Color(0xbb25003f),
+                  Color(0xff25003f),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xffffdf48), width: 3),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x88ff2ccf),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xd9f82fc7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'LIVE EVENTS',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  campaign?.title ?? event?.title ?? 'MEGA COIN WEEK',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 27,
+                    height: .95,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _remaining(campaign?.endsAt ?? event?.endsAt, now),
+                  style: const TextStyle(
+                    color: Color(0xffffdf48),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: onTap,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff29c93f),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  icon: const Icon(Icons.rocket_launch),
+                  label: const Text(
+                    'EVENT ÖFFNEN',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PromoFeature extends StatelessWidget {
+  const _PromoFeature({
+    required this.game,
+    required this.level,
+    required this.highRollerActive,
+    required this.packageManager,
+    required this.eyebrow,
+    required this.onPlay,
+    required this.onPrepare,
+  });
+
+  final GameDefinition game;
+  final int level;
+  final bool highRollerActive;
+  final SlotPackageManager packageManager;
+  final String eyebrow;
+  final ValueChanged<GameDefinition> onPlay, onPrepare;
+
+  @override
+  Widget build(BuildContext context) {
+    final levelLocked = level < game.unlockLevel;
+    final clubLocked = game.highRollerExclusive && !highRollerActive;
+    final ready = packageManager.stateFor(game) == SlotPackageState.ready;
+    final onTap = levelLocked
+        ? null
+        : clubLocked || ready
+        ? () => onPlay(game)
+        : () => onPrepare(game);
+    return Material(
+      color: const Color(0xff13042f),
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(game.asset, fit: BoxFit.cover, cacheWidth: 900),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerRight,
+                  end: Alignment.centerLeft,
+                  colors: [Color(0x11000000), Color(0xd20b0324)],
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: game.primary, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: game.primary.withValues(alpha: .35),
+                    blurRadius: 17,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          eyebrow,
+                          style: TextStyle(
+                            color: game.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        Text(
+                          game.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 27,
+                            height: .95,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${game.jackpot} JACKPOT',
+                          style: TextStyle(
+                            color: game.primary,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: 128,
+                    child: FilledButton.icon(
+                      key: Key('desktop-slot-action-${game.id}'),
+                      onPressed: onTap,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: levelLocked
+                            ? Colors.grey.shade700
+                            : const Color(0xff2fd044),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: Icon(
+                        levelLocked ? Icons.lock : Icons.play_arrow_rounded,
+                      ),
+                      label: Text(
+                        levelLocked
+                            ? 'LEVEL ${game.unlockLevel}'
+                            : ready
+                            ? 'SPIELEN'
+                            : 'LADEN',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentlyPlayed extends StatelessWidget {
+  const _RecentlyPlayed({
+    required this.games,
+    required this.level,
+    required this.highRollerActive,
+    required this.packageManager,
+    required this.onPlay,
+    required this.onPrepare,
+    required this.onShop,
+    required this.offer,
+  });
+
+  final List<GameDefinition> games;
+  final int level;
+  final bool highRollerActive;
+  final SlotPackageManager packageManager;
+  final ValueChanged<GameDefinition> onPlay, onPrepare;
+  final VoidCallback onShop;
+  final ShopOfferView? offer;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xc9e229d5),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xffffec48), width: 3),
+      boxShadow: const [BoxShadow(color: Color(0x88ff2ccf), blurRadius: 18)],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ZULETZT GESPIELT',
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 9),
+        Expanded(
+          child: GridView.builder(
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: games.length < 4 ? games.length : 4,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 9,
+              crossAxisSpacing: 9,
+              childAspectRatio: .88,
+            ),
+            itemBuilder: (context, index) => _MiniSlotCard(
+              game: games[index],
+              level: level,
+              highRollerActive: highRollerActive,
+              packageManager: packageManager,
+              onPlay: onPlay,
+              onPrepare: onPrepare,
+            ),
+          ),
+        ),
+        const SizedBox(height: 9),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: onShop,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xffffd53b),
+              foregroundColor: const Color(0xff3c0757),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            icon: const Icon(Icons.redeem),
+            label: Text(
+              offer?.title ?? 'TÄGLICHES ANGEBOT',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MiniSlotCard extends StatelessWidget {
+  const _MiniSlotCard({
+    required this.game,
+    required this.level,
+    required this.highRollerActive,
+    required this.packageManager,
+    required this.onPlay,
+    required this.onPrepare,
+  });
+  final GameDefinition game;
+  final int level;
+  final bool highRollerActive;
+  final SlotPackageManager packageManager;
+  final ValueChanged<GameDefinition> onPlay, onPrepare;
+
+  @override
+  Widget build(BuildContext context) {
+    final locked =
+        level < game.unlockLevel ||
+        (game.highRollerExclusive && !highRollerActive);
+    final ready = packageManager.stateFor(game) == SlotPackageState.ready;
+    return Material(
+      color: const Color(0xff17032f),
+      borderRadius: BorderRadius.circular(15),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: locked
+            ? () => onPlay(game)
+            : ready
+            ? () => onPlay(game)
+            : () => onPrepare(game),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(game.asset, fit: BoxFit.cover, cacheWidth: 360),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xe80a021a)],
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: game.primary, width: 2),
+              ),
+            ),
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 7,
+              child: Text(
+                game.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            if (locked)
+              const Center(
+                child: CircleAvatar(
+                  backgroundColor: Color(0xbb240448),
+                  foregroundColor: Colors.white,
+                  child: Icon(Icons.lock),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

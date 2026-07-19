@@ -265,6 +265,63 @@ void main() {
 
     expect(await storage.read('aurora.identity.refresh-token.v1'), isNull);
   });
+
+  test('verified provider exchange replaces guest credentials', () async {
+    final storage = MemorySessionStorage();
+    final paths = <String>[];
+    final client = MockClient((request) async {
+      paths.add(request.url.path);
+      if (request.url.path == '/v1/auth/guest') {
+        return _tokens(201, access: 'guest-access', refresh: _token('g'));
+      }
+      expect(request.headers['authorization'], 'Bearer guest-access');
+      expect(jsonDecode(request.body), {
+        'provider': 'apple',
+        'providerAccessToken': _token('p'),
+        'installationId': installationId,
+        'platform': 'ios',
+      });
+      return _tokens(201, access: 'linked-access', refresh: _token('l'));
+    });
+    final session = AuthSessionManager(
+      baseUrl: baseUrl,
+      client: client,
+      storage: storage,
+      platform: 'ios',
+      installationIdFactory: () => installationId,
+    );
+
+    await session.signInWithProvider(
+      provider: 'apple',
+      providerAccessToken: _token('p'),
+    );
+
+    expect(await session.accessToken(), 'linked-access');
+    expect(await storage.read('aurora.identity.refresh-token.v1'), _token('l'));
+    expect(paths, ['/v1/auth/guest', '/v1/auth/provider']);
+  });
+
+  test('logout all revokes server sessions and clears this device', () async {
+    final storage = MemorySessionStorage();
+    final client = MockClient((request) async {
+      if (request.url.path == '/v1/auth/guest')
+        return _tokens(201, access: 'access', refresh: _token('r'));
+      expect(request.url.path, '/v1/auth/logout-all');
+      expect(request.headers['authorization'], 'Bearer access');
+      return http.Response('{"revokedSessions":2}', 200);
+    });
+    final session = AuthSessionManager(
+      baseUrl: baseUrl,
+      client: client,
+      storage: storage,
+      platform: 'android',
+      installationIdFactory: () => installationId,
+    );
+
+    await session.logoutAll();
+
+    expect(await storage.read('aurora.identity.refresh-token.v1'), isNull);
+  });
 }
 
 http.Response _tokens(

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'account_screen.dart';
 
 import '../models/game_definition.dart';
 import '../services/casino_api.dart';
@@ -791,9 +792,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xff050b27),
     body: Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: BoxConstraints(maxWidth: tab == 0 ? 1600 : 960),
         child: Column(
           children: [
             TopHud(
@@ -807,6 +809,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
               onVipTap: _showVip,
               onNotificationsTap: _openNotificationSettings,
               onShopTap: () => setState(() => tab = 4),
+              onProfileTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AccountScreen()),
+              ),
             ),
             Expanded(child: _content()),
             _nav(),
@@ -1537,25 +1542,89 @@ class _LobbyScreenState extends State<LobbyScreen> {
     ),
   );
 
-  Widget _nav() => NavigationBar(
-    height: 68,
-    selectedIndex: tab,
-    onDestinationSelected: (value) => setState(() => tab = value),
-    backgroundColor: const Color(0xff1a073c),
-    indicatorColor: const Color(0xff7a29ba),
-    destinations: const [
-      NavigationDestination(icon: Icon(Icons.castle), label: 'HOME'),
-      NavigationDestination(
-        icon: Badge(label: Text('4'), child: Icon(Icons.task_alt)),
-        label: 'QUESTS',
-      ),
-      NavigationDestination(icon: Icon(Icons.groups), label: 'CLUB'),
-      NavigationDestination(
-        icon: Badge(label: Text('2'), child: Icon(Icons.event)),
-        label: 'EVENTS',
-      ),
-      NavigationDestination(icon: Icon(Icons.shopping_cart), label: 'SHOP'),
-    ],
+  Widget _nav() => Builder(
+    builder: (context) {
+      final desktop = MediaQuery.sizeOf(context).width >= 900;
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xffa91abf), Color(0xff50046f), Color(0xff240039)],
+          ),
+          border: Border(
+            top: BorderSide(color: Color(0xffff57e5), width: 2),
+            bottom: BorderSide(color: Color(0xffffd449), width: 2),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xaaee2dff),
+              blurRadius: 15,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            backgroundColor: Colors.transparent,
+            indicatorColor: const Color(0xffff37d5),
+            indicatorShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: const BorderSide(color: Color(0xffffe054), width: 2),
+            ),
+            iconTheme: WidgetStateProperty.resolveWith(
+              (states) => IconThemeData(
+                color: states.contains(WidgetState.selected)
+                    ? Colors.white
+                    : const Color(0xffffd5fb),
+                size: desktop ? 30 : 24,
+              ),
+            ),
+            labelTextStyle: WidgetStateProperty.resolveWith(
+              (states) => TextStyle(
+                color: Colors.white,
+                fontSize: desktop ? 12 : 10,
+                fontWeight: FontWeight.w900,
+                shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+              ),
+            ),
+          ),
+          child: NavigationBar(
+            height: desktop ? 84 : 68,
+            selectedIndex: tab,
+            onDestinationSelected: (value) => setState(() => tab = value),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.castle_rounded),
+                label: 'LOBBY',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  label: Text('4'),
+                  child: Icon(Icons.track_changes_rounded),
+                ),
+                label: 'MISSIONEN',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.groups_2_rounded),
+                label: 'CLAN',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  label: Text('2'),
+                  child: Icon(Icons.emoji_events_rounded),
+                ),
+                label: 'EVENTS',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.shopping_bag_rounded),
+                label: 'SHOP',
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 
   String _fmt(int value) => value.toString().replaceAllMapped(

@@ -747,6 +747,82 @@ class CasinoApi {
   final AuthenticatedHttpClient _client;
   final Random _random = Random.secure();
 
+  Future<void> signInWithProvider(String provider, String accessToken) =>
+      _sharedSession.signInWithProvider(
+        provider: provider,
+        providerAccessToken: accessToken,
+      );
+  Future<void> logout() => _sharedSession.logout();
+  Future<void> logoutAll() => _sharedSession.logoutAll();
+
+  Future<Map<String, dynamic>> accountStatus() async {
+    final response = await _client.get(Uri.parse('$base/v1/auth/account'));
+    if (response.statusCode != 200)
+      throw StateError('Kontostatus ist nicht verfügbar');
+    return (jsonDecode(response.body) as Map<String, dynamic>)['account']
+        as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> accountSessions() async {
+    final response = await _client.get(Uri.parse('$base/v1/auth/sessions'));
+    if (response.statusCode != 200)
+      throw StateError('Sitzungen sind nicht verfügbar');
+    return ((jsonDecode(response.body) as Map<String, dynamic>)['sessions']
+            as List)
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<void> revokeAccountSession(String sessionId) async {
+    final response = await _client.delete(
+      Uri.parse('$base/v1/auth/sessions/$sessionId'),
+    );
+    if (response.statusCode != 204)
+      throw StateError('Sitzung konnte nicht beendet werden');
+  }
+
+  Future<Map<String, dynamic>> cloudSave() async {
+    final response = await _client.get(Uri.parse('$base/v1/auth/cloud-save'));
+    if (response.statusCode != 200)
+      throw StateError('Cloud Save ist nicht verfügbar');
+    return (jsonDecode(response.body) as Map<String, dynamic>)['cloudSave']
+        as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateCloudSave(
+    int expectedVersion,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _client.put(
+      Uri.parse('$base/v1/auth/cloud-save'),
+      headers: const {'content-type': 'application/json'},
+      body: jsonEncode({'expectedVersion': expectedVersion, 'data': data}),
+    );
+    if (response.statusCode != 200)
+      throw StateError(
+        response.statusCode == 409
+            ? 'Neuere Cloud-Daten vorhanden'
+            : 'Cloud Save fehlgeschlagen',
+      );
+    return (jsonDecode(response.body) as Map<String, dynamic>)['cloudSave']
+        as Map<String, dynamic>;
+  }
+
+  Future<String> privacyExport() async {
+    final response = await _client.get(
+      Uri.parse('$base/v1/auth/privacy-export'),
+    );
+    if (response.statusCode != 200)
+      throw StateError('Datenexport ist nicht verfügbar');
+    return response.body;
+  }
+
+  Future<void> deleteAccount() async {
+    final response = await _client.delete(Uri.parse('$base/v1/profile'));
+    if (response.statusCode != 204)
+      throw StateError('Konto konnte nicht gelöscht werden');
+    await _sharedSession.logout();
+  }
+
   Future<SlotPaytable> paytable(String gameId) async {
     final response = await _client.get(
       Uri.parse('$base/v1/slots/$gameId/paytable'),

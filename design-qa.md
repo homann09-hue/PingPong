@@ -1,73 +1,35 @@
-# Design QA
+# Design QA — Aurora Casino AAA UI
 
-## Target
-
-- Reference: `design/selected-world-tour.png`
-- Reference viewport: 390 × 844 logical pixels
-- Browser capture: centered 480 × 720 application crop from the in-app browser
-- Primary flow: lobby world journey → select slot → spin → win/free-spin/bonus feedback
-
-## Automated checks
-
-- Flutter static analysis: passed
-- Flutter widget journey tests: passed (4)
-- Flutter release web build: passed
-- Backend and slot-engine type checks: passed
-- Backend API tests: passed (9; PostgreSQL integration test skipped without `TEST_DATABASE_URL`)
-- Deterministic slot-engine tests: passed (16)
+- Reference: `/Users/angelo/Downloads/IMG_3030.PNG`
+- Slot motion reference: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4`
+- Prototype: `http://localhost:8080/?game=dragon-peak`
+- Comparison viewport: `1440 × 666` (same aspect ratio as the reference)
+- Slot comparison viewport: `1280 × 591` (same dimensions as the supplied recording)
+- Additional viewport: `390 × 844`
+- Comparison artifact: `/private/tmp/aurora-design-comparison.png`
+- Slot comparison artifact: `/private/tmp/aurora-slot-reference-comparison.png`
 
 ## Visual comparison
 
-- Side-by-side comparison: `design/qa-lobby-comparison.png`
-- Lobby capture: `design/implementation-lobby.png`
-- Slot captures: `design/implementation-slot-{pharaoh,dragon,candy,pirate,neon,frozen,jungle,vegas}.png`
-- Extended lobby capture: `design/implementation-lobby-eight-slots.png`
-- Meta captures: `design/meta-{quests,club,events,shop}.png`
-- Progression flow: `design/meta-spin-result.png`,
-  `design/meta-quests-progress.png`, and `design/meta-quest-claimed.png`
-- VIP and competitive meta: `design/meta-vip.png`,
-  `design/meta-achievements.png`, `design/meta-tournament.png`, and
-  `design/meta-leaderboard.png`
-- Bonus Buy flow: `design/bonus-buy-confirmation.png` and
-  `design/bonus-buy-wheel.png`
+The implementation matches the references' intended product qualities without copying protected brand assets: a dense full-screen casino composition, persistent premium-currency HUD, high-saturation magenta/gold/cyan chrome, a vertical quick-action rail, prominent live-event and slot artwork, recent-game cards, jackpot messaging, and a persistent bottom navigation bar. The shared slot screen now uses a landscape cabinet composition with feature masthead, side paylines, progressive jackpot tower, reel-stop presentation and integrated bottom controls. Aurora uses original artwork, titles, colors, icons, and game identities.
 
-The in-app browser now loads the local release build. The comparison confirms
-the selected fantasy world-tour composition, purple/gold economy HUD, player
-avatar and level progress, tournament and daily-reward surfaces, progressive
-slot journey, and persistent bottom navigation.
+## Interaction and responsive checks
 
-All eight available games have distinct backgrounds, frames, jackpots, color
-systems, and six bespoke transparent reel symbols (48 symbols total). Reels use
-slide/fade transitions, winning states animate, free-spin and cascade rounds are
-presented sequentially. Pirate Bay can reveal a server-authoritative pick bonus,
-Jungle Temple a deterministic wheel bonus, and Vegas Gold a bounded hold-and-win
-bonus.
+- Lobby, shop/navigation entry points, slot launch, back navigation, and a complete server-authoritative spin were exercised in the in-app browser.
+- The spin deducted the wager, returned a win, updated the wallet, highlighted the result, and restored the controls.
+- Desktop idle, spinning and win states were verified at `1280 × 591`; mobile idle, spinning and result states were verified at `390 × 844`.
+- The five reels stop sequentially, haptics fire per reel on supported devices, the win meter counts up, and the shared animated light/coin layer remains non-blocking.
+- Desktop lobby verified at `1440 × 900` and `1440 × 666`.
+- Mobile lobby verified at `390 × 844`.
+- One P2 issue was found at `1440 × 666`: the seven-button side rail overflowed by 26 pixels. The rail now derives each item height from the available layout height and the overflow is no longer present.
+- Two slot P2 issues were found at `1280 × 591`: the original two-row desktop controls overflowed by 45 pixels and the dynamic spin/win labels later caused 7/3/55-pixel state-dependent overflows. Desktop now uses a fixed-height control bar, reserves a stable feature-label region, and renders the animated win count inside the bar. Repeated idle, spin and win checks show no overflow.
 
-No P0 or P1 visual defects remain in the captured lobby and eight slot screens.
-Remaining P2 product-fidelity gaps are the use of illustrated journey cards
-instead of fully modelled machine/building nodes, fewer ornamental progression
-details than the reference, and an eight-game catalogue rather than mature
-live-ops catalogue scale.
+## Open visual issues
 
-Browser coordinate interaction verified the complete current loop: claim the
-daily reward, open Pharaoh Oasis, perform a server-authoritative spin, return to
-the lobby, observe updated quest progress, and claim the completed free-spin
-mission. The HUD balance increased only after successful API responses. Widget,
-API, and deterministic engine tests cover the same boundaries.
+- P0: none
+- P1: none
+- P2: none
 
-The extended browser pass also verified the tappable VIP badge and progress
-sheet, three achievement cards, tournament overview, complete five-player
-leaderboard, and the player's server-calculated rank. Reward requirements now
-fail closed in the API when their objective has not been met.
+Browser warnings are limited to Flutter's optional remote Noto Sans Symbols fallback font being unavailable in the isolated browser. The application uses its bundled fonts and icons and remains visually and functionally intact. The browser log contains the historical overflow assertions from the QA iterations, followed by clean reloads after the final fix; no new rendering assertion was emitted by the final desktop or mobile runs.
 
-The Bonus Buy browser pass verified the 50× price label, mandatory confirmation
-dialog, purchased Jungle Temple wheel, and the transition into the animated
-bonus presentation. A 390-pixel widget test also caught and fixed a jackpot-row
-overflow before release.
-
-The exact 390 × 844 browser capture remains unavailable; the centered 480 × 720
-application crop has no visible clipping in the tested states. This is
-sufficient for the current vertical slice, but not evidence that the platform
-has reached the content breadth of a mature live title.
-
-final result: blocked
+final result: passed

@@ -140,6 +140,56 @@ class AuthSessionManager {
     }
   }
 
+  /// Exchanges a Supabase-verified Apple, Google, or email session for Aurora credentials.
+  Future<void> signInWithProvider({
+    required String provider,
+    required String providerAccessToken,
+  }) async {
+    if (!const {'apple', 'google', 'email'}.contains(provider) ||
+        providerAccessToken.length < 32) {
+      throw ArgumentError('Ungültige Provider-Anmeldung');
+    }
+    final currentAccessToken = await accessToken();
+    final response = await client.post(
+      Uri.parse('$baseUrl/v1/auth/provider'),
+      headers: {
+        'authorization': 'Bearer $currentAccessToken',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        'provider': provider,
+        'providerAccessToken': providerAccessToken,
+        'installationId': await installationId(),
+        'platform': platform,
+      }),
+    );
+    if (response.statusCode != 201) {
+      throw StateError(
+        'Anmeldung konnte nicht verknüpft werden (${response.statusCode})',
+      );
+    }
+    await _acceptTokens(response);
+  }
+
+  /// Revokes every active device session and clears credentials on this device.
+  Future<void> logoutAll() async {
+    final token = await accessToken();
+    try {
+      final response = await client.post(
+        Uri.parse('$baseUrl/v1/auth/logout-all'),
+        headers: {'authorization': 'Bearer $token'},
+      );
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Sitzungen konnten nicht beendet werden (${response.statusCode})',
+        );
+      }
+    } finally {
+      await storage.delete(_refreshTokenKey);
+      _clearMemorySession();
+    }
+  }
+
   bool get _hasUsableAccessToken {
     final refreshAt = _accessTokenRefreshAt;
     return _accessToken != null &&
