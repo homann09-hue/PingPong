@@ -32,6 +32,11 @@
 - Feature-trigger desktop spin state: `/private/tmp/aurora-feature-trigger-spin.png`
 - Feature-trigger mobile implementation: `/private/tmp/aurora-feature-trigger-mobile.png`
 - Feature-trigger reference comparison: `/private/tmp/aurora-feature-trigger-reference-comparison.png`
+- Wild-feature desktop implementation: `/private/tmp/aurora-wild-feature-desktop.png`
+- Wild-feature live Mystery Reveal: `/private/tmp/aurora-wild-feature-live-4.png`
+- Wild-feature mobile implementation: `/private/tmp/aurora-wild-feature-mobile.png`
+- Wild-feature mobile spin state: `/private/tmp/aurora-wild-feature-mobile-spin.png`
+- Wild-feature reference comparison: `/private/tmp/aurora-wild-feature-reference-comparison.png`
 
 ## Visual comparison
 
@@ -77,6 +82,7 @@ The base game and each free-spin round now use continuous vertical reel strips w
 - A real Dragon Peak desktop spin was captured at `1280 × 591` during continuous reel motion and after settlement. All five reels showed vertical travel and motion blur, then stopped independently without moving the cabinet, jackpot tower or control bar.
 - The same real flow was captured at `390 × 844`. Reel motion stayed clipped inside the mobile cabinet, the primary spin control remained visible, and the final grid returned without overlap or horizontal overflow.
 - The current Dragon Peak build was rechecked at `1280 × 591` and `390 × 844` after adding the third-trigger slam. Real spins confirmed continuous clipped reel motion, sequential recovery and persistent controls; a deterministic server-response fixture confirms that the trigger overlay and all three landed trigger cells appear only when the authoritative grid reaches its third scatter/bonus symbol.
+- Pharaoh Oasis was exercised through repeated real server spins after connecting the engine-event feature pipeline. A live Mystery Reveal produced its position-specific reel sweep and label; a later mobile spin produced the complete third-trigger slam. Both states remained clipped to the cabinet and returned control correctly.
 
 ## Motion comparison gate
 
@@ -146,6 +152,22 @@ The base game and each free-spin round now use continuous vertical reel strips w
 - Accessibility and performance: the overlay is non-interactive and finite, shares one animation controller, and remains isolated from the persistent controls. Haptic output is a presentation hook only and does not affect game state.
 - Comparison history: this pass found no new actionable P0/P1/P2 mismatch. The prior build stopped at a two-trigger `FEATURE?` anticipation state; the revised deterministic render adds the missing third-trigger landing phase while preserving the post-animation cabinet geometry and responsive layout.
 
+## Engine-event Wild and transformation comparison gate
+
+- Source visual truth: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4` and `/private/tmp/aurora-video-contact-sheet.png`.
+- Implementation state: Pharaoh Oasis idle, real server-driven Mystery Reveal, mobile feature trigger, and deterministic Expanding Wild reveal.
+- Viewports: `1280 × 591` desktop and `390 × 844` mobile.
+- Full-view comparison evidence: `/private/tmp/aurora-wild-feature-reference-comparison.png` places the complete supplied multi-state slot reference above Aurora's real browser-rendered Mystery Reveal at the normalized desktop viewport.
+- Focused-region evidence: the combined artifact keeps the complete reel cabinet, affected reel, feature labels, wallet, jackpot tower and controls readable. A separate crop was unnecessary; the transient Expanding Wild state is additionally verified with exact affected-reel and cell assertions in the deterministic widget test.
+- Fonts and typography: the short uppercase engine labels use Aurora's existing slot-display hierarchy. `MYSTERY → J • 1 SYMBOLE`, `EXPANDING WILD` and persistent HUD copy remain inside their reserved areas without wrapping or clipping.
+- Spacing and layout rhythm: reel sweeps and symbol charges are painted inside the existing reel bounds. They do not alter cabinet dimensions, jackpot geometry, bet controls or the primary spin target at desktop or mobile width.
+- Colors and visual tokens: feature glows derive from the active slot's primary and secondary colors, so Pharaoh Oasis uses its established purple/gold treatment while preserving the white impact highlight visible in the motion reference.
+- Image quality and asset fidelity: the animation preserves the original Pharaoh background and raster symbol artwork. Only the established Material icon family is used for finite sparkle accents; no reference-brand image, custom SVG or placeholder art was introduced.
+- Copy and content: feature labels and affected positions come directly from `wild.expanded`, `wild.stacked`, `wild.stuck`, `wild.walked`, `mystery.revealed` and `free_spins.modified` engine events. The client does not infer or fabricate a transformation outcome.
+- States and interactions: real desktop spins exercised anticipation, settlement and a live Mystery Reveal. Mobile exercised idle, active reels and the complete trigger slam; controls remained visible and recovered after every state. Console inspection found only Flutter's expected bootstrap debug output.
+- Accessibility and performance: one finite shared controller drives the symbol-feature layer, and only server-identified reels/cells repaint. The visual overlay ignores pointer input and cannot obstruct the persistent spin controls.
+- Comparison history: this pass found no actionable P0/P1/P2 issue. Previously these engine events were collapsed into static text or generic win-cell emphasis. The revised implementation preserves their exact positions and adds a dedicated finite reveal before the normal win animation.
+
 ## Open visual issues
 
 - P0: none
@@ -155,7 +177,7 @@ The base game and each free-spin round now use continuous vertical reel strips w
 
 The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `47` Flutter tests passed, including deterministic authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
+Automated verification: `48` Flutter tests passed, including deterministic Expanding Wild reveal, authoritative third-trigger landing, continuous reel motion, authoritative-payline rendering, cascade clear-before-refill ordering, two-trigger reel anticipation, persistent free-spin HUD, BIG/SUPER/MEGA escalation, welcome-curtain, Hold & Win, Wheel Bonus and Treasure Pick coverage. Focused Flutter analysis for the changed API mapper, slot screen and widget suite reported `No issues found`; the debug web build completed successfully.
 
 The final browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 

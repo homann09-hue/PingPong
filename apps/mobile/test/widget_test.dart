@@ -851,6 +851,57 @@ void main() {
     expect(find.text('DREH!'), findsOneWidget);
   });
 
+  testWidgets('authoritative expanding wild receives a reel-wide reveal', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _ExpandingWildPresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedFeature = false;
+    for (var frame = 0; frame < 50; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find
+          .byKey(const ValueKey('symbol-feature-overlay'))
+          .evaluate()
+          .isNotEmpty) {
+        observedFeature = true;
+        expect(find.text('EXPANDING WILD'), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('symbol-feature-cell-0-0')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('symbol-feature-cell-0-1')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('symbol-feature-cell-0-2')),
+          findsOneWidget,
+        );
+        break;
+      }
+    }
+    expect(observedFeature, isTrue);
+    for (var frame = 0; frame < 35; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('symbol-feature-overlay')), findsNothing);
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
   testWidgets('high multiplier win escalates through cinematic win tiers', (
     tester,
   ) async {
@@ -1215,6 +1266,64 @@ class _FeatureTriggerPresentationApi extends CasinoApi {
       vipPoints: 1,
       maxWinReached: false,
       winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _ExpandingWildPresentationApi extends CasinoApi {
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final round = SpinRoundView(
+      phase: 'base',
+      index: 1,
+      grid: const [
+        ['W', 'W', 'W'],
+        ['A', 'Q', 'J'],
+        ['K', 'A', 'Q'],
+        ['J', 'Q', 'A'],
+        ['K', 'A', 'Q'],
+      ],
+      win: 300,
+      bonusMultiplier: null,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: 'EXPANDING WILD',
+      winningCells: const {'0:0', '0:1', '0:2'},
+      winLabel: '3× WILD • 1 LINIE',
+      visualFeature: 'wild.expanded',
+      featureCells: const {'0:0', '0:1', '0:2'},
+      featureReels: const {0},
+    );
+    return SpinResponse(
+      grid: round.grid,
+      balance: 1000200,
+      win: 300,
+      freeSpins: 0,
+      rounds: [round],
+      level: 12,
+      xp: 10,
+      spins: 1,
+      totalWon: 300,
+      totalFreeSpins: 0,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: 'SMALL',
       jackpots: const [
         JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
         JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),

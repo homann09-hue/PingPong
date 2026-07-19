@@ -26,6 +26,9 @@ class SpinRoundView {
     required this.winningCells,
     required this.winLabel,
     this.paylineWins = const [],
+    this.visualFeature,
+    this.featureCells = const {},
+    this.featureReels = const {},
   });
 
   final String phase;
@@ -45,6 +48,9 @@ class SpinRoundView {
   final Set<String> winningCells;
   final String? winLabel;
   final List<PaylineWinView> paylineWins;
+  final String? visualFeature;
+  final Set<String> featureCells;
+  final Set<int> featureReels;
 }
 
 class PaylineWinView {
@@ -770,16 +776,18 @@ class CasinoApi {
 
   Future<Map<String, dynamic>> accountStatus() async {
     final response = await _client.get(Uri.parse('$base/v1/auth/account'));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Kontostatus ist nicht verfügbar');
+    }
     return (jsonDecode(response.body) as Map<String, dynamic>)['account']
         as Map<String, dynamic>;
   }
 
   Future<List<Map<String, dynamic>>> accountSessions() async {
     final response = await _client.get(Uri.parse('$base/v1/auth/sessions'));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Sitzungen sind nicht verfügbar');
+    }
     return ((jsonDecode(response.body) as Map<String, dynamic>)['sessions']
             as List)
         .cast<Map<String, dynamic>>();
@@ -789,14 +797,16 @@ class CasinoApi {
     final response = await _client.delete(
       Uri.parse('$base/v1/auth/sessions/$sessionId'),
     );
-    if (response.statusCode != 204)
+    if (response.statusCode != 204) {
       throw StateError('Sitzung konnte nicht beendet werden');
+    }
   }
 
   Future<Map<String, dynamic>> cloudSave() async {
     final response = await _client.get(Uri.parse('$base/v1/auth/cloud-save'));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Cloud Save ist nicht verfügbar');
+    }
     return (jsonDecode(response.body) as Map<String, dynamic>)['cloudSave']
         as Map<String, dynamic>;
   }
@@ -810,12 +820,13 @@ class CasinoApi {
       headers: const {'content-type': 'application/json'},
       body: jsonEncode({'expectedVersion': expectedVersion, 'data': data}),
     );
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError(
         response.statusCode == 409
             ? 'Neuere Cloud-Daten vorhanden'
             : 'Cloud Save fehlgeschlagen',
       );
+    }
     return (jsonDecode(response.body) as Map<String, dynamic>)['cloudSave']
         as Map<String, dynamic>;
   }
@@ -824,15 +835,17 @@ class CasinoApi {
     final response = await _client.get(
       Uri.parse('$base/v1/auth/privacy-export'),
     );
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Datenexport ist nicht verfügbar');
+    }
     return response.body;
   }
 
   Future<void> deleteAccount() async {
     final response = await _client.delete(Uri.parse('$base/v1/profile'));
-    if (response.statusCode != 204)
+    if (response.statusCode != 204) {
       throw StateError('Konto konnte nicht gelöscht werden');
+    }
     await _sharedSession.logout();
   }
 
@@ -897,6 +910,7 @@ class CasinoApi {
           ? null
           : bonusEvents.first['data'] as Map<String, dynamic>;
       final eventTypes = events.map((event) => event['type'] as String).toSet();
+      final roundGrid = _grid(round['grid']);
       final multiplierEvents = events.where(
         (event) => event['type'] == 'multiplier.applied',
       );
@@ -940,6 +954,9 @@ class CasinoApi {
       final mysteryData = mysteryEvents.isEmpty
           ? null
           : mysteryEvents.last['data'] as Map<String, dynamic>;
+      final expandedEvents = events
+          .where((event) => event['type'] == 'wild.expanded')
+          .toList();
       final wins = (round['wins'] as List).cast<Map<String, dynamic>>();
       final winningCells = <String>{};
       for (final win in wins) {
@@ -980,6 +997,69 @@ class CasinoApi {
           winningCells.add(encoded);
         }
       }
+      final featureCells = <String>{};
+      final featureReels = <int>{};
+      String? visualFeature;
+      if (expandedEvents.isNotEmpty) {
+        visualFeature = 'wild.expanded';
+        for (final event in expandedEvents) {
+          final data = event['data'] as Map<String, dynamic>;
+          final reel = data['reel'] as int;
+          featureReels.add(reel);
+          if (reel >= 0 && reel < roundGrid.length) {
+            for (var row = 0; row < roundGrid[reel].length; row++) {
+              featureCells.add('$reel:$row');
+            }
+          }
+        }
+      } else if (extraWildData != null) {
+        visualFeature = 'free_spins.extra_wilds';
+        for (final encoded in (extraWildData['positions'] as String).split(
+          ',',
+        )) {
+          if (encoded.isEmpty) continue;
+          featureCells.add(encoded);
+          featureReels.add(int.parse(encoded.split(':').first));
+        }
+      } else if (mysteryData != null) {
+        visualFeature = 'mystery.revealed';
+        for (final encoded in (mysteryData['positions'] as String).split(',')) {
+          if (encoded.isEmpty) continue;
+          featureCells.add(encoded);
+          featureReels.add(int.parse(encoded.split(':').first));
+        }
+      } else if (eventTypes.contains('wild.stacked')) {
+        visualFeature = 'wild.stacked';
+        for (final event in events.where(
+          (event) => event['type'] == 'wild.stacked',
+        )) {
+          final data = event['data'] as Map<String, dynamic>;
+          final reel = data['reel'] as int;
+          final startRow = data['startRow'] as int;
+          final size = data['size'] as int;
+          featureReels.add(reel);
+          for (var row = startRow; row < startRow + size; row++) {
+            featureCells.add('$reel:$row');
+          }
+        }
+      } else if (eventTypes.contains('wild.stuck') ||
+          eventTypes.contains('wild.walked')) {
+        visualFeature = eventTypes.contains('wild.stuck')
+            ? 'wild.stuck'
+            : 'wild.walked';
+        final featureEvent = events.firstWhere(
+          (event) => event['type'] == visualFeature,
+        );
+        final featureSymbol =
+            (featureEvent['data'] as Map<String, dynamic>)['symbol'] as String;
+        for (var reel = 0; reel < roundGrid.length; reel++) {
+          for (var row = 0; row < roundGrid[reel].length; row++) {
+            if (roundGrid[reel][row] != featureSymbol) continue;
+            featureCells.add('$reel:$row');
+            featureReels.add(reel);
+          }
+        }
+      }
       final lineWins = wins.where((win) => win['kind'] == 'line').toList();
       final waysWins = wins.where((win) => win['kind'] == 'ways').toList();
       final scatterWins = wins
@@ -1006,7 +1086,7 @@ class CasinoApi {
       return SpinRoundView(
         phase: round['phase'] as String,
         index: round['index'] as int,
-        grid: _grid(round['grid']),
+        grid: roundGrid,
         win: round['totalWin'] as int,
         bonusMultiplier: bonusData?['multiplier'] as int?,
         bonusMode: bonusData?['mode'] as String?,
@@ -1024,6 +1104,8 @@ class CasinoApi {
         bonusCoins: _holdAndWinSpots(bonusData?['coins'] as String?),
         featureLabel: eventTypes.contains('max_win.reached')
             ? 'MAX WIN'
+            : eventTypes.contains('wild.expanded')
+            ? 'EXPANDING WILD'
             : eventTypes.contains('wild.walked')
             ? 'WALKING WILD'
             : eventTypes.contains('wild.stacked')
@@ -1058,6 +1140,9 @@ class CasinoApi {
         winningCells: winningCells,
         winLabel: winLabel,
         paylineWins: paylineWins,
+        visualFeature: visualFeature,
+        featureCells: featureCells,
+        featureReels: featureReels,
       );
     }).toList();
     return SpinResponse(

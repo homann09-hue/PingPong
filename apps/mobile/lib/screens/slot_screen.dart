@@ -32,6 +32,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final AnimationController paylineController;
   late final AnimationController anticipationController;
   late final AnimationController featureTriggerController;
+  late final AnimationController symbolFeatureController;
   late final AnimationController reelMotionController;
   Timer? welcomePresentationTimer;
   final random = Random();
@@ -60,6 +61,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   int? anticipationReel;
   Set<String> featureTriggerCells = {};
   bool featureTriggerActive = false;
+  String? activeSymbolFeature;
+  Set<String> symbolFeatureCells = {};
+  Set<int> symbolFeatureReels = {};
   int freeSpinTotal = 0;
   int freeSpinPlayed = 0;
   int freeSpinRemaining = 0;
@@ -96,6 +100,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 820),
     );
+    symbolFeatureController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 940),
+    );
     reelMotionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 310),
@@ -123,6 +131,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     paylineController.dispose();
     anticipationController.dispose();
     featureTriggerController.dispose();
+    symbolFeatureController.dispose();
     reelMotionController.dispose();
     super.dispose();
   }
@@ -240,6 +249,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     featureTriggerController
       ..stop()
       ..value = 0;
+    symbolFeatureController
+      ..stop()
+      ..value = 0;
     reelMotionController
       ..stop()
       ..repeat();
@@ -257,6 +269,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       anticipationReel = null;
       featureTriggerCells = {};
       featureTriggerActive = false;
+      activeSymbolFeature = null;
+      symbolFeatureCells = {};
+      symbolFeatureReels = {};
       freeSpinTotal = 0;
       freeSpinPlayed = 0;
       freeSpinRemaining = 0;
@@ -357,6 +372,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           }
           displayedWin += round.win;
           await _revealGrid(round.grid);
+          if (!mounted) return null;
+          await _showSymbolFeature(round);
           if (!mounted) return null;
           setState(() {
             win = displayedWin;
@@ -507,6 +524,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       featureTriggerController
         ..stop()
         ..value = 0;
+      symbolFeatureController
+        ..stop()
+        ..value = 0;
       reelMotionController
         ..stop()
         ..value = 0;
@@ -517,6 +537,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           anticipationReel = null;
           featureTriggerCells = {};
           featureTriggerActive = false;
+          activeSymbolFeature = null;
+          symbolFeatureCells = {};
+          symbolFeatureReels = {};
           reelsInMotion = List<bool>.filled(max(1, grid.length), false);
         });
       }
@@ -546,6 +569,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       winningPaylines = const [];
       featureTriggerCells = {};
       featureTriggerActive = false;
+      activeSymbolFeature = null;
+      symbolFeatureCells = {};
+      symbolFeatureReels = {};
     });
   }
 
@@ -644,6 +670,29 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         ..stop()
         ..value = 0;
     }
+  }
+
+  Future<void> _showSymbolFeature(SpinRoundView round) async {
+    if (round.visualFeature == null || round.featureCells.isEmpty) return;
+    setState(() {
+      activeSymbolFeature = round.visualFeature;
+      symbolFeatureCells = {...round.featureCells};
+      symbolFeatureReels = {...round.featureReels};
+      featureMode = round.featureLabel ?? 'FEATURE ACTIVE';
+    });
+    symbolFeatureController.forward(from: 0);
+    unawaited(
+      round.visualFeature == 'wild.expanded'
+          ? HapticFeedback.heavyImpact()
+          : HapticFeedback.mediumImpact(),
+    );
+    await Future<void>.delayed(Duration(milliseconds: turbo ? 190 : 760));
+    if (!mounted) return;
+    setState(() {
+      activeSymbolFeature = null;
+      symbolFeatureCells = {};
+      symbolFeatureReels = {};
+    });
   }
 
   Future<void> _showInsufficientCoins(int wager) async {
@@ -1578,6 +1627,19 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                     secondary: widget.game.secondary,
                   ),
                 ),
+              if (activeSymbolFeature != null)
+                Positioned.fill(
+                  child: _SymbolFeatureSweep(
+                    key: const ValueKey('symbol-feature-overlay'),
+                    animation: symbolFeatureController,
+                    kind: activeSymbolFeature!,
+                    label: featureMode ?? 'FEATURE ACTIVE',
+                    reels: symbolFeatureReels,
+                    reelCount: grid.length,
+                    primary: widget.game.primary,
+                    secondary: widget.game.secondary,
+                  ),
+                ),
             ],
           ),
         ),
@@ -1682,6 +1744,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     final winning = winningCells.contains('$reel:$row');
     final clearing = clearingCells.contains('$reel:$row');
     final featureTrigger = featureTriggerCells.contains('$reel:$row');
+    final symbolFeature = symbolFeatureCells.contains('$reel:$row');
     final cell = Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
@@ -1795,15 +1858,25 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         ],
       ),
     );
+    final symbolFeatureCell = symbolFeature
+        ? _SymbolFeatureCell(
+            key: ValueKey('symbol-feature-cell-$reel-$row'),
+            animation: symbolFeatureController,
+            kind: activeSymbolFeature!,
+            primary: widget.game.primary,
+            secondary: widget.game.secondary,
+            child: cell,
+          )
+        : cell;
     final featureCell = featureTrigger
         ? _FeatureTriggerCell(
             key: ValueKey('feature-trigger-cell-$reel-$row'),
             animation: featureTriggerController,
             primary: widget.game.primary,
             secondary: widget.game.secondary,
-            child: cell,
+            child: symbolFeatureCell,
           )
-        : cell;
+        : symbolFeatureCell;
     final animatedCell = winning
         ? AnimatedBuilder(
             animation: winController,
@@ -2818,6 +2891,281 @@ class _TriggerCharge extends StatelessWidget {
           ),
         );
       },
+    ),
+  );
+}
+
+class _SymbolFeatureCell extends StatelessWidget {
+  const _SymbolFeatureCell({
+    super.key,
+    required this.animation,
+    required this.kind,
+    required this.primary,
+    required this.secondary,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final String kind;
+  final Color primary, secondary;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: animation,
+    child: child,
+    builder: (context, child) {
+      final progress = Curves.easeOutCubic.transform(animation.value);
+      final impact = sin(min(1, animation.value * 1.8) * pi).abs();
+      final shimmer = sin(animation.value * pi * 4).abs();
+      final expanding = kind == 'wild.expanded';
+      return Transform.scale(
+        scaleX: 1 + impact * .07,
+        scaleY: expanding
+            ? .72 + progress * .28 + impact * .1
+            : 1 + impact * .09,
+        child: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Color.lerp(Colors.white, primary, progress)!,
+                  width: 2 + shimmer * 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withValues(alpha: .45 + impact * .5),
+                    blurRadius: 14 + impact * 30,
+                    spreadRadius: impact * 4,
+                  ),
+                  BoxShadow(
+                    color: secondary.withValues(alpha: .32 + shimmer * .34),
+                    blurRadius: 8 + shimmer * 18,
+                  ),
+                ],
+              ),
+              child: child,
+            ),
+            Align(
+              alignment: Alignment(0, -1.25 + progress * 2.5),
+              child: FractionallySizedBox(
+                widthFactor: 1,
+                heightFactor: .16,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.white.withValues(alpha: .78 - progress * .3),
+                        Colors.transparent,
+                      ],
+                    ),
+                    boxShadow: [BoxShadow(color: primary, blurRadius: 12)],
+                  ),
+                ),
+              ),
+            ),
+            for (final particle in const [
+              Alignment(-.82, -.82),
+              Alignment(.82, -.7),
+              Alignment(-.74, .82),
+              Alignment(.78, .78),
+            ])
+              Align(
+                alignment: particle,
+                child: Opacity(
+                  opacity: (1 - progress).clamp(0, 1),
+                  child: Transform.scale(
+                    scale: .55 + impact * .85,
+                    child: Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Colors.white,
+                      size: 15,
+                      shadows: [Shadow(color: primary, blurRadius: 9)],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _SymbolFeatureSweep extends StatelessWidget {
+  const _SymbolFeatureSweep({
+    super.key,
+    required this.animation,
+    required this.kind,
+    required this.label,
+    required this.reels,
+    required this.reelCount,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final Animation<double> animation;
+  final String kind, label;
+  final Set<int> reels;
+  final int reelCount;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: LayoutBuilder(
+      builder: (context, constraints) => AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          final progress = Curves.easeOutCubic.transform(animation.value);
+          final pulse = sin(animation.value * pi).abs();
+          final fade = (1 - progress).clamp(0.0, 1.0);
+          final reelWidth = constraints.maxWidth / max(1, reelCount);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              for (final reel in reels.where(
+                (value) => value >= 0 && value < reelCount,
+              ))
+                Positioned(
+                  left: reel * reelWidth,
+                  width: reelWidth,
+                  top: 0,
+                  bottom: 0,
+                  child: ClipRect(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: primary.withValues(alpha: fade * .08),
+                            border: Border.symmetric(
+                              vertical: BorderSide(
+                                color: Colors.white.withValues(
+                                  alpha: .3 + fade * .55,
+                                ),
+                                width: 2,
+                              ),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primary.withValues(alpha: fade * .75),
+                                blurRadius: 24,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Transform.translate(
+                          offset: Offset(
+                            0,
+                            (-.35 + progress * 1.7) * constraints.maxHeight,
+                          ),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: FractionallySizedBox(
+                              heightFactor: .22,
+                              widthFactor: 1,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.white.withValues(alpha: fade),
+                                      primary.withValues(alpha: fade * .65),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: secondary.withValues(
+                                        alpha: fade * .8,
+                                      ),
+                                      blurRadius: 22,
+                                      spreadRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Align(
+                alignment: const Alignment(0, -.88),
+                child: Transform.scale(
+                  scale: .82 + pulse * .14,
+                  child: Opacity(
+                    opacity: fade,
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * .7,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xf20e041c),
+                            primary.withValues(alpha: .96),
+                            const Color(0xf20e041c),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primary,
+                            blurRadius: 20,
+                            spreadRadius: 3,
+                          ),
+                        ],
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              kind == 'mystery.revealed'
+                                  ? Icons.help_rounded
+                                  : Icons.bolt_rounded,
+                              size: 17,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              label,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .8,
+                                shadows: [
+                                  Shadow(color: Colors.black, blurRadius: 5),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     ),
   );
 }
