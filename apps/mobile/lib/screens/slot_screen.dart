@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/game_definition.dart';
@@ -30,6 +31,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final AnimationController winController;
   late final AnimationController paylineController;
   late final AnimationController anticipationController;
+  late final AnimationController reelMotionController;
   Timer? welcomePresentationTimer;
   final random = Random();
   late int balance, level, xp, vipPoints;
@@ -60,6 +62,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   int freeSpinRemaining = 0;
   int freeSpinMultiplier = 1;
   List<int> reelStopEpochs = List<int>.filled(5, 0);
+  List<bool> reelsInMotion = List<bool>.filled(5, false);
   List<List<String>> grid = [
     ['A', 'K', 'Q'],
     ['J', 'W', 'K'],
@@ -86,6 +89,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 680),
     );
+    reelMotionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 310),
+    );
     api = widget.api ?? CasinoApi();
     balance = widget.balance;
     level = widget.level;
@@ -108,6 +115,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     winController.dispose();
     paylineController.dispose();
     anticipationController.dispose();
+    reelMotionController.dispose();
     super.dispose();
   }
 
@@ -221,6 +229,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     anticipationController
       ..stop()
       ..value = 0;
+    reelMotionController
+      ..stop()
+      ..repeat();
     setState(() {
       spinning = true;
       win = 0;
@@ -238,6 +249,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       freeSpinRemaining = 0;
       freeSpinMultiplier = 1;
       reelStopEpochs = List<int>.filled(max(1, grid.length), 0);
+      reelsInMotion = List<bool>.filled(max(1, grid.length), true);
+      grid = _randomSpinGrid();
     });
     SpinResponse? response;
     Object? requestError;
@@ -249,19 +262,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             requestError = exception;
           },
         );
-    for (var i = 0; i < 7; i++) {
-      await Future<void>.delayed(Duration(milliseconds: turbo ? 18 : 65));
-      if (!mounted) return null;
-      setState(
-        () => grid = List.generate(
-          5,
-          (_) => List.generate(
-            3,
-            (_) => ['A', 'K', 'Q', 'J', 'W', 'S'][random.nextInt(6)],
-          ),
-        ),
-      );
-    }
+    await Future<void>.delayed(Duration(milliseconds: turbo ? 130 : 520));
+    if (!mounted) return null;
     try {
       await request;
       if (requestError != null) throw requestError!;
@@ -334,6 +336,11 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
               freeSpinRemaining = freeRounds - presentedFreeSpins + 1;
               freeSpinMultiplier = round.bonusMultiplier ?? 1;
             });
+            _startRoundReelMotion();
+            await Future<void>.delayed(
+              Duration(milliseconds: turbo ? 110 : 410),
+            );
+            if (!mounted) return null;
           }
           displayedWin += round.win;
           await _revealGrid(round.grid);
@@ -484,14 +491,42 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       anticipationController
         ..stop()
         ..value = 0;
+      reelMotionController
+        ..stop()
+        ..value = 0;
       if (mounted) {
         setState(() {
           spinning = false;
           clearingCells = {};
           anticipationReel = null;
+          reelsInMotion = List<bool>.filled(max(1, grid.length), false);
         });
       }
     }
+  }
+
+  List<List<String>> _randomSpinGrid() {
+    const pool = ['A', 'K', 'Q', 'J', 'W', 'S'];
+    return List.generate(
+      max(1, grid.length),
+      (reel) => List.generate(
+        grid.isEmpty || reel >= grid.length ? 3 : max(1, grid[reel].length),
+        (_) => pool[random.nextInt(pool.length)],
+      ),
+    );
+  }
+
+  void _startRoundReelMotion() {
+    reelMotionController
+      ..stop()
+      ..repeat();
+    setState(() {
+      grid = _randomSpinGrid();
+      reelsInMotion = List<bool>.filled(max(1, grid.length), true);
+      winningCells = {};
+      clearingCells = {};
+      winningPaylines = const [];
+    });
   }
 
   Future<void> _revealGrid(List<List<String>> target) async {
@@ -516,6 +551,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         while (reelStopEpochs.length < target.length) {
           reelStopEpochs.add(0);
         }
+        while (reelsInMotion.length < target.length) {
+          reelsInMotion.add(false);
+        }
+        reelsInMotion[reel] = false;
         reelStopEpochs[reel]++;
         anticipationReel = nextAnticipationReel;
         if (anticipation) {
@@ -545,6 +584,11 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           ),
         );
       }
+    }
+    if (!reelsInMotion.any((moving) => moving)) {
+      reelMotionController
+        ..stop()
+        ..value = 0;
     }
   }
 
@@ -1475,12 +1519,14 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   );
 
   Widget _animatedReel(int reel) {
-    final column = Column(
+    Widget buildColumn() => Column(
       children: [
         for (var row = 0; row < grid[reel].length; row++)
           Expanded(child: _symbol(grid[reel][row], reel, row)),
       ],
     );
+
+    final column = buildColumn();
     final epoch = reel < reelStopEpochs.length ? reelStopEpochs[reel] : 0;
     final stoppedReel = epoch == 0
         ? column
@@ -1526,6 +1572,16 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           );
     final anticipated = anticipationReel == reel;
     final dimmed = anticipationReel != null && !anticipated;
+    final moving = reel < reelsInMotion.length && reelsInMotion[reel];
+    final reelSurface = moving
+        ? _RollingReel(
+            key: ValueKey('rolling-reel-$reel'),
+            animation: reelMotionController,
+            reel: reel,
+            first: buildColumn(),
+            second: buildColumn(),
+          )
+        : stoppedReel;
     return AnimatedOpacity(
       opacity: dimmed ? .48 : 1,
       duration: const Duration(milliseconds: 180),
@@ -1537,7 +1593,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           key: anticipated ? ValueKey('reel-anticipation-$reel') : null,
           fit: StackFit.expand,
           children: [
-            stoppedReel,
+            reelSurface,
             if (anticipated)
               _ReelAnticipation(
                 animation: anticipationController,
@@ -2508,6 +2564,65 @@ class _FreeSpinHud extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RollingReel extends StatelessWidget {
+  const _RollingReel({
+    super.key,
+    required this.animation,
+    required this.reel,
+    required this.first,
+    required this.second,
+  });
+
+  final Animation<double> animation;
+  final int reel;
+  final Widget first, second;
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final strip = OverflowBox(
+          alignment: Alignment.topCenter,
+          minHeight: height * 2,
+          maxHeight: height * 2,
+          child: SizedBox(
+            width: constraints.maxWidth,
+            height: height * 2,
+            child: Column(
+              children: [
+                SizedBox(height: height, child: first),
+                SizedBox(height: height, child: second),
+              ],
+            ),
+          ),
+        );
+        return ClipRect(
+          child: ImageFiltered(
+            key: ValueKey('reel-motion-blur-$reel'),
+            imageFilter: ui.ImageFilter.blur(sigmaX: .15, sigmaY: 2.5),
+            child: AnimatedBuilder(
+              animation: animation,
+              child: strip,
+              builder: (context, child) {
+                final phase = (animation.value + reel * .137) % 1;
+                return Transform.translate(
+                  offset: Offset(0, -height * phase),
+                  child: Transform.scale(
+                    scaleX: 1.01,
+                    scaleY: 1.045,
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _ReelAnticipation extends StatelessWidget {

@@ -729,6 +729,38 @@ void main() {
     expect(find.text('FREE SPINS COMPLETE'), findsOneWidget);
   });
 
+  testWidgets('all reels run continuously before authoritative stops', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _AnticipationPresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(find.byKey(const ValueKey('rolling-reel-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rolling-reel-4')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reel-motion-blur-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reel-motion-blur-4')), findsOneWidget);
+    for (var frame = 0; frame < 40; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('rolling-reel-0')), findsNothing);
+    expect(find.byKey(const ValueKey('rolling-reel-4')), findsNothing);
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
   testWidgets('two landed triggers start finite reel anticipation', (
     tester,
   ) async {
