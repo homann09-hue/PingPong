@@ -679,6 +679,57 @@ void main() {
     expect(find.text('50 AUTO SPINS'), findsOneWidget);
   });
 
+  testWidgets('slot opens with a themed feature curtain', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.textContaining('WELCOME TO'), findsOneWidget);
+    expect(
+      find.text('WILD POWER • BONUS FEATURES • JACKPOTS'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('WELCOME TO'), findsNothing);
+  });
+
+  testWidgets('free spins use the shared feature presentation', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _FreeSpinPresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    for (var frame = 0; frame < 8; frame++) {
+      await tester.pump(const Duration(milliseconds: 70));
+    }
+    expect(find.text('2 FREE SPINS'), findsOneWidget);
+    expect(find.textContaining('SPECIAL REELS'), findsOneWidget);
+    for (var frame = 0; frame < 45; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  });
+
   testWidgets('expired High Roller access stops an open exclusive slot', (
     tester,
   ) async {
@@ -713,6 +764,63 @@ class _ExpiredHighRollerApi extends CasinoApi {
   @override
   Future<SpinResponse> spin(String gameId, int bet, {bool bonusBuy = false}) =>
       Future.error(const SpinException('HIGH_ROLLER_MEMBERSHIP_REQUIRED', 403));
+}
+
+class _FreeSpinPresentationApi extends CasinoApi {
+  SpinRoundView _round(int index, int win) => SpinRoundView(
+    phase: 'free_spin',
+    index: index,
+    grid: [
+      ['A', 'K', 'Q'],
+      ['A', 'W', 'Q'],
+      ['A', 'K', 'S'],
+      ['J', 'K', 'Q'],
+      ['A', 'K', 'Q'],
+    ],
+    win: win,
+    bonusMultiplier: 2,
+    bonusMode: null,
+    bonusTier: null,
+    bonusSpots: null,
+    bonusSegment: null,
+    bonusBoardSize: null,
+    bonusPickMultipliers: const [],
+    bonusInitialSpots: const [],
+    bonusRespinSteps: const [],
+    bonusCoins: const [],
+    featureLabel: 'FREE SPINS ×2',
+    winningCells: const {'0:0', '1:0', '2:0'},
+    winLabel: 'FREE SPIN WIN',
+  );
+
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final rounds = [_round(1, 200), _round(2, 300)];
+    return SpinResponse(
+      grid: rounds.last.grid,
+      balance: 1000400,
+      win: 500,
+      freeSpins: 2,
+      rounds: rounds,
+      level: 12,
+      xp: 50,
+      spins: 1,
+      totalWon: 500,
+      totalFreeSpins: 2,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
 }
 
 class _RewardApi extends CasinoApi {

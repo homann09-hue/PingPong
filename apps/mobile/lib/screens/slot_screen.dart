@@ -28,6 +28,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final CasinoApi api;
   late final AnimationController ambientController;
   late final AnimationController winController;
+  Timer? welcomePresentationTimer;
   final random = Random();
   late int balance, level, xp, vipPoints;
   int bet = 100, win = 0, free = 0;
@@ -42,8 +43,12 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     'GRAND': 50000000,
   };
   bool spinning = false;
+  bool intenseWin = false;
   String? error, featureMode;
   String? winDetail;
+  String? presentationTitle, presentationSubtitle;
+  int presentationSequence = 0;
+  IconData presentationIcon = Icons.auto_awesome_rounded;
   Set<String> winningCells = {};
   List<List<String>> grid = [
     ['A', 'K', 'Q'],
@@ -70,6 +75,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     vipPoints = widget.vipPoints;
     _loadJackpots();
     _loadPaytableMetadata();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showWelcomePresentation();
+    });
     unawaited(
       api.trackEvent('screen.viewed', screen: 'slot', slotId: widget.game.id),
     );
@@ -77,9 +85,28 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    welcomePresentationTimer?.cancel();
     ambientController.dispose();
     winController.dispose();
     super.dispose();
+  }
+
+  void _showWelcomePresentation() {
+    if (!mounted) return;
+    welcomePresentationTimer?.cancel();
+    final sequence = ++presentationSequence;
+    setState(() {
+      presentationTitle = 'WELCOME TO\n${widget.game.name.toUpperCase()}';
+      presentationSubtitle = 'WILD POWER • BONUS FEATURES • JACKPOTS';
+      presentationIcon = Icons.local_fire_department_rounded;
+    });
+    welcomePresentationTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (!mounted || sequence != presentationSequence) return;
+      setState(() {
+        presentationTitle = null;
+        presentationSubtitle = null;
+      });
+    });
   }
 
   Future<void> _loadJackpots() async {
@@ -110,6 +137,30 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _showFeaturePresentation({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    Duration hold = const Duration(milliseconds: 820),
+  }) async {
+    if (!mounted) return;
+    final sequence = ++presentationSequence;
+    setState(() {
+      presentationTitle = title;
+      presentationSubtitle = subtitle;
+      presentationIcon = icon;
+    });
+    await Future<void>.delayed(
+      turbo ? const Duration(milliseconds: 260) : hold,
+    );
+    if (!mounted || sequence != presentationSequence) return;
+    setState(() {
+      presentationTitle = null;
+      presentationSubtitle = null;
+    });
+    await Future<void>.delayed(Duration(milliseconds: turbo ? 80 : 260));
+  }
+
   Future<SpinResponse?> spin({bool bonusBuy = false}) async {
     final wager = bet * (bonusBuy ? widget.game.bonusBuyMultiplier ?? 1 : 1);
     if (spinning || balance < wager) {
@@ -128,6 +179,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       error = null;
       featureMode = bonusBuy ? 'BONUS BUY' : 'GOOD LUCK';
       winDetail = null;
+      intenseWin = false;
       winningCells = {};
     });
     SpinResponse? response;
@@ -162,11 +214,47 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           .where((round) => round.phase == 'free_spin')
           .length;
       var displayedWin = 0;
+      var freeSpinsIntroduced = false;
+      var respinsIntroduced = false;
       for (final round in r.rounds) {
         if (!mounted) return null;
         if (round.phase == 'bonus') {
+          await _showFeaturePresentation(
+            title: switch (round.bonusMode) {
+              'hold_and_win' => 'HOLD & WIN',
+              'wheel' => 'WHEEL BONUS',
+              'coin_collect' => 'COIN COLLECT',
+              'jackpot' => '${round.bonusTier ?? 'MEGA'} JACKPOT',
+              _ => 'BONUS GAME',
+            },
+            subtitle: switch (round.bonusMode) {
+              'hold_and_win' => '3 RESPINS • COINS LOCKEN • JACKPOTS JAGEN',
+              'wheel' => 'DAS PREMIUM-RAD WIRD AKTIVIERT',
+              'coin_collect' => 'COINS SAMMELN • MULTIPLIKATOR AUFBAUEN',
+              'jackpot' => 'PROGRESSIVER PREIS WIRD ENTHÜLLT',
+              _ => 'WÄHLE DEINE SCHÄTZE',
+            },
+            icon: round.bonusMode == 'jackpot'
+                ? Icons.emoji_events_rounded
+                : Icons.auto_awesome_rounded,
+          );
           await _showBonus(round);
         } else {
+          if (round.phase == 'free_spin' && !freeSpinsIntroduced) {
+            freeSpinsIntroduced = true;
+            await _showFeaturePresentation(
+              title: '$freeRounds FREE SPINS',
+              subtitle: 'SPECIAL REELS • EXTRA WILDS • MULTIPLIKATOREN',
+              icon: Icons.bolt_rounded,
+            );
+          } else if (round.phase == 'respin' && !respinsIntroduced) {
+            respinsIntroduced = true;
+            await _showFeaturePresentation(
+              title: 'LOCK & RESPIN',
+              subtitle: '3 RESPINS • LOCKED COINS • JACKPOT CHANCE',
+              icon: Icons.lock_clock_rounded,
+            );
+          }
           displayedWin += round.win;
           await _revealGrid(round.grid);
           if (!mounted) return null;
@@ -213,8 +301,22 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         vipPoints = r.vipPoints;
       });
       if (r.win > 0) {
+        final winMultiplier = r.win ~/ max(1, bet);
+        intenseWin = r.maxWinReached || winMultiplier >= 10;
         unawaited(HapticFeedback.heavyImpact());
         unawaited(winController.forward(from: 0));
+        if (intenseWin) {
+          await _showFeaturePresentation(
+            title: r.maxWinReached
+                ? 'MAX WIN'
+                : winMultiplier >= 50
+                ? 'MEGA WIN'
+                : 'BIG WIN',
+            subtitle: '${_fmt(r.win)} COINS • $winMultiplier× BET',
+            icon: Icons.workspace_premium_rounded,
+            hold: const Duration(milliseconds: 1100),
+          );
+        }
       }
       unawaited(
         api.trackEvent(
@@ -601,128 +703,187 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        SafeArea(
-                          top: false,
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: spinning || autoplay
-                                        ? null
-                                        : () => Navigator.pop(context, {
-                                            'balance': balance,
-                                            'level': level,
-                                            'xp': xp,
-                                            'spins': spins,
-                                            'totalWon': totalWon,
-                                            'totalFreeSpins': totalFreeSpins,
-                                            'vipPoints': vipPoints,
-                                          }),
-                                    icon: const Icon(Icons.arrow_back),
+                        AnimatedBuilder(
+                          animation: winController,
+                          builder: (context, child) {
+                            final remaining = 1 - winController.value;
+                            final amplitude = intenseWin ? 6.0 : 0.0;
+                            final shakeX =
+                                sin(winController.value * pi * 18) *
+                                remaining *
+                                amplitude;
+                            final shakeY =
+                                cos(winController.value * pi * 14) *
+                                remaining *
+                                amplitude *
+                                .45;
+                            return Transform.translate(
+                              offset: Offset(shakeX, shakeY),
+                              child: child,
+                            );
+                          },
+                          child: SafeArea(
+                            top: false,
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      onPressed: spinning || autoplay
+                                          ? null
+                                          : () => Navigator.pop(context, {
+                                              'balance': balance,
+                                              'level': level,
+                                              'xp': xp,
+                                              'spins': spins,
+                                              'totalWon': totalWon,
+                                              'totalFreeSpins': totalFreeSpins,
+                                              'vipPoints': vipPoints,
+                                            }),
+                                      icon: const Icon(Icons.arrow_back),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        widget.game.name,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: _showGameInfo,
+                                      icon: const Icon(Icons.info_outline),
+                                    ),
+                                  ],
+                                ),
+                                if (desktop)
+                                  _featureMasthead()
+                                else
+                                  _jackpots(),
+                                SizedBox(
+                                  height: desktop
+                                      ? 42
+                                      : (featureMode == null ? 0 : 42),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 220),
+                                    child: featureMode == null
+                                        ? const SizedBox.shrink()
+                                        : Container(
+                                            key: ValueKey(featureMode),
+                                            margin: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 18,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: widget.game.secondary
+                                                  .withValues(alpha: .92),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: widget.game.primary,
+                                                width: 2,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: widget.game.primary
+                                                      .withValues(alpha: .5),
+                                                  blurRadius: 12,
+                                                ),
+                                              ],
+                                            ),
+                                            child: Text(
+                                              featureMode!,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                          ),
                                   ),
-                                  Expanded(
-                                    child: Text(
-                                      widget.game.name,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 22,
+                                ),
+                                const Spacer(),
+                                _cabinet(desktop: desktop),
+                                const SizedBox(height: 10),
+                                if (!desktop && win > 0)
+                                  TweenAnimationBuilder<int>(
+                                    tween: IntTween(begin: 0, end: win),
+                                    duration: const Duration(milliseconds: 850),
+                                    curve: Curves.easeOutCubic,
+                                    builder: (context, value, child) => Text(
+                                      'WIN  ${_fmt(value)}',
+                                      style: TextStyle(
+                                        fontSize: desktop ? 34 : 28,
                                         fontWeight: FontWeight.w900,
+                                        color: widget.game.primary,
+                                        shadows: [
+                                          Shadow(
+                                            color: widget.game.primary,
+                                            blurRadius: 18,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                                  IconButton(
-                                    onPressed: _showGameInfo,
-                                    icon: const Icon(Icons.info_outline),
-                                  ),
-                                ],
-                              ),
-                              if (desktop) _featureMasthead() else _jackpots(),
-                              SizedBox(
-                                height: desktop
-                                    ? 42
-                                    : (featureMode == null ? 0 : 42),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 220),
-                                  child: featureMode == null
-                                      ? const SizedBox.shrink()
-                                      : Container(
-                                          key: ValueKey(featureMode),
-                                          margin: const EdgeInsets.only(top: 6),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 18,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: widget.game.secondary
-                                                .withValues(alpha: .92),
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                            border: Border.all(
-                                              color: widget.game.primary,
-                                              width: 2,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: widget.game.primary
-                                                    .withValues(alpha: .5),
-                                                blurRadius: 12,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Text(
-                                            featureMode!,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              const Spacer(),
-                              _cabinet(desktop: desktop),
-                              const SizedBox(height: 10),
-                              if (!desktop && win > 0)
-                                TweenAnimationBuilder<int>(
-                                  tween: IntTween(begin: 0, end: win),
-                                  duration: const Duration(milliseconds: 850),
-                                  curve: Curves.easeOutCubic,
-                                  builder: (context, value, child) => Text(
-                                    'WIN  ${_fmt(value)}',
-                                    style: TextStyle(
-                                      fontSize: desktop ? 34 : 28,
-                                      fontWeight: FontWeight.w900,
-                                      color: widget.game.primary,
-                                      shadows: [
-                                        Shadow(
-                                          color: widget.game.primary,
-                                          blurRadius: 18,
-                                        ),
-                                      ],
+                                if (!desktop && winDetail != null)
+                                  Text(
+                                    winDetail!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.1,
                                     ),
                                   ),
-                                ),
-                              if (!desktop && winDetail != null)
-                                Text(
-                                  winDetail!,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.1,
+                                if (error != null)
+                                  Text(
+                                    error!,
+                                    style: const TextStyle(
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                const Spacer(),
+                                _controls(desktop: desktop),
+                                SizedBox(height: desktop ? 0 : 18),
+                              ],
+                            ),
+                          ),
+                        ),
+                        IgnorePointer(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 320),
+                            switchInCurve: Curves.easeOutBack,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: ScaleTransition(
+                                    scale: Tween<double>(
+                                      begin: .82,
+                                      end: 1,
+                                    ).animate(animation),
+                                    child: child,
                                   ),
                                 ),
-                              if (error != null)
-                                Text(
-                                  error!,
-                                  style: const TextStyle(
-                                    color: Colors.redAccent,
+                            child: presentationTitle == null
+                                ? const SizedBox.shrink(
+                                    key: ValueKey('feature-curtain-hidden'),
+                                  )
+                                : _FeatureCurtain(
+                                    key: ValueKey(
+                                      '$presentationTitle-$presentationSequence',
+                                    ),
+                                    title: presentationTitle!,
+                                    subtitle: presentationSubtitle!,
+                                    icon: presentationIcon,
+                                    backgroundAsset: widget.game.asset,
+                                    symbolPaths:
+                                        _symbolPaths[widget.game.symbolSet]!,
+                                    primary: widget.game.primary,
+                                    secondary: widget.game.secondary,
                                   ),
-                                ),
-                              const Spacer(),
-                              _controls(desktop: desktop),
-                              SizedBox(height: desktop ? 0 : 18),
-                            ],
                           ),
                         ),
                       ],
@@ -814,13 +975,13 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
       if (desktop) ...[
-        SizedBox(width: 74, height: 260, child: _paylineRail()),
+        SizedBox(width: 74, height: 256, child: _paylineRail()),
         const SizedBox(width: 7),
       ],
       Expanded(child: _reels(desktop: desktop)),
       if (desktop) ...[
         const SizedBox(width: 7),
-        SizedBox(width: 142, height: 260, child: _jackpotTower()),
+        SizedBox(width: 142, height: 256, child: _jackpotTower()),
       ],
     ],
   );
@@ -1006,7 +1167,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         constraints: BoxConstraints(maxWidth: desktop ? 960 : 760),
-        height: desktop ? 260 : 300,
+        height: desktop ? 256 : 300,
         margin: const EdgeInsets.symmetric(horizontal: 10),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -1701,6 +1862,166 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       'B': 'assets/symbols/vegas/scatter.png',
     },
   };
+}
+
+class _FeatureCurtain extends StatelessWidget {
+  const _FeatureCurtain({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.backgroundAsset,
+    required this.symbolPaths,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final String title, subtitle, backgroundAsset;
+  final IconData icon;
+  final Map<String, String> symbolPaths;
+  final Color primary, secondary;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final desktop = constraints.maxWidth >= 900;
+      final symbolSize = desktop ? 94.0 : 62.0;
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            backgroundAsset,
+            fit: BoxFit.cover,
+            color: const Color(0xaa12000b),
+            colorBlendMode: BlendMode.multiply,
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                radius: .82,
+                colors: [
+                  primary.withValues(alpha: .38),
+                  secondary.withValues(alpha: .82),
+                  const Color(0xf5080012),
+                ],
+                stops: const [0, .58, 1],
+              ),
+            ),
+          ),
+          Center(
+            child: Container(
+              constraints: BoxConstraints(maxWidth: desktop ? 960 : 350),
+              margin: EdgeInsets.symmetric(horizontal: desktop ? 28 : 18),
+              padding: EdgeInsets.symmetric(
+                horizontal: desktop ? 54 : 22,
+                vertical: desktop ? 30 : 22,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xdd120018),
+                borderRadius: BorderRadius.circular(desktop ? 34 : 26),
+                border: Border.all(color: primary, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withValues(alpha: .65),
+                    blurRadius: 42,
+                    spreadRadius: 5,
+                  ),
+                  BoxShadow(
+                    color: secondary.withValues(alpha: .7),
+                    blurRadius: 70,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: desktop ? 64 : 52,
+                    height: desktop ? 64 : 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [Colors.white, primary, secondary],
+                      ),
+                      boxShadow: [BoxShadow(color: primary, blurRadius: 24)],
+                    ),
+                    child: Icon(
+                      icon,
+                      color: const Color(0xff210229),
+                      size: desktop ? 36 : 29,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: const Color(0xfffff1a8),
+                      fontSize: desktop ? 52 : 31,
+                      height: .95,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: desktop ? 1.2 : .4,
+                      shadows: [
+                        Shadow(color: primary, blurRadius: 18),
+                        Shadow(
+                          color: secondary,
+                          blurRadius: 5,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: desktop ? 15 : 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: desktop ? 1.7 : .8,
+                    ),
+                  ),
+                  SizedBox(height: desktop ? 20 : 14),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final symbol in const ['W', 'S', 'A']) ...[
+                        Container(
+                          width: symbolSize,
+                          height: symbolSize,
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xcc050008),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: symbol == 'S' ? Colors.white : primary,
+                              width: symbol == 'S' ? 3 : 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primary.withValues(alpha: .55),
+                                blurRadius: 16,
+                              ),
+                            ],
+                          ),
+                          child: Image.asset(
+                            symbolPaths[symbol]!,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        if (symbol != 'A') SizedBox(width: desktop ? 15 : 9),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _WinCelebration extends StatelessWidget {
