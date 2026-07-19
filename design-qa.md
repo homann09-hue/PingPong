@@ -13,6 +13,9 @@
 - Reel-motion implementation screenshot: `/private/tmp/aurora-motion-desktop.png`
 - Mobile celebration screenshot: `/private/tmp/aurora-motion-mobile.png`
 - Reel-motion focused comparison artifact: `/private/tmp/aurora-motion-reference-comparison.png`
+- Cascade-clear implementation screenshot: `/private/tmp/aurora-cascade-desktop.png`
+- Cascade responsive screenshot: `/private/tmp/aurora-cascade-mobile.png`
+- Cascade-clear comparison artifact: `/private/tmp/aurora-cascade-reference-comparison.png`
 
 ## Visual comparison
 
@@ -23,6 +26,8 @@ Feature transitions now mirror the recording's strong state separation while rem
 Hold & Win, Wheel Bonus and Treasure Pick now use the same responsive full-screen feature stage instead of modal cards. The real Bonus Buy path was exercised for all three modes: Hold & Win advances through its server-provided respin steps, the wheel animates to the authoritative reward segment, and Treasure Pick requires the complete authoritative pick sequence before the collect action is enabled. The wheel uses a new original jungle-temple prize-wheel asset generated specifically for Aurora Casino.
 
 The shared reel presentation now adds a finite stop impulse and flash per reel, feature anticipation when two trigger symbols are already visible, animated emphasis on authoritative winning cells, and a denser coin/diamond/light celebration. Wins at 10× bet and above escalate through reusable BIG, SUPER and MEGA presentation tiers. The implementation keeps Aurora's original symbols and cabinet styling while matching the recording's stronger separation between spinning, reel-stop, cascade and win states.
+
+Cascade transitions now have an explicit three-step rhythm: authoritative winning cells charge, shrink and burst into finite slot-colored particles; only after that clear window does the next authoritative round grid drop into the cabinet. The presentation never manufactures replacement symbols or rewards client-side, and turbo mode uses the same sequence with compressed timings.
 
 ## Interaction and responsive checks
 
@@ -41,6 +46,8 @@ The shared reel presentation now adds a finite stop impulse and flash per reel, 
 - One bonus P2 issue was found at `1280 × 591`: square Treasure Pick cells clipped the lower two rows. Wide layouts now use a responsive cell aspect ratio; all three rows remain visible and the three-pick collect flow completes without overflow.
 - A live Dragon Peak cascade was exercised at `1280 × 591`. The five independent stop impulses were visible, the authoritative winning cells pulsed, the win meter accumulated across cascades, and controls returned after the final BIG WIN state.
 - The same real-spin flow was exercised at `390 × 844`. Reel-stop flashes, winning-symbol emphasis, coin/diamond particles, cascade labeling and the persistent spin controls remained visible without clipping.
+- A fresh real Dragon Peak cascade was captured at `1280 × 591`: the winning cells visibly cleared under `CASCADE CHARGED · NEXT DROP`, the following server grid appeared under `CASCADE ×2`, and the spin control returned after settlement.
+- Responsive stability was rechecked at `390 × 844` over three additional real spins, including sequential reel stops and feature anticipation. No clipping, overflow or control obstruction appeared. The exact clear/refill ordering is additionally locked by a deterministic widget test at the desktop viewport.
 
 ## Motion comparison gate
 
@@ -55,6 +62,7 @@ The shared reel presentation now adds a finite stop impulse and flash per reel, 
 - Image quality and asset fidelity: existing original raster symbol and background assets remain sharp; effects use the established icon system and do not replace slot art.
 - Copy and content: feature-chance, cascade, BIG/SUPER/MEGA and multiplier labels correspond to authoritative round state.
 - Comparison history: the initial implementation had only a slide/fade reel transition and static win borders. The revised capture shows distinct per-reel impacts, animated win focus and denser finite celebration effects with no new P0/P1/P2 issue.
+- Cascade-clear evidence: `/private/tmp/aurora-cascade-reference-comparison.png` places the supplied slot-motion reference and Aurora's browser-rendered clear state together. The comparison confirms a similarly legible feature transition while retaining original artwork, cabinet geometry, colors and copy.
 
 ## Open visual issues
 
@@ -63,8 +71,8 @@ The shared reel presentation now adds a finite stop impulse and flash per reel, 
 - P2: none
 - P3: additional slot-specific win sound layers can further distinguish each theme.
 
-The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request.
+The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `42` Flutter tests passed, including deterministic BIG/SUPER/MEGA escalation, welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage.
+Automated verification: `43` Flutter tests passed, including deterministic cascade clear-before-refill ordering, BIG/SUPER/MEGA escalation, welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage.
 
 final result: passed

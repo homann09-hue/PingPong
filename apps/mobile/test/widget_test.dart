@@ -765,6 +765,45 @@ void main() {
     expect(find.text('DREH!'), findsOneWidget);
   });
 
+  testWidgets('cascade clears winning symbols before authoritative refill', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _CascadePresentationApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedBurst = false;
+    for (var frame = 0; frame < 25; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find
+          .byKey(const ValueKey('cascade-burst-0-0'))
+          .evaluate()
+          .isNotEmpty) {
+        observedBurst = true;
+        expect(find.text('CASCADE CHARGED • NEXT DROP'), findsOneWidget);
+        break;
+      }
+    }
+    expect(observedBurst, isTrue);
+    for (var frame = 0; frame < 45; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('cascade-burst-0-0')), findsNothing);
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
   testWidgets('hold and win runs as a full-screen bonus experience', (
     tester,
   ) async {
@@ -959,6 +998,92 @@ class _CinematicWinApi extends CasinoApi {
       vipPoints: 1,
       maxWinReached: false,
       winClass: 'mega',
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _CascadePresentationApi extends CasinoApi {
+  SpinRoundView _round({
+    required String phase,
+    required int index,
+    required int win,
+    required List<List<String>> grid,
+    required Set<String> winningCells,
+    String? featureLabel,
+  }) => SpinRoundView(
+    phase: phase,
+    index: index,
+    grid: grid,
+    win: win,
+    bonusMultiplier: phase == 'cascade' ? 2 : null,
+    bonusMode: null,
+    bonusTier: null,
+    bonusSpots: null,
+    bonusSegment: null,
+    bonusBoardSize: null,
+    bonusPickMultipliers: const [],
+    bonusInitialSpots: const [],
+    bonusRespinSteps: const [],
+    bonusCoins: const [],
+    featureLabel: featureLabel,
+    winningCells: winningCells,
+    winLabel: phase == 'cascade' ? 'CASCADE WIN ×2' : 'LINE WIN',
+  );
+
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final rounds = [
+      _round(
+        phase: 'base',
+        index: 1,
+        win: 200,
+        grid: const [
+          ['A', 'K', 'Q'],
+          ['A', 'W', 'Q'],
+          ['A', 'K', 'J'],
+          ['J', 'K', 'Q'],
+          ['A', 'K', 'Q'],
+        ],
+        winningCells: const {'0:0', '1:0', '2:0', '3:0', '4:0'},
+      ),
+      _round(
+        phase: 'cascade',
+        index: 1,
+        win: 300,
+        grid: const [
+          ['K', 'K', 'Q'],
+          ['K', 'W', 'Q'],
+          ['K', 'K', 'J'],
+          ['J', 'K', 'Q'],
+          ['K', 'K', 'Q'],
+        ],
+        winningCells: const {'0:0', '1:0', '2:0', '3:0', '4:0'},
+        featureLabel: 'CASCADE ×2',
+      ),
+    ];
+    return SpinResponse(
+      grid: rounds.last.grid,
+      balance: 1000400,
+      win: 500,
+      freeSpins: 0,
+      rounds: rounds,
+      level: 12,
+      xp: 50,
+      spins: 1,
+      totalWon: 500,
+      totalFreeSpins: 0,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: null,
       jackpots: const [
         JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
         JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),

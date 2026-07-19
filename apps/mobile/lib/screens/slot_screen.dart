@@ -50,6 +50,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   int presentationSequence = 0;
   IconData presentationIcon = Icons.auto_awesome_rounded;
   Set<String> winningCells = {};
+  Set<String> clearingCells = {};
   List<int> reelStopEpochs = List<int>.filled(5, 0);
   List<List<String>> grid = [
     ['A', 'K', 'Q'],
@@ -205,6 +206,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       winDetail = null;
       intenseWin = false;
       winningCells = {};
+      clearingCells = {};
       reelStopEpochs = List<int>.filled(max(1, grid.length), 0);
     });
     SpinResponse? response;
@@ -241,7 +243,15 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       var displayedWin = 0;
       var freeSpinsIntroduced = false;
       var respinsIntroduced = false;
-      for (final round in r.rounds) {
+      for (
+        var roundPosition = 0;
+        roundPosition < r.rounds.length;
+        roundPosition++
+      ) {
+        final round = r.rounds[roundPosition];
+        final nextRound = roundPosition + 1 < r.rounds.length
+            ? r.rounds[roundPosition + 1]
+            : null;
         if (!mounted) return null;
         if (round.phase == 'bonus') {
           await _showFeaturePresentation(
@@ -300,7 +310,25 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           if (round.win > 0) {
             unawaited(winController.forward(from: 0));
           }
-          if (r.rounds.length > 1) {
+          final clearsIntoCascade =
+              nextRound?.phase == 'cascade' && round.winningCells.isNotEmpty;
+          if (clearsIntoCascade) {
+            await Future<void>.delayed(
+              Duration(milliseconds: turbo ? 70 : 360),
+            );
+            if (!mounted) return null;
+            winController.stop();
+            setState(() {
+              clearingCells = round.winningCells;
+              featureMode = 'CASCADE CHARGED • NEXT DROP';
+            });
+            unawaited(HapticFeedback.mediumImpact());
+            await Future<void>.delayed(
+              Duration(milliseconds: turbo ? 100 : 320),
+            );
+            if (!mounted) return null;
+            setState(() => clearingCells = {});
+          } else if (r.rounds.length > 1) {
             await Future<void>.delayed(
               Duration(milliseconds: turbo ? 120 : 520),
             );
@@ -310,6 +338,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       if (!mounted) return null;
       setState(() {
         grid = r.rounds.lastWhere((round) => round.phase != 'bonus').grid;
+        clearingCells = {};
         balance = r.balance;
         win = r.win;
         free = r.freeSpins;
@@ -393,7 +422,12 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       ambientController
         ..stop()
         ..value = 0;
-      if (mounted) setState(() => spinning = false);
+      if (mounted) {
+        setState(() {
+          spinning = false;
+          clearingCells = {};
+        });
+      }
     }
   }
 
@@ -1341,8 +1375,8 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       '$symbol-$reel-$row-${spinning ? random.nextInt(999) : 0}',
     );
     final winning = winningCells.contains('$reel:$row');
+    final clearing = clearingCells.contains('$reel:$row');
     final cell = Container(
-      key: winning ? null : key,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         gradient: RadialGradient(
@@ -1450,7 +1484,6 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     );
     final animatedCell = winning
         ? AnimatedBuilder(
-            key: key,
             animation: winController,
             child: cell,
             builder: (context, child) {
@@ -1479,6 +1512,38 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             },
           )
         : cell;
+    final cascadeCell = Stack(
+      key: key,
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedOpacity(
+          opacity: clearing ? 0 : 1,
+          duration: Duration(milliseconds: turbo ? 90 : 260),
+          curve: Curves.easeInCubic,
+          child: AnimatedScale(
+            scale: clearing ? .18 : 1,
+            duration: Duration(milliseconds: turbo ? 90 : 260),
+            curve: Curves.easeInBack,
+            child: AnimatedRotation(
+              turns: clearing ? .08 : 0,
+              duration: Duration(milliseconds: turbo ? 90 : 260),
+              curve: Curves.easeInCubic,
+              child: animatedCell,
+            ),
+          ),
+        ),
+        if (clearing)
+          Positioned.fill(
+            key: ValueKey('cascade-burst-$reel-$row'),
+            child: _CascadeBurst(
+              primary: widget.game.primary,
+              secondary: widget.game.secondary,
+              turbo: turbo,
+            ),
+          ),
+      ],
+    );
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 140),
       transitionBuilder: (child, animation) => SlideTransition(
@@ -1487,7 +1552,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         ),
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: animatedCell,
+      child: cascadeCell,
     );
   }
 
@@ -2162,6 +2227,58 @@ class _FeatureCurtain extends StatelessWidget {
         ],
       );
     },
+  );
+}
+
+class _CascadeBurst extends StatelessWidget {
+  const _CascadeBurst({
+    required this.primary,
+    required this.secondary,
+    required this.turbo,
+  });
+
+  final Color primary, secondary;
+  final bool turbo;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: turbo ? 100 : 320),
+      curve: Curves.easeOutCubic,
+      builder: (context, progress, child) => Opacity(
+        opacity: (1 - progress).clamp(0.0, 1.0),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (var index = 0; index < 8; index++)
+              Align(
+                alignment: Alignment.center,
+                child: Transform.translate(
+                  offset: Offset(
+                    cos(index * pi / 4) * (8 + progress * 42),
+                    sin(index * pi / 4) * (8 + progress * 34),
+                  ),
+                  child: Transform.rotate(
+                    angle: progress * pi * (index.isEven ? 1.5 : -1.5),
+                    child: Icon(
+                      index.isEven
+                          ? Icons.auto_awesome_rounded
+                          : Icons.diamond_rounded,
+                      size: 12 + (index % 3) * 3,
+                      color: index.isEven ? primary : secondary,
+                      shadows: const [
+                        Shadow(color: Colors.white, blurRadius: 8),
+                        Shadow(color: Colors.black54, blurRadius: 3),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
