@@ -50,6 +50,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   int presentationSequence = 0;
   IconData presentationIcon = Icons.auto_awesome_rounded;
   Set<String> winningCells = {};
+  List<int> reelStopEpochs = List<int>.filled(5, 0);
   List<List<String>> grid = [
     ['A', 'K', 'Q'],
     ['J', 'W', 'K'],
@@ -66,7 +67,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     );
     winController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1350),
+      duration: const Duration(milliseconds: 1800),
     );
     api = widget.api ?? CasinoApi();
     balance = widget.balance;
@@ -161,6 +162,26 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     await Future<void>.delayed(Duration(milliseconds: turbo ? 80 : 260));
   }
 
+  Future<void> _showWinLadder(SpinResponse result) async {
+    final multiplier = result.win ~/ max(1, bet);
+    final stages = <(String, IconData)>[
+      ('BIG WIN', Icons.stars_rounded),
+      if (multiplier >= 25 || result.maxWinReached)
+        ('SUPER WIN', Icons.auto_awesome_rounded),
+      if (multiplier >= 50 || result.maxWinReached)
+        ('MEGA WIN', Icons.workspace_premium_rounded),
+      if (result.maxWinReached) ('MAX WIN', Icons.emoji_events_rounded),
+    ];
+    for (final stage in stages) {
+      await _showFeaturePresentation(
+        title: stage.$1,
+        subtitle: '${_fmt(result.win)} COINS • $multiplier× BET',
+        icon: stage.$2,
+        hold: const Duration(milliseconds: 620),
+      );
+    }
+  }
+
   Future<SpinResponse?> spin({bool bonusBuy = false}) async {
     final wager = bet * (bonusBuy ? widget.game.bonusBuyMultiplier ?? 1 : 1);
     if (spinning || balance < wager) {
@@ -172,6 +193,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     }
     unawaited(HapticFeedback.mediumImpact());
     ambientController.repeat(reverse: true);
+    winController
+      ..stop()
+      ..value = 0;
     setState(() {
       spinning = true;
       win = 0;
@@ -181,6 +205,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       winDetail = null;
       intenseWin = false;
       winningCells = {};
+      reelStopEpochs = List<int>.filled(max(1, grid.length), 0);
     });
     SpinResponse? response;
     Object? requestError;
@@ -272,6 +297,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
               _ => round.featureLabel,
             };
           });
+          if (round.win > 0) {
+            unawaited(winController.forward(from: 0));
+          }
           if (r.rounds.length > 1) {
             await Future<void>.delayed(
               Duration(milliseconds: turbo ? 120 : 520),
@@ -306,16 +334,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         unawaited(HapticFeedback.heavyImpact());
         unawaited(winController.forward(from: 0));
         if (intenseWin) {
-          await _showFeaturePresentation(
-            title: r.maxWinReached
-                ? 'MAX WIN'
-                : winMultiplier >= 50
-                ? 'MEGA WIN'
-                : 'BIG WIN',
-            subtitle: '${_fmt(r.win)} COINS • $winMultiplier× BET',
-            icon: Icons.workspace_premium_rounded,
-            hold: const Duration(milliseconds: 1100),
-          );
+          await _showWinLadder(r);
         }
       }
       unawaited(
@@ -381,6 +400,12 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   Future<void> _revealGrid(List<List<String>> target) async {
     for (var reel = 0; reel < target.length; reel++) {
       if (!mounted) return;
+      final triggerCount = target
+          .take(reel + 1)
+          .expand((column) => column)
+          .where((symbol) => symbol == 'S' || symbol == 'B')
+          .length;
+      final anticipation = reel < target.length - 1 && triggerCount >= 2;
       setState(() {
         final next = [
           for (final column in grid) [...column],
@@ -390,10 +415,27 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         }
         next[reel] = [...target[reel]];
         grid = next;
+        while (reelStopEpochs.length < target.length) {
+          reelStopEpochs.add(0);
+        }
+        reelStopEpochs[reel]++;
+        if (anticipation) {
+          featureMode = 'FEATURE CHANCE • REEL ${reel + 2}';
+        }
       });
-      unawaited(HapticFeedback.selectionClick());
+      unawaited(
+        anticipation
+            ? HapticFeedback.mediumImpact()
+            : HapticFeedback.selectionClick(),
+      );
       if (reel < target.length - 1) {
-        await Future<void>.delayed(Duration(milliseconds: turbo ? 24 : 105));
+        await Future<void>.delayed(
+          Duration(
+            milliseconds: turbo
+                ? (anticipation ? 90 : 24)
+                : (anticipation ? 360 : 105),
+          ),
+        );
       }
     }
   }
@@ -724,6 +766,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
                               progress: winController.value,
                               primary: widget.game.primary,
                               secondary: widget.game.secondary,
+                              intense: intenseWin,
                             ),
                           ),
                         ),
@@ -1232,20 +1275,65 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           child: Row(
             children: [
               for (var reel = 0; reel < grid.length; reel++)
-                Expanded(
-                  child: Column(
-                    children: [
-                      for (var row = 0; row < grid[reel].length; row++)
-                        Expanded(child: _symbol(grid[reel][row], reel, row)),
-                    ],
-                  ),
-                ),
+                Expanded(child: _animatedReel(reel)),
             ],
           ),
         ),
       ),
     ),
   );
+
+  Widget _animatedReel(int reel) {
+    final column = Column(
+      children: [
+        for (var row = 0; row < grid[reel].length; row++)
+          Expanded(child: _symbol(grid[reel][row], reel, row)),
+      ],
+    );
+    final epoch = reel < reelStopEpochs.length ? reelStopEpochs[reel] : 0;
+    if (epoch == 0) return column;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('reel-stop-$reel-$epoch'),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: turbo ? 110 : 260),
+      curve: Curves.easeOutCubic,
+      child: column,
+      builder: (context, progress, child) {
+        final impulse = sin(progress * pi);
+        return Transform.translate(
+          offset: Offset(0, impulse * 5),
+          child: Transform.scale(
+            scale: 1 + impulse * .025,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                child!,
+                IgnorePointer(
+                  child: Opacity(
+                    opacity: impulse * .32,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .08),
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: widget.game.primary,
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _symbol(String symbol, int reel, int row) {
     final paths = _symbolPaths[widget.game.symbolSet]!;
     final assetPath = paths[symbol];
@@ -1253,6 +1341,144 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       '$symbol-$reel-$row-${spinning ? random.nextInt(999) : 0}',
     );
     final winning = winningCells.contains('$reel:$row');
+    final cell = Container(
+      key: winning ? null : key,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          colors: winning
+              ? [Colors.white, widget.game.primary]
+              : const [Color(0xfffef2c4), Color(0xffdba850)],
+        ),
+        border: Border.all(
+          color: winning ? Colors.white : const Color(0x664a2300),
+          width: winning ? 3 : 1,
+        ),
+        boxShadow: winning
+            ? [
+                BoxShadow(
+                  color: widget.game.primary,
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        alignment: Alignment.center,
+        children: [
+          if (symbol == 'C')
+            const Icon(
+              Icons.monetization_on_rounded,
+              color: Color(0xffffc928),
+              size: 48,
+              shadows: [Shadow(color: Colors.white, blurRadius: 8)],
+            )
+          else if (symbol == 'M')
+            Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const RadialGradient(
+                  colors: [
+                    Color(0xffffffff),
+                    Color(0xffff35dc),
+                    Color(0xff4815a9),
+                  ],
+                ),
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0xffff35dc),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: const Text(
+                '×2',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                ),
+              ),
+            )
+          else if (assetPath != null)
+            Image.asset(
+              assetPath,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+            )
+          else
+            Center(
+              child: Text(
+                const {'X': '10', 'Y': '9', 'Z': '8', 'T': '7'}[symbol] ??
+                    symbol,
+                style: TextStyle(
+                  color: widget.game.secondary,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  shadows: const [Shadow(color: Colors.white, blurRadius: 5)],
+                ),
+              ),
+            ),
+          if (symbol == 'B')
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xdd260047),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.white),
+                ),
+                child: const Text(
+                  'BONUS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    final animatedCell = winning
+        ? AnimatedBuilder(
+            key: key,
+            animation: winController,
+            child: cell,
+            builder: (context, child) {
+              final pulse = sin(winController.value * pi * 3).abs();
+              return Transform.scale(
+                scale: 1 + pulse * (intenseWin ? .075 : .052),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .45 + pulse * .55),
+                      width: 1 + pulse * 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.game.primary.withValues(
+                          alpha: .38 + pulse * .55,
+                        ),
+                        blurRadius: 12 + pulse * 24,
+                        spreadRadius: pulse * 3,
+                      ),
+                    ],
+                  ),
+                  child: child,
+                ),
+              );
+            },
+          )
+        : cell;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 140),
       transitionBuilder: (child, animation) => SlideTransition(
@@ -1261,116 +1487,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
         ),
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: Container(
-        key: key,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            colors: winning
-                ? [Colors.white, widget.game.primary]
-                : const [Color(0xfffef2c4), Color(0xffdba850)],
-          ),
-          border: Border.all(
-            color: winning ? Colors.white : const Color(0x664a2300),
-            width: winning ? 3 : 1,
-          ),
-          boxShadow: winning
-              ? [
-                  BoxShadow(
-                    color: widget.game.primary,
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          alignment: Alignment.center,
-          children: [
-            if (symbol == 'C')
-              const Icon(
-                Icons.monetization_on_rounded,
-                color: Color(0xffffc928),
-                size: 48,
-                shadows: [Shadow(color: Colors.white, blurRadius: 8)],
-              )
-            else if (symbol == 'M')
-              Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    colors: [
-                      Color(0xffffffff),
-                      Color(0xffff35dc),
-                      Color(0xff4815a9),
-                    ],
-                  ),
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0xffff35dc),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  '×2',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                  ),
-                ),
-              )
-            else if (assetPath != null)
-              Image.asset(
-                assetPath,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              )
-            else
-              Center(
-                child: Text(
-                  const {'X': '10', 'Y': '9', 'Z': '8', 'T': '7'}[symbol] ??
-                      symbol,
-                  style: TextStyle(
-                    color: widget.game.secondary,
-                    fontSize: 36,
-                    fontWeight: FontWeight.w900,
-                    shadows: const [Shadow(color: Colors.white, blurRadius: 5)],
-                  ),
-                ),
-              ),
-            if (symbol == 'B')
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xdd260047),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.white),
-                  ),
-                  child: const Text(
-                    'BONUS',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
+      child: animatedCell,
     );
   }
 
@@ -2053,20 +2170,23 @@ class _WinCelebration extends StatelessWidget {
     required this.progress,
     required this.primary,
     required this.secondary,
+    required this.intense,
   });
 
   final double progress;
   final Color primary, secondary;
+  final bool intense;
 
   @override
   Widget build(BuildContext context) {
     if (progress <= 0) return const SizedBox.shrink();
     final opacity = sin(progress * pi).clamp(0.0, 1.0);
+    final particleCount = intense ? 48 : 28;
     return LayoutBuilder(
       builder: (context, constraints) => Stack(
         clipBehavior: Clip.none,
         children: [
-          for (var index = 0; index < 28; index++)
+          for (var index = 0; index < particleCount; index++)
             Positioned(
               left:
                   ((index * 97) % 100) /
@@ -2078,22 +2198,30 @@ class _WinCelebration extends StatelessWidget {
                   (index % 5) * 16,
               child: Opacity(
                 opacity: opacity,
-                child: Transform.rotate(
-                  angle: progress * pi * (2 + index % 4),
-                  child: Icon(
-                    index.isEven
-                        ? Icons.monetization_on_rounded
-                        : Icons.auto_awesome,
-                    color: index % 3 == 0
-                        ? Colors.white
-                        : index.isEven
-                        ? primary
-                        : secondary,
-                    size: 18 + (index % 4) * 5,
-                    shadows: [
-                      Shadow(color: primary, blurRadius: 10),
-                      const Shadow(color: Colors.black54, blurRadius: 3),
-                    ],
+                child: Transform.scale(
+                  scale: .78 + opacity * .42 + (index % 3) * .06,
+                  child: Transform.rotate(
+                    angle: progress * pi * (2 + index % 4),
+                    child: Icon(
+                      index.isEven
+                          ? Icons.monetization_on_rounded
+                          : index % 3 == 0
+                          ? Icons.diamond_rounded
+                          : Icons.auto_awesome,
+                      color: index % 3 == 0
+                          ? Colors.white
+                          : index.isEven
+                          ? primary
+                          : secondary,
+                      size: 18 + (index % 4) * 5,
+                      shadows: [
+                        Shadow(
+                          color: index.isEven ? primary : secondary,
+                          blurRadius: intense ? 18 : 10,
+                        ),
+                        const Shadow(color: Colors.black54, blurRadius: 3),
+                      ],
+                    ),
                   ),
                 ),
               ),

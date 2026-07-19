@@ -727,6 +727,44 @@ void main() {
     }
   });
 
+  testWidgets('high multiplier win escalates through cinematic win tiers', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _CinematicWinApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    for (var frame = 0; frame < 12; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('BIG WIN'), findsOneWidget);
+    expect(find.textContaining('6.000 COINS'), findsOneWidget);
+    for (var frame = 0; frame < 9; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('SUPER WIN'), findsOneWidget);
+    for (var frame = 0; frame < 9; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('MEGA WIN'), findsOneWidget);
+    for (var frame = 0; frame < 14; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
   testWidgets('hold and win runs as a full-screen bonus experience', (
     tester,
   ) async {
@@ -866,6 +904,61 @@ class _FreeSpinPresentationApi extends CasinoApi {
       vipPoints: 1,
       maxWinReached: false,
       winClass: null,
+      jackpots: const [
+        JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
+        JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),
+        JackpotPoolView(tier: 'GRAND', amount: 50000000, seedAmount: 50000000),
+      ],
+    );
+  }
+}
+
+class _CinematicWinApi extends CasinoApi {
+  @override
+  Future<SpinResponse> spin(
+    String gameId,
+    int bet, {
+    bool bonusBuy = false,
+  }) async {
+    final round = SpinRoundView(
+      phase: 'base',
+      index: 1,
+      grid: const [
+        ['A', 'K', 'Q'],
+        ['A', 'W', 'Q'],
+        ['A', 'K', 'J'],
+        ['J', 'K', 'Q'],
+        ['A', 'K', 'Q'],
+      ],
+      win: 6000,
+      bonusMultiplier: null,
+      bonusMode: null,
+      bonusTier: null,
+      bonusSpots: null,
+      bonusSegment: null,
+      bonusBoardSize: null,
+      bonusPickMultipliers: const [],
+      bonusInitialSpots: const [],
+      bonusRespinSteps: const [],
+      bonusCoins: const [],
+      featureLabel: null,
+      winningCells: const {'0:0', '1:0', '2:0', '3:0', '4:0'},
+      winLabel: 'FIVE OF A KIND',
+    );
+    return SpinResponse(
+      grid: round.grid,
+      balance: 1005900,
+      win: 6000,
+      freeSpins: 0,
+      rounds: [round],
+      level: 12,
+      xp: 60,
+      spins: 1,
+      totalWon: 6000,
+      totalFreeSpins: 0,
+      vipPoints: 1,
+      maxWinReached: false,
+      winClass: 'mega',
       jackpots: const [
         JackpotPoolView(tier: 'MINI', amount: 500000, seedAmount: 500000),
         JackpotPoolView(tier: 'MINOR', amount: 5000000, seedAmount: 5000000),

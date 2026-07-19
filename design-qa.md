@@ -10,6 +10,9 @@
 - Slot comparison artifact: `/private/tmp/aurora-slot-reference-comparison.png`
 - Feature-intro comparison artifact: `/private/tmp/aurora-feature-reference-comparison-final.png`
 - Full-screen bonus comparison artifact: `/private/tmp/aurora-bonus-visual-comparison.png`
+- Reel-motion implementation screenshot: `/private/tmp/aurora-motion-desktop.png`
+- Mobile celebration screenshot: `/private/tmp/aurora-motion-mobile.png`
+- Reel-motion focused comparison artifact: `/private/tmp/aurora-motion-reference-comparison.png`
 
 ## Visual comparison
 
@@ -18,6 +21,8 @@ The implementation matches the references' intended product qualities without co
 Feature transitions now mirror the recording's strong state separation while remaining original. Every slot receives a themed welcome curtain built from its own background and symbol set. Free spins, lock-and-respin, bonus games, jackpot reveals and big-win tiers use the same reusable presentation layer with slot-specific copy, colors and imagery. Big wins add finite screen shake and the existing coin/light celebration without blocking controls after the result is complete.
 
 Hold & Win, Wheel Bonus and Treasure Pick now use the same responsive full-screen feature stage instead of modal cards. The real Bonus Buy path was exercised for all three modes: Hold & Win advances through its server-provided respin steps, the wheel animates to the authoritative reward segment, and Treasure Pick requires the complete authoritative pick sequence before the collect action is enabled. The wheel uses a new original jungle-temple prize-wheel asset generated specifically for Aurora Casino.
+
+The shared reel presentation now adds a finite stop impulse and flash per reel, feature anticipation when two trigger symbols are already visible, animated emphasis on authoritative winning cells, and a denser coin/diamond/light celebration. Wins at 10× bet and above escalate through reusable BIG, SUPER and MEGA presentation tiers. The implementation keeps Aurora's original symbols and cabinet styling while matching the recording's stronger separation between spinning, reel-stop, cascade and win states.
 
 ## Interaction and responsive checks
 
@@ -34,15 +39,32 @@ Hold & Win, Wheel Bonus and Treasure Pick now use the same responsive full-scree
 - Hold & Win, Wheel Bonus and Treasure Pick were exercised through their real Bonus Buy paths at `1280 × 591`.
 - Treasure Pick was additionally verified at `390 × 844`, including the full header, all nine pick fields and the persistent footer action.
 - One bonus P2 issue was found at `1280 × 591`: square Treasure Pick cells clipped the lower two rows. Wide layouts now use a responsive cell aspect ratio; all three rows remain visible and the three-pick collect flow completes without overflow.
+- A live Dragon Peak cascade was exercised at `1280 × 591`. The five independent stop impulses were visible, the authoritative winning cells pulsed, the win meter accumulated across cascades, and controls returned after the final BIG WIN state.
+- The same real-spin flow was exercised at `390 × 844`. Reel-stop flashes, winning-symbol emphasis, coin/diamond particles, cascade labeling and the persistent spin controls remained visible without clipping.
+
+## Motion comparison gate
+
+- Source visual truth: `/Users/angelo/Downloads/ScreenRecording_07-19-2026 17-30-33_1.MP4`
+- Implementation state: Dragon Peak, active cascade and winning-cell highlight.
+- Viewport: `1280 × 591`, matching the supplied recording.
+- Full-view evidence: `/private/tmp/aurora-motion-reference-comparison.png` compares the reference cascade and the browser-rendered Aurora cascade in one image.
+- Focused-region evidence: the same artifact isolates the complete cabinet, feature label, jackpot tower, win meter and spin controls; no additional crop was needed because all critical motion surfaces remain legible at this viewport.
+- Fonts and typography: display and HUD hierarchy remain consistent with the existing Aurora system; no clipping or unintended wrapping was observed.
+- Spacing and layout rhythm: cabinet, side rails, feature label and control bar remain stable through idle, stop, cascade and result states.
+- Colors and visual tokens: slot-specific orange/gold accents preserve clear winning-cell contrast without introducing reference-brand colors or assets.
+- Image quality and asset fidelity: existing original raster symbol and background assets remain sharp; effects use the established icon system and do not replace slot art.
+- Copy and content: feature-chance, cascade, BIG/SUPER/MEGA and multiplier labels correspond to authoritative round state.
+- Comparison history: the initial implementation had only a slide/fade reel transition and static win borders. The revised capture shows distinct per-reel impacts, animated win focus and denser finite celebration effects with no new P0/P1/P2 issue.
 
 ## Open visual issues
 
 - P0: none
 - P1: none
 - P2: none
+- P3: additional slot-specific win sound layers can further distinguish each theme.
 
-Browser warnings are limited to Flutter's optional remote Noto Sans Symbols fallback font being unavailable in the isolated browser. The application uses its bundled fonts and icons and remains visually and functionally intact. No new rendering assertion was emitted by the final desktop or mobile bonus runs.
+The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request.
 
-Automated verification: `41` Flutter tests passed, including dedicated welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage.
+Automated verification: `42` Flutter tests passed, including deterministic BIG/SUPER/MEGA escalation, welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage.
 
 final result: passed
