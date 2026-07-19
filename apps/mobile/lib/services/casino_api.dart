@@ -25,6 +25,7 @@ class SpinRoundView {
     required this.featureLabel,
     required this.winningCells,
     required this.winLabel,
+    this.paylineWins = const [],
   });
 
   final String phase;
@@ -43,6 +44,18 @@ class SpinRoundView {
   final String? featureLabel;
   final Set<String> winningCells;
   final String? winLabel;
+  final List<PaylineWinView> paylineWins;
+}
+
+class PaylineWinView {
+  const PaylineWinView({
+    required this.line,
+    required this.amount,
+    required this.cells,
+  });
+
+  final int line, amount;
+  final List<String> cells;
 }
 
 class HoldAndWinSpotView {
@@ -979,6 +992,17 @@ class CasinoApi {
           : scatterWins.isNotEmpty
           ? '${scatterWins.first['count']}× SCATTER'
           : null;
+      final paylineWins = [
+        for (final lineWin in lineWins)
+          PaylineWinView(
+            line: lineWin['payline'] as int? ?? 0,
+            amount: lineWin['amount'] as int? ?? 0,
+            cells: [
+              for (final coordinates in (lineWin['cells'] as List).cast<List>())
+                '${coordinates[0]}:${coordinates[1]}',
+            ],
+          ),
+      ];
       return SpinRoundView(
         phase: round['phase'] as String,
         index: round['index'] as int,
@@ -1033,6 +1057,7 @@ class CasinoApi {
             : null,
         winningCells: winningCells,
         winLabel: winLabel,
+        paylineWins: paylineWins,
       );
     }).toList();
     return SpinResponse(

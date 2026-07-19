@@ -765,6 +765,44 @@ void main() {
     expect(find.text('DREH!'), findsOneWidget);
   });
 
+  testWidgets('line wins render the authoritative animated payline path', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 591));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SlotScreen(
+          game: games.first,
+          balance: 1000000,
+          level: 12,
+          xp: 0,
+          vipPoints: 0,
+          api: _CinematicWinApi(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2100));
+    await tester.tap(find.text('DREH!'));
+    var observedPayline = false;
+    for (var frame = 0; frame < 25; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find
+          .byKey(const ValueKey('winning-payline-overlay'))
+          .evaluate()
+          .isNotEmpty) {
+        observedPayline = true;
+        break;
+      }
+    }
+    expect(observedPayline, isTrue);
+    expect(find.text('1'), findsWidgets);
+    for (var frame = 0; frame < 40; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('DREH!'), findsOneWidget);
+  });
+
   testWidgets('cascade clears winning symbols before authoritative refill', (
     tester,
   ) async {
@@ -983,6 +1021,13 @@ class _CinematicWinApi extends CasinoApi {
       featureLabel: null,
       winningCells: const {'0:0', '1:0', '2:0', '3:0', '4:0'},
       winLabel: 'FIVE OF A KIND',
+      paylineWins: const [
+        PaylineWinView(
+          line: 0,
+          amount: 6000,
+          cells: ['0:0', '1:0', '2:0', '3:0', '4:0'],
+        ),
+      ],
     );
     return SpinResponse(
       grid: round.grid,

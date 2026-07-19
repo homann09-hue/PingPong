@@ -16,6 +16,9 @@
 - Cascade-clear implementation screenshot: `/private/tmp/aurora-cascade-desktop.png`
 - Cascade responsive screenshot: `/private/tmp/aurora-cascade-mobile.png`
 - Cascade-clear comparison artifact: `/private/tmp/aurora-cascade-reference-comparison.png`
+- Payline implementation screenshot: `/private/tmp/aurora-payline-desktop.png`
+- Payline responsive screenshot: `/private/tmp/aurora-payline-mobile.png`
+- Payline comparison artifact: `/private/tmp/aurora-payline-reference-comparison.png`
 
 ## Visual comparison
 
@@ -28,6 +31,8 @@ Hold & Win, Wheel Bonus and Treasure Pick now use the same responsive full-scree
 The shared reel presentation now adds a finite stop impulse and flash per reel, feature anticipation when two trigger symbols are already visible, animated emphasis on authoritative winning cells, and a denser coin/diamond/light celebration. Wins at 10× bet and above escalate through reusable BIG, SUPER and MEGA presentation tiers. The implementation keeps Aurora's original symbols and cabinet styling while matching the recording's stronger separation between spinning, reel-stop, cascade and win states.
 
 Cascade transitions now have an explicit three-step rhythm: authoritative winning cells charge, shrink and burst into finite slot-colored particles; only after that clear window does the next authoritative round grid drop into the cabinet. The presentation never manufactures replacement symbols or rewards client-side, and turbo mode uses the same sequence with compressed timings.
+
+Line wins now preserve the server-provided payline number, amount and exact cell coordinates through the mobile API model. The reel cabinet renders those coordinates as a finite illuminated path with a traveling highlight, while the matching line numbers activate in the side rail. Multiple lines reveal sequentially; cascade clears remove the path before the next authoritative grid arrives.
 
 ## Interaction and responsive checks
 
@@ -48,6 +53,8 @@ Cascade transitions now have an explicit three-step rhythm: authoritative winnin
 - The same real-spin flow was exercised at `390 × 844`. Reel-stop flashes, winning-symbol emphasis, coin/diamond particles, cascade labeling and the persistent spin controls remained visible without clipping.
 - A fresh real Dragon Peak cascade was captured at `1280 × 591`: the winning cells visibly cleared under `CASCADE CHARGED · NEXT DROP`, the following server grid appeared under `CASCADE ×2`, and the spin control returned after settlement.
 - Responsive stability was rechecked at `390 × 844` over three additional real spins, including sequential reel stops and feature anticipation. No clipping, overflow or control obstruction appeared. The exact clear/refill ordering is additionally locked by a deterministic widget test at the desktop viewport.
+- A live multi-line Dragon Peak win was exercised at `1280 × 591`. Server line numbers 3 and 6 activated in the rail, the path drew through the authoritative winning coordinates, the win meter advanced, and the same spin continued through cascades without stale overlays.
+- A live line win and cascade were exercised at `390 × 844`. Winning-cell emphasis, line detail, clear state, coin/diamond celebration and persistent controls remained visible without clipping or horizontal overflow.
 
 ## Motion comparison gate
 
@@ -63,6 +70,12 @@ Cascade transitions now have an explicit three-step rhythm: authoritative winnin
 - Copy and content: feature-chance, cascade, BIG/SUPER/MEGA and multiplier labels correspond to authoritative round state.
 - Comparison history: the initial implementation had only a slide/fade reel transition and static win borders. The revised capture shows distinct per-reel impacts, animated win focus and denser finite celebration effects with no new P0/P1/P2 issue.
 - Cascade-clear evidence: `/private/tmp/aurora-cascade-reference-comparison.png` places the supplied slot-motion reference and Aurora's browser-rendered clear state together. The comparison confirms a similarly legible feature transition while retaining original artwork, cabinet geometry, colors and copy.
+- Payline evidence: `/private/tmp/aurora-payline-reference-comparison.png` places the supplied active-slot reference and Aurora's browser-rendered multi-line state together at `1280 × 591`. The focused view keeps the reel cabinet, active line rail, progressive tower, win meter and controls readable, so no additional crop was required.
+- Fonts and typography: the path introduces no text; line numbers retain the compact HUD weight and remain legible in active and inactive states.
+- Spacing and layout rhythm: the overlay paints inside the existing reel bounds and does not alter cabinet, rail or control-bar geometry.
+- Colors and visual tokens: line glow derives from each slot's established primary/secondary palette with a white tracking highlight for contrast.
+- Image quality and asset fidelity: original symbol rasters remain unobscured except during their intentional win emphasis; no source artwork was replaced or approximated.
+- Copy and content: line detail, line identifiers and win totals originate from authoritative round data rather than presentation-only labels.
 
 ## Open visual issues
 
@@ -73,6 +86,6 @@ Cascade transitions now have an explicit three-step rhythm: authoritative winnin
 
 The final motion-QA browser log contains no rendering assertion, runtime error or failed asset request; only Flutter's expected bootstrap debug message was recorded.
 
-Automated verification: `43` Flutter tests passed, including deterministic cascade clear-before-refill ordering, BIG/SUPER/MEGA escalation, welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage.
+Automated verification: `44` Flutter tests passed, including deterministic authoritative-payline rendering, cascade clear-before-refill ordering, BIG/SUPER/MEGA escalation, welcome-curtain, free-spin, Hold & Win, Wheel Bonus and Treasure Pick coverage. Flutter analysis reported no errors or warnings; seven existing brace-style info notices remain outside this change.
 
 final result: passed

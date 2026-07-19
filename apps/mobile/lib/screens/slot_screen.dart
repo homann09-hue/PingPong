@@ -28,6 +28,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   late final CasinoApi api;
   late final AnimationController ambientController;
   late final AnimationController winController;
+  late final AnimationController paylineController;
   Timer? welcomePresentationTimer;
   final random = Random();
   late int balance, level, xp, vipPoints;
@@ -51,6 +52,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
   IconData presentationIcon = Icons.auto_awesome_rounded;
   Set<String> winningCells = {};
   Set<String> clearingCells = {};
+  List<PaylineWinView> winningPaylines = const [];
   List<int> reelStopEpochs = List<int>.filled(5, 0);
   List<List<String>> grid = [
     ['A', 'K', 'Q'],
@@ -69,6 +71,10 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     winController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
+    );
+    paylineController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
     );
     api = widget.api ?? CasinoApi();
     balance = widget.balance;
@@ -90,6 +96,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     welcomePresentationTimer?.cancel();
     ambientController.dispose();
     winController.dispose();
+    paylineController.dispose();
     super.dispose();
   }
 
@@ -197,6 +204,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     winController
       ..stop()
       ..value = 0;
+    paylineController
+      ..stop()
+      ..value = 0;
     setState(() {
       spinning = true;
       win = 0;
@@ -207,6 +217,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       intenseWin = false;
       winningCells = {};
       clearingCells = {};
+      winningPaylines = const [];
       reelStopEpochs = List<int>.filled(max(1, grid.length), 0);
     });
     SpinResponse? response;
@@ -296,6 +307,7 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           setState(() {
             win = displayedWin;
             winningCells = round.winningCells;
+            winningPaylines = round.paylineWins;
             winDetail = round.winLabel;
             featureMode = switch (round.phase) {
               'free_spin' => 'FREE SPIN ${round.index} / $freeRounds',
@@ -309,17 +321,22 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
           });
           if (round.win > 0) {
             unawaited(winController.forward(from: 0));
+            if (round.paylineWins.isNotEmpty) {
+              unawaited(paylineController.forward(from: 0));
+            }
           }
           final clearsIntoCascade =
               nextRound?.phase == 'cascade' && round.winningCells.isNotEmpty;
           if (clearsIntoCascade) {
             await Future<void>.delayed(
-              Duration(milliseconds: turbo ? 70 : 360),
+              Duration(milliseconds: turbo ? 90 : 680),
             );
             if (!mounted) return null;
             winController.stop();
+            paylineController.stop();
             setState(() {
               clearingCells = round.winningCells;
+              winningPaylines = const [];
               featureMode = 'CASCADE CHARGED • NEXT DROP';
             });
             unawaited(HapticFeedback.mediumImpact());
@@ -339,6 +356,9 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
       setState(() {
         grid = r.rounds.lastWhere((round) => round.phase != 'bonus').grid;
         clearingCells = {};
+        winningPaylines = r.rounds
+            .lastWhere((round) => round.phase != 'bonus')
+            .paylineWins;
         balance = r.balance;
         win = r.win;
         free = r.freeSpins;
@@ -1087,55 +1107,100 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
     ],
   );
 
-  Widget _paylineRail() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-    decoration: BoxDecoration(
-      color: const Color(0xe8110324),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: widget.game.primary, width: 2),
-      boxShadow: [
-        BoxShadow(
-          color: widget.game.secondary.withValues(alpha: .55),
-          blurRadius: 14,
-        ),
-      ],
-    ),
-    child: Column(
-      children: [
-        Text(
-          evaluationLabel,
-          maxLines: 2,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 5),
-        for (var index = 1; index <= 5; index++)
-          Expanded(
-            child: Center(
-              child: Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [widget.game.primary, widget.game.secondary],
-                  ),
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: Text(
-                  '$index',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    shadows: [Shadow(color: Colors.black, blurRadius: 3)],
-                  ),
+  Widget _paylineRail() {
+    final winningLineNumbers = winningPaylines
+        .map((win) => win.line + 1)
+        .toSet();
+    final displayedLines = <int>[
+      ...winningLineNumbers,
+      for (var line = 1; line <= 20; line++)
+        if (!winningLineNumbers.contains(line)) line,
+    ].take(5).toList();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xe8110324),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: widget.game.primary, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: widget.game.secondary.withValues(alpha: .55),
+            blurRadius: 14,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            evaluationLabel,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 5),
+          for (final line in displayedLines)
+            Expanded(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: paylineController,
+                  builder: (context, child) {
+                    final active = winningLineNumbers.contains(line);
+                    final pulse = active
+                        ? sin(paylineController.value * pi * 4).abs()
+                        : 0.0;
+                    return Transform.scale(
+                      scale: 1 + pulse * .12,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: active
+                                ? [Colors.white, widget.game.primary]
+                                : [widget.game.primary, widget.game.secondary],
+                          ),
+                          border: Border.all(
+                            color: active
+                                ? const Color(0xfffff3a8)
+                                : Colors.white,
+                            width: active ? 3 : 2,
+                          ),
+                          boxShadow: active
+                              ? [
+                                  BoxShadow(
+                                    color: widget.game.primary,
+                                    blurRadius: 14 + pulse * 16,
+                                    spreadRadius: 1 + pulse * 3,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Text(
+                          '$line',
+                          style: TextStyle(
+                            color: active
+                                ? const Color(0xff2a062e)
+                                : Colors.white,
+                            fontWeight: FontWeight.w900,
+                            shadows: active
+                                ? null
+                                : const [
+                                    Shadow(color: Colors.black, blurRadius: 3),
+                                  ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Widget _jackpotTower() {
     final tiers = [
@@ -1306,10 +1371,34 @@ class _SlotScreenState extends State<SlotScreen> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(13),
             border: Border.all(color: const Color(0xff3f176c), width: 2),
           ),
-          child: Row(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              for (var reel = 0; reel < grid.length; reel++)
-                Expanded(child: _animatedReel(reel)),
+              Row(
+                children: [
+                  for (var reel = 0; reel < grid.length; reel++)
+                    Expanded(child: _animatedReel(reel)),
+                ],
+              ),
+              if (winningPaylines.isNotEmpty)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: paylineController,
+                      builder: (context, child) => CustomPaint(
+                        key: const ValueKey('winning-payline-overlay'),
+                        painter: _PaylinePainter(
+                          wins: winningPaylines,
+                          progress: paylineController.value,
+                          reels: grid.length,
+                          rows: grid.isEmpty ? 0 : grid.first.length,
+                          primary: widget.game.primary,
+                          secondary: widget.game.secondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -2280,6 +2369,114 @@ class _CascadeBurst extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _PaylinePainter extends CustomPainter {
+  const _PaylinePainter({
+    required this.wins,
+    required this.progress,
+    required this.reels,
+    required this.rows,
+    required this.primary,
+    required this.secondary,
+  });
+
+  final List<PaylineWinView> wins;
+  final double progress;
+  final int reels, rows;
+  final Color primary, secondary;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (wins.isEmpty || reels <= 0 || rows <= 0 || size.isEmpty) return;
+    final stagedProgress = progress * wins.length;
+    for (var index = 0; index < wins.length; index++) {
+      final reveal = (stagedProgress - index).clamp(0.0, 1.0);
+      if (reveal <= 0) continue;
+      final cells =
+          [
+              for (final encoded in wins[index].cells)
+                if (encoded.split(':').length == 2)
+                  (
+                    int.tryParse(encoded.split(':')[0]),
+                    int.tryParse(encoded.split(':')[1]),
+                  ),
+            ].where((cell) => cell.$1 != null && cell.$2 != null).toList()
+            ..sort((a, b) => a.$1!.compareTo(b.$1!));
+      if (cells.length < 2) continue;
+      final path = Path();
+      for (var cellIndex = 0; cellIndex < cells.length; cellIndex++) {
+        final reel = cells[cellIndex].$1!;
+        final row = cells[cellIndex].$2!;
+        final point = Offset(
+          (reel + .5) * size.width / reels,
+          (row + .5) * size.height / rows,
+        );
+        if (cellIndex == 0) {
+          path.moveTo(point.dx, point.dy);
+        } else {
+          path.lineTo(point.dx, point.dy);
+        }
+      }
+      final metrics = path.computeMetrics().toList();
+      if (metrics.isEmpty) continue;
+      final metric = metrics.first;
+      final visiblePath = metric.extractPath(0, metric.length * reveal);
+      final lineColor = Color.lerp(
+        primary,
+        secondary,
+        wins.length == 1 ? .35 : index / max(1, wins.length - 1),
+      )!;
+      canvas.drawPath(
+        visiblePath,
+        Paint()
+          ..color = lineColor.withValues(alpha: .72)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 15
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11),
+      );
+      canvas.drawPath(
+        visiblePath,
+        Paint()
+          ..color = lineColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 7
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+      canvas.drawPath(
+        visiblePath,
+        Paint()
+          ..color = Colors.white.withValues(alpha: .9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+      final tangent = metric.getTangentForOffset(metric.length * reveal);
+      if (tangent != null) {
+        canvas.drawCircle(
+          tangent.position,
+          14,
+          Paint()
+            ..color = lineColor.withValues(alpha: .7)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+        );
+        canvas.drawCircle(tangent.position, 6, Paint()..color = Colors.white);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PaylinePainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.wins != wins ||
+      oldDelegate.reels != reels ||
+      oldDelegate.rows != rows ||
+      oldDelegate.primary != primary ||
+      oldDelegate.secondary != secondary;
 }
 
 class _WinCelebration extends StatelessWidget {
