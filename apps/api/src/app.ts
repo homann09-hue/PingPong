@@ -342,7 +342,10 @@ export function buildApp(dependencies: AppDependencies) {
     if (!config) return reply.code(404).send({ code: "SLOT_NOT_FOUND" });
     const variableRows = config.features?.variableRows;
     const minimumWays = variableRows?.optionsByReel.reduce((ways, options) => ways * options[0]!, 1);
-    const maximumWays = variableRows?.optionsByReel.reduce((ways, options) => ways * options.at(-1)!, 1);
+    const maximumWays = variableRows?.optionsByReel.reduce(
+      (ways, options) => ways * options[options.length - 1]!,
+      1,
+    );
     return {
       id: config.id,
       name: config.name,
@@ -455,7 +458,11 @@ export function buildApp(dependencies: AppDependencies) {
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     const body = pushPreferencesBody.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
-    return dependencies.messagingStore.updatePreferences(playerId, body.data, new Date());
+    return dependencies.messagingStore.updatePreferences(playerId, {
+      ...body.data,
+      quietHoursStartMinutes: body.data.quietHoursStartMinutes ?? null,
+      quietHoursEndMinutes: body.data.quietHoursEndMinutes ?? null,
+    }, new Date());
   });
   app.get("/v1/messaging/installations", async (request, reply) => {
     if (!dependencies.messagingStore) return reply.code(503).send({ code: "MESSAGING_UNAVAILABLE" });
