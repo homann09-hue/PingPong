@@ -456,7 +456,7 @@ describe("configuration-driven layouts", () => {
     expect(result.totalWin).toBe(50);
     expect(result.maxWinReached).toBe(true);
     expect(result.winClass).toBe("MAX");
-    expect(result.rounds.at(-1)?.events).toContainEqual({
+    expect(result.rounds[result.rounds.length - 1]?.events).toContainEqual({
       type: "max_win.reached", data: { multiplier: 10, amount: 50 },
     });
     expect(() => new SlotEngine(config).spin({ bet: 7, seed: 12n })).toThrow("configured stake step");
@@ -512,7 +512,7 @@ describe("configuration-driven layouts", () => {
       },
     });
     const result = new SlotEngine(config).spin({ bet: 10, seed: 11n });
-    expect(result.rounds.at(-1)?.events[0]).toEqual({
+    expect(result.rounds[result.rounds.length - 1]?.events[0]).toEqual({
       type: "bonus.awarded",
       data: { amount: 1_000, multiplier: 100, mode: "jackpot", tier: "MAJOR", scatterCount: 5 },
     });

@@ -185,7 +185,7 @@ export class InMemorySocialStore implements SocialStore {
       .filter((message) => !decoded || message.createdAt < decoded.createdAt
         || (message.createdAt === decoded.createdAt && message.id < decoded.id));
     const selected = ordered.slice(0, limit);
-    const last = selected.at(-1);
+    const last = selected[selected.length - 1];
     return {
       messages: selected.map((message) => this.messageView(message)),
       nextCursor: ordered.length > selected.length && last

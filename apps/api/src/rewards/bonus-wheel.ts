@@ -23,5 +23,5 @@ export function selectWheelSegment(randomUnit: number): WheelSegment {
     cursor -= segment.weight;
     if (cursor < 0) return segment;
   }
-  return standardWheel.segments.at(-1)!;
+  return standardWheel.segments[standardWheel.segments.length - 1]!;
 }

@@ -150,7 +150,7 @@ export function parseSlotConfig(input: unknown): SlotConfig {
   const symbols = new Set(Object.keys(config.symbols));
   if (config.bet) {
     if (config.bet.min > config.bet.max) throw new Error("Minimum bet must not exceed maximum bet");
-    if (config.bet.steps[0] !== config.bet.min || config.bet.steps.at(-1) !== config.bet.max) {
+    if (config.bet.steps[0] !== config.bet.min || config.bet.steps[config.bet.steps.length - 1] !== config.bet.max) {
       throw new Error("Bet steps must include configured minimum and maximum");
     }
     if (config.bet.steps.some((step, index) => step < config.bet!.min || step > config.bet!.max || (index > 0 && step <= config.bet!.steps[index - 1]!))) {
@@ -185,7 +185,10 @@ export function parseSlotConfig(input: unknown): SlotConfig {
     )))) {
       throw new Error("Variable-row options must be unique, ascending, and fit the configured rows");
     }
-    const maxWays = variableRows.optionsByReel.reduce((ways, options) => ways * options.at(-1)!, 1);
+    const maxWays = variableRows.optionsByReel.reduce(
+      (ways, options) => ways * options[options.length - 1]!,
+      1,
+    );
     if (!Number.isSafeInteger(maxWays)) throw new Error("Variable-row maximum ways must be a safe integer");
   }
   const expanding = config.features?.expandingWild?.symbols ?? [];

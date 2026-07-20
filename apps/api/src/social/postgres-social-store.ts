@@ -348,7 +348,7 @@ export class PostgresSocialStore implements SocialStore {
     );
     const hasMore = messages.rows.length > limit;
     const selected = messages.rows.slice(0, limit);
-    const last = selected.at(-1);
+    const last = selected[selected.length - 1];
     return {
       messages: selected.map((row) => this.message(row)),
       nextCursor: hasMore && last ? encodeClanFeedCursor({ createdAt: last.created_at.toISOString(), id: last.message_id }) : null,
