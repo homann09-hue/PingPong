@@ -1,9 +1,87 @@
+export interface Balance { readonly currency: string; readonly balance: number }
+
+export interface Achievement {
+  readonly id: string;
+  readonly category: string;
+  readonly tier: string;
+  readonly name: string;
+  readonly metric: string;
+  readonly target: number;
+  readonly coins: number;
+  readonly description: string;
+  readonly rewardId: string;
+  readonly progress: number;
+  readonly completed: boolean;
+  readonly claimed: boolean;
+  readonly unlocked: boolean;
+  readonly prerequisiteId?: string;
+}
+
+export interface Tournament {
+  readonly id: string;
+  readonly name: string;
+  readonly subtitle?: string;
+  readonly prizePool: number;
+  readonly endsAt: string;
+  readonly score: number;
+  readonly rank: number;
+  readonly entrants: number;
+  readonly leaders: readonly { readonly name: string; readonly score: number }[];
+}
+
 export interface Profile {
   readonly playerId: string;
   readonly coinBalance: number;
   readonly gemBalance?: number;
-  readonly progression: { readonly level: number; readonly xp: number; readonly vipPoints: number };
+  readonly balances?: readonly Balance[];
+  readonly progression: {
+    readonly level: number;
+    readonly xp: number;
+    readonly vipPoints: number;
+    readonly spins?: number;
+    readonly totalWon?: number;
+    readonly freeSpins?: number;
+  };
   readonly vip?: { readonly tier: string; readonly points: number; readonly nextTierPoints: number };
+  readonly achievements?: readonly Achievement[];
+  readonly tournament?: Tournament;
+}
+
+export interface Mission {
+  readonly id: string;
+  readonly cadence: string;
+  readonly tier: string;
+  readonly translationKey: string;
+  readonly metric: string;
+  readonly target: number;
+  readonly rewardCoins: number;
+  readonly progress: number;
+  readonly completed: boolean;
+  readonly claimed: boolean;
+  readonly unlocked: boolean;
+  readonly endsAt: string;
+  readonly unlockTarget?: number;
+  readonly unlockProgress?: number;
+}
+
+export interface JackpotTier { readonly tier: string; readonly amount: number; readonly seedAmount?: number }
+
+export interface LiveEvent {
+  readonly id: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly cadence: string;
+  readonly metric: string;
+  readonly accent?: string;
+  readonly endsAt: string;
+  readonly progress: number;
+  readonly milestones: readonly {
+    readonly id: string;
+    readonly target: number;
+    readonly rewardCoins: number;
+    readonly completed: boolean;
+    readonly claimed: boolean;
+  }[];
 }
 
 export interface SpinWin {
