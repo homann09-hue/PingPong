@@ -1,0 +1,14 @@
+{
+  "name": "Aurora Casino",
+  "short_name": "Aurora",
+  "description": "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events und Jackpots.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#120b2b",
+  "theme_color": "#120b2b",
+  "lang": "de",
+  "icons": [
+    { "src": "/assets/ui/player-avatar.png", "sizes": "any", "type": "image/png", "purpose": "any" }
+  ]
+}
