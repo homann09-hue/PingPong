@@ -1,0 +1,246 @@
+/* ============================================================
+   Aurora Fix-Layer — wird in layout.tsx NACH globals.css geladen
+   und ueberschreibt gezielt problematische Regeln.
+   ============================================================ */
+
+/* --- Anker-Navigation: Ziele nicht mehr unter der fixen Topbar --- */
+html { scroll-padding-top: 96px; }
+.lobby-section { scroll-margin-top: 96px; margin: 30px 0 0; }
+#all-games { scroll-margin-top: 110px; }
+
+/* --- Bottom-Nav nur auf Mobile (die Skin hatte sie versehentlich auch am Desktop aktiviert) --- */
+@media (min-width: 761px) { .bottom-nav { display: none; } }
+
+/* --- Wallet-Plus ist jetzt ein Link zum Shop --- */
+.wallet-pill a {
+  display: grid; width: 34px; height: 34px; place-items: center;
+  border-radius: 999px; background: linear-gradient(180deg, #ffdd58, #f66d10);
+  color: #4d1200; font-weight: 900; text-decoration: none;
+  box-shadow: inset 0 2px rgb(255 255 255 / 45%);
+}
+
+/* --- Touch-Ziele auf mindestens ~44px bringen --- */
+.bet-control { grid-template-columns: 44px 84px 44px; }
+.icon-button { width: 44px; height: 44px; }
+
+/* --- Lesbarkeit: Mindestschriftgroessen anheben --- */
+.game-title p { font-size: 11px; }
+.activity-dock small { font-size: 10px; }
+.jackpot-strip small { font-size: 10px; }
+
+/* --- Buttons fuer Statusseiten (404, Coming soon) --- */
+.primary-button, .ghost-button {
+  display: inline-flex; min-height: 46px; align-items: center; justify-content: center;
+  gap: 8px; padding: 0 22px; border-radius: 14px; font-weight: 900; cursor: pointer;
+}
+.primary-button {
+  border: 3px solid #dcff74;
+  background: linear-gradient(180deg, #94ff4d, #18a710 58%, #0a5d08);
+  color: white; text-shadow: 0 2px #063800;
+  box-shadow: inset 0 3px rgb(255 255 255 / 42%), 0 5px 0 #074406;
+}
+.ghost-button { border: 2px solid rgb(255 255 255 / 30%); background: rgb(10 6 26 / 55%); color: #efe9ff; }
+
+/* --- Service-Alert mit Retry --- */
+.alert-retry {
+  margin-left: 8px; padding: 4px 10px; border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 8px; background: rgb(255 255 255 / 12%); color: inherit; font-weight: 800; cursor: pointer;
+}
+
+/* --- Spielsuche (Cmd+K / Lupe) --- */
+.search-overlay {
+  position: fixed; z-index: 90; inset: 0; display: grid; align-content: start;
+  padding: 12vh 16px 16px; background: rgb(4 2 12 / 72%); backdrop-filter: blur(6px);
+}
+.search-panel {
+  width: min(560px, 100%); margin: 0 auto; overflow: hidden;
+  border: 3px solid #f44cff; border-radius: 20px; background: #140b1e;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 55%);
+}
+.search-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid rgb(255 255 255 / 12%); color: #d9c8ec; }
+.search-head svg { width: 22px; height: 22px; flex: 0 0 auto; }
+.search-head input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: white; font-size: 16px; }
+.search-head button { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 10px; background: rgb(255 255 255 / 10%); color: white; cursor: pointer; }
+.search-results { max-height: 52vh; margin: 0; padding: 8px; list-style: none; overflow-y: auto; }
+.search-results a { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; }
+.search-results a:hover, .search-results a:focus-visible { background: rgb(244 76 255 / 16%); }
+.search-results img { border-radius: 8px; object-fit: cover; }
+.search-results a span { display: grid; }
+.search-results a small { color: #a08cb8; font-size: 11px; }
+.search-empty { padding: 16px; color: #a08cb8; text-align: center; }
+
+/* --- Gemeinsame Bausteine der neuen Sektionen --- */
+.section-empty { color: rgb(255 255 255 / 75%); font-size: 13px; }
+.progress-track {
+  display: block; overflow: hidden; width: 100%; height: 10px; margin-top: 8px;
+  border-radius: 999px; background: rgb(0 0 0 / 45%); box-shadow: inset 0 2px rgb(0 0 0 / 40%);
+}
+.progress-track i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #94ff4d, #ffe04f); transition: width 400ms ease; }
+.claim-button {
+  min-height: 40px; padding: 0 16px; border: 3px solid #dcff74; border-radius: 999px;
+  background: linear-gradient(180deg, #94ff4d, #18a710 58%, #0a5d08); color: white;
+  font-weight: 950; text-shadow: 0 2px #063800; cursor: pointer;
+  box-shadow: inset 0 3px rgb(255 255 255 / 42%), 0 4px 0 #074406;
+}
+.claim-button:disabled { cursor: not-allowed; filter: saturate(.35) brightness(.75); box-shadow: none; }
+.claimed-chip, .locked-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px;
+  border-radius: 999px; background: rgb(0 0 0 / 40%); color: #b9f4c9; font-size: 11px; font-style: normal; font-weight: 800;
+}
+.locked-chip { color: #d3c2ee; }
+.claimed-chip svg, .locked-chip svg { width: 15px; height: 15px; }
+
+/* --- Missionen --- */
+.mission-list { display: grid; gap: 10px; }
+.mission-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center;
+  padding: 14px 16px; border: 3px solid #ff62ff; border-radius: 18px;
+  background: linear-gradient(180deg, #69007e, #2b0038); color: white;
+  box-shadow: inset 0 3px rgb(255 255 255 / 22%), 0 6px 0 #17001e;
+}
+.mission-item.is-locked { filter: saturate(.5) brightness(.85); }
+.mission-item.is-claimed { border-color: #6de08c; }
+.mission-copy { display: grid; min-width: 0; gap: 2px; }
+.mission-tier {
+  justify-self: start; padding: 3px 9px; border-radius: 999px;
+  background: rgb(255 255 255 / 16%); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
+}
+.mission-copy strong { font-size: 15px; }
+.mission-copy small { color: #ffd1ff; font-size: 11px; }
+.mission-reward { display: grid; justify-items: end; gap: 7px; }
+.mission-reward > span { color: #ffe470; font-size: 17px; font-weight: 950; text-shadow: 0 2px #23002b; }
+
+/* --- Events & Turnier --- */
+.event-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.event-card {
+  padding: 16px; border: 3px solid #82eaff; border-radius: 18px;
+  background: linear-gradient(180deg, #1e42ba, #0d145b); color: white;
+  box-shadow: inset 0 3px rgb(255 255 255 / 22%), 0 6px 0 #060b33;
+}
+.event-card header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.event-card header strong { font-size: 17px; letter-spacing: .04em; }
+.event-card header small { color: #9fe9ff; font-size: 11px; white-space: nowrap; }
+.event-card p { margin: 6px 0 10px; color: #d7e6ff; font-size: 12px; }
+.event-card ul { display: grid; margin: 0; padding: 0; gap: 6px; list-style: none; }
+.event-card li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgb(0 0 0 / 30%); font-size: 12px; }
+.event-card li span { flex: 1; }
+.event-card li b { color: #ffe470; }
+.event-card li.done { outline: 2px solid #6de08c; }
+.event-card li svg { width: 16px; height: 16px; color: #6de08c; }
+.tournament-card { border-color: #ffc36a; background: linear-gradient(180deg, #441222, #cb185d 45%, #36051b); }
+.leaderboard { display: grid; margin: 0; padding: 0; gap: 5px; list-style: none; }
+.leaderboard li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: rgb(0 0 0 / 32%); font-size: 12px; }
+.leaderboard li span { width: 34px; color: #ffd78b; font-weight: 900; }
+.leaderboard li strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard li b { color: #ffe470; }
+.leaderboard .own-rank { outline: 2px solid #ffe04f; background: rgb(255 224 79 / 14%); }
+
+/* --- Rewards / Erfolge --- */
+.vip-progress {
+  display: grid; gap: 4px; margin-bottom: 12px; padding: 14px 16px;
+  border: 3px solid #ffbe46; border-radius: 18px;
+  background: linear-gradient(180deg, #4a2a00, #2b1400); color: #ffe4a3;
+  box-shadow: inset 0 3px rgb(255 255 255 / 18%);
+}
+.vip-progress > span:first-child { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 950; }
+.vip-progress svg { width: 19px; height: 19px; color: #ffd23e; }
+.vip-progress small { color: #e8c88a; font-size: 11px; }
+.achievement-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.achievement-card {
+  display: grid; gap: 4px; padding: 14px; border: 3px solid #bc9fff; border-radius: 16px;
+  background: linear-gradient(180deg, #33125e, #1a0930); color: white;
+  box-shadow: inset 0 3px rgb(255 255 255 / 16%), 0 5px 0 #0e041c;
+}
+.achievement-card.tier-silver { border-color: #d7e2ee; }
+.achievement-card.tier-gold { border-color: #ffd23e; }
+.achievement-card.is-locked { filter: saturate(.45) brightness(.8); }
+.achievement-card.is-claimed { opacity: .82; }
+.achievement-tier { justify-self: start; padding: 3px 9px; border-radius: 999px; background: rgb(255 255 255 / 14%); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.achievement-card strong { font-size: 14px; letter-spacing: .03em; }
+.achievement-card small { color: #cdb9ea; font-size: 11px; }
+.achievement-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.achievement-foot > span { color: #ffe470; font-weight: 950; }
+
+/* --- Shop --- */
+.shop-wallet {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;
+}
+.shop-wallet span {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px;
+  border: 3px solid #1b061e; border-radius: 999px;
+  background: linear-gradient(180deg, #16111b, #08040d); color: white; font-size: 15px; font-weight: 900;
+  box-shadow: 0 0 0 2px #dd3bec, inset 0 3px rgb(255 255 255 / 26%);
+}
+.shop-wallet svg { width: 19px; height: 19px; color: #ffd23e; }
+.shop-wallet span + span svg { color: #59e3ff; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.shop-card {
+  display: grid; align-content: start; gap: 6px; padding: 16px;
+  border: 3px solid #ffbe46; border-radius: 18px;
+  background: linear-gradient(180deg, #3a0044, #1c0124); color: white;
+  box-shadow: inset 0 3px rgb(255 255 255 / 18%), 0 6px 0 #170020;
+}
+.shop-card.free-card { border-color: #94ff4d; }
+.shop-badge { justify-self: start; padding: 3px 10px; border-radius: 999px; background: #18a710; font-size: 10px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.shop-badge.soon { background: #6b4aff; }
+.shop-card strong { font-size: 16px; }
+.shop-card small { min-height: 30px; color: #dcc6ea; font-size: 11px; }
+.shop-card .claim-button { margin-top: 6px; }
+
+/* --- Clans-Teaser --- */
+.clans-teaser {
+  display: flex; gap: 16px; align-items: center; padding: 18px;
+  border: 3px solid #82eaff; border-radius: 18px;
+  background: linear-gradient(180deg, #103a5e, #071b31); color: white;
+  box-shadow: inset 0 3px rgb(255 255 255 / 18%);
+}
+.clans-teaser > svg { width: 44px; height: 44px; flex: 0 0 auto; color: #7cd8ff; }
+.clans-teaser strong { font-size: 16px; }
+.clans-teaser p { margin: 4px 0 0; color: #c8e4f7; font-size: 12px; line-height: 1.5; }
+
+/* --- Alle-Events-Link im Event-Panel (ersetzt die Fake-Karussell-Punkte) --- */
+.panel-more-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+  color: white; font-size: 12px; font-weight: 900; text-shadow: 0 2px #4d0057;
+}
+.panel-more-link svg { width: 15px; height: 15px; }
+
+/* --- Slot: Auto-(Bald)-Beschriftung --- */
+.auto-button span { display: grid; justify-items: center; }
+.auto-button em { color: #cbb8ff; font-size: 9px; font-style: normal; }
+
+/* --- Coming-soon-Seite --- */
+.coming-soon-stage { display: grid; min-height: 70vh; place-items: center; padding: 24px 12px; }
+.coming-soon-card {
+  display: grid; width: min(480px, 100%); gap: 6px; padding: 20px;
+  border: 4px solid #ffbe46; border-radius: 24px;
+  background: linear-gradient(180deg, #2c0f3f, #150522); color: white; text-align: center;
+  box-shadow: inset 0 3px rgb(255 255 255 / 18%), 0 16px 40px rgb(0 0 0 / 45%);
+}
+.coming-soon-cover { position: relative; aspect-ratio: 1.5 / 1; overflow: hidden; border-radius: 16px; }
+.coming-soon-cover img { object-fit: cover; }
+.coming-soon-chip {
+  position: absolute; top: 12px; left: 12px; padding: 6px 12px; border-radius: 999px;
+  background: #6b4aff; font-size: 11px; font-weight: 950; letter-spacing: .07em; text-transform: uppercase;
+}
+.coming-soon-card small { margin-top: 8px; color: #84c9bd; font-size: 11px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+.coming-soon-card h1 { margin: 0; font-family: Impact, "Arial Black", sans-serif; font-size: 40px; letter-spacing: .02em; text-transform: uppercase; }
+.coming-soon-card > p { margin: 0; color: #d9c8ec; font-size: 13px; }
+.coming-soon-note { margin-top: 6px !important; color: #b8a5d1 !important; font-size: 12px !important; line-height: 1.5; }
+.coming-soon-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 12px; }
+
+/* --- Mobile-Feinschliff --- */
+@media (max-width: 760px) {
+  html { scroll-padding-top: 72px; }
+  .lobby-section { scroll-margin-top: 72px; margin: 22px 0 0; padding: 0 9px; }
+  #all-games { scroll-margin-top: 86px; }
+  .bottom-nav a { font-size: 10px; }
+  .bottom-nav svg { width: 26px; height: 26px; }
+  .wallet-pill a { width: 32px; height: 32px; }
+  .bet-control { grid-template-columns: 44px 70px 44px; }
+  .bet-control button { height: 48px; }
+  .mission-item { grid-template-columns: 1fr; }
+  .mission-reward { grid-auto-flow: column; justify-content: space-between; justify-items: start; width: 100%; align-items: center; }
+  .search-overlay { padding: 8vh 10px 10px; }
+  .clans-teaser { align-items: flex-start; }
+}
