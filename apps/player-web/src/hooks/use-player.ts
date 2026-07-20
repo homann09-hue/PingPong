@@ -13,7 +13,7 @@ export function usePlayer() {
       setProfile(await response.json() as Profile);
       setError(null);
     } catch {
-      setError("Player services are temporarily unavailable.");
+      setError("Die Spieler-Dienste sind gerade nicht erreichbar.");
     }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
