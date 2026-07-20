@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildApp, createHttpLoggerOptions } from "./http-app.js";
 import { PostgresSpinStore } from "./spins/postgres-spin-store.js";
 import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
@@ -96,10 +97,20 @@ const app = buildApp({
   monetizationService,
   storeWebhookToken: demoMode ? "local-store-webhook" : storeWebhookToken!,
 }, Fastify({ logger: createHttpLoggerOptions() }));
-try {
-  await app.listen({ port, host });
-  pushWorker.start();
-} catch (error) {
-  app.log.error(error);
-  process.exitCode = 1;
+const appReady = app.ready();
+
+if (!process.env.VERCEL) {
+  try {
+    await app.listen({ port, host });
+    pushWorker.start();
+  } catch (error) {
+    app.log.error(error);
+    process.exitCode = 1;
+  }
+}
+
+/** Vercel Node entrypoint; local processes continue to use Fastify's listener above. */
+export default async function handler(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  await appReady;
+  app.server.emit("request", request, response);
 }
