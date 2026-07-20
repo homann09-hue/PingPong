@@ -4,8 +4,14 @@ import { buildApp } from "../app.js";
 import { InMemorySpinStore } from "../spins/in-memory-spin-store.js";
 import { IdentityService } from "./identity-service.js";
 import { InMemoryIdentityStore } from "./in-memory-identity-store.js";
+import type { ExternalIdentityVerifier } from "./external-identity-verifier.js";
 
 const secret = "identity-test-secret-with-at-least-32-bytes";
+const verifiedIdentities: ExternalIdentityVerifier = {
+  async verify(accessToken, provider) {
+    return accessToken === "valid-provider-token-with-at-least-32-characters" ? { provider, subject: `subject-${provider}` } : null;
+  },
+};
 
 describe("identity sessions", () => {
   it("creates a guest, rotates refresh tokens, and rejects token replay", async () => {
@@ -108,5 +114,36 @@ describe("identity sessions", () => {
     expect(responses[5]!.json()).toEqual({ code: "RATE_LIMITED" });
     expect(responses[5]!.headers["retry-after"]).toBeTruthy();
     await app.close();
+  });
+
+  it("links a verified provider, restores it on another device, and syncs versioned cloud state", async () => {
+    const identity = new IdentityService(new InMemoryIdentityStore(), secret, verifiedIdentities);
+    const guest = await identity.createGuest(randomUUID(), "web");
+    const linked = await identity.signInWithProvider({
+      provider: "google", providerAccessToken: "valid-provider-token-with-at-least-32-characters",
+      currentPlayerId: guest.playerId, installationId: randomUUID(), platform: "web",
+    });
+    expect(linked.playerId).toBe(guest.playerId);
+    expect(await identity.authenticate(`Bearer ${guest.accessToken}`)).toBeNull();
+    expect((await identity.getAccount(linked.playerId))?.providers).toEqual(["google"]);
+    const firstSave = await identity.updateCloudSave(linked.playerId, 0, { sound: false, locale: "de" });
+    expect(firstSave?.version).toBe(1);
+    expect(await identity.updateCloudSave(linked.playerId, 0, { sound: true })).toBeNull();
+
+    const restored = await identity.signInWithProvider({
+      provider: "google", providerAccessToken: "valid-provider-token-with-at-least-32-characters",
+      currentPlayerId: null, installationId: randomUUID(), platform: "ios",
+    });
+    expect(restored.playerId).toBe(linked.playerId);
+    expect((await identity.listDevices(linked.playerId)).map((device) => device.platform).sort()).toEqual(["ios", "web", "web"]);
+    expect((await identity.exportAccount(linked.playerId))?.cloudSave).toEqual(firstSave);
+  });
+
+  it("rejects an unverified external provider token", async () => {
+    const identity = new IdentityService(new InMemoryIdentityStore(), secret, verifiedIdentities);
+    await expect(identity.signInWithProvider({
+      provider: "apple", providerAccessToken: "invalid-provider-token-that-is-long-enough",
+      currentPlayerId: null, installationId: randomUUID(), platform: "ios",
+    })).rejects.toThrow("External identity token is invalid");
   });
 });

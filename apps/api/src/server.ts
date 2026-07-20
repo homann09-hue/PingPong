@@ -4,6 +4,7 @@ import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { IdentityService } from "./identity/identity-service.js";
 import { InMemoryIdentityStore } from "./identity/in-memory-identity-store.js";
 import { PostgresIdentityStore } from "./identity/postgres-identity-store.js";
+import { SupabaseIdentityVerifier } from "./identity/external-identity-verifier.js";
 import { InMemorySocialStore } from "./social/in-memory-social-store.js";
 import { PostgresSocialStore } from "./social/postgres-social-store.js";
 import { AdminJwtAuthenticator, DemoAdminAuthenticator } from "./admin/admin-auth.js";
@@ -37,17 +38,23 @@ const pushGatewayToken = process.env.PUSH_GATEWAY_TOKEN;
 const storeVerificationUrl = process.env.STORE_VERIFICATION_URL;
 const storeGatewayToken = process.env.STORE_GATEWAY_TOKEN;
 const storeWebhookToken = process.env.STORE_WEBHOOK_TOKEN;
+const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const demoMode = process.env.DEMO_MODE === "true";
 if (!demoMode && (!databaseUrl || !jwtSecret || !adminJwtSecret || !metricsToken
-  || !pushTokenEncryptionKey || !pushGatewayUrl || !pushGatewayToken || !storeVerificationUrl || !storeGatewayToken || !storeWebhookToken)) {
+  || !pushTokenEncryptionKey || !pushGatewayUrl || !pushGatewayToken || !storeVerificationUrl || !storeGatewayToken || !storeWebhookToken
+  || !supabaseUrl || !supabasePublishableKey)) {
   throw new Error("Database, auth, metrics, push and store verification credentials are required outside DEMO_MODE");
 }
 if (!demoMode && Buffer.byteLength(metricsToken!) < 32) throw new Error("METRICS_TOKEN must contain at least 32 bytes");
 if (!demoMode && Buffer.byteLength(storeWebhookToken!) < 32) throw new Error("STORE_WEBHOOK_TOKEN must contain at least 32 bytes");
 const demoPlayerId = "00000000-0000-4000-8000-000000000001";
+const externalIdentityVerifier = supabaseUrl && supabasePublishableKey
+  ? new SupabaseIdentityVerifier(supabaseUrl, supabasePublishableKey)
+  : undefined;
 const identityService = demoMode
-  ? new IdentityService(new InMemoryIdentityStore(), "local-demo-jwt-secret-at-least-32-bytes")
-  : new IdentityService(PostgresIdentityStore.connect(databaseUrl!), jwtSecret!);
+  ? new IdentityService(new InMemoryIdentityStore(), "local-demo-jwt-secret-at-least-32-bytes", externalIdentityVerifier)
+  : new IdentityService(PostgresIdentityStore.connect(databaseUrl!), jwtSecret!, externalIdentityVerifier);
 const messagingStore = demoMode
   ? new InMemoryMessagingStore()
   : PostgresMessagingStore.connect(databaseUrl!, new AesGcmPushTokenCipher(pushTokenEncryptionKey!));

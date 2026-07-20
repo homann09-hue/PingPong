@@ -4,28 +4,56 @@ Date: 2026-07-17
 
 ## Compared evidence
 
-- Reference: `../../docs/audits/web-readiness/04-current-flutter-web-lobby-mobile.png` at 390×844
-- Prototype: `../../docs/audits/web-readiness/06-player-web-lobby-mobile.png` at 390×844
-- Desktop prototype: `../../docs/audits/web-readiness/05-player-web-lobby-desktop.png` at 1280×720
-- Playable slot: `../../docs/audits/web-readiness/07-player-web-slot-mobile.png` at 390×844
+- Source visual truth: `/Users/angelo/Downloads/IMG_3030.PNG`
+- Intended implementation route: `http://localhost:3002/`
+- Target desktop viewport: 1280×720
+- Target mobile viewport: 390×844
+- State: lobby, signed-in play-money profile
+- Implementation screenshot: unavailable for the current revision because the in-app browser rejected navigation to `http://localhost:3002/` under its active URL policy.
 
-## Results
+## Build and runtime evidence
 
-| Priority | Check | Result |
-| --- | --- | --- |
-| P0 | Lobby → Pharaoh Oasis → server spin → wallet update | Passed; wallet changed from 8,400,000 to 8,399,900 for a 100-coin spin. |
-| P0 | Viewport overflow | Passed; `scrollWidth === innerWidth` at 390 and 1280. |
-| P1 | Responsive navigation | Passed; desktop side navigation and mobile bottom navigation are visible at their target breakpoints. |
-| P1 | Asset fidelity | Passed; canonical covers, avatar, font, and Pharaoh symbols are synced from the existing Flutter source assets. |
-| P1 | Readability and clipping | Passed after shrinking the mobile wallet cluster and constraining hero copy to the card width. |
-| P1 | Semantic interaction | Passed; lobby landmarks, named links/buttons, wallet label, slot grid label, live region, and image alternatives are exposed. |
-| P2 | Reel end state | Passed after waiting for all five sequential reel transitions; no persistent blur or cropped reel. |
-| P2 | Category controls | Passed; visible categories change the catalog and expose pressed state. |
+- The repaired Turbopack development server returned HTTP 200 for `/` in 1.689 seconds.
+- Production compilation completed successfully with Next.js 16.2.9.
+- TypeScript completed successfully.
+- Player Web tests passed: 15/15.
+- The previous implementation screenshot was deliberately not used as current visual evidence because it predates this redesign.
+
+## Findings
+
+- [P0] No functional build blocker remains.
+  Evidence: HTTP 200, successful production build, and 15/15 automated tests.
+- [P1] Final visual comparison is blocked.
+  Location: desktop and mobile lobby.
+  Evidence: the source image is available, but the browser-rendered screenshot for this revision could not be captured after the browser refused the localhost URL.
+  Impact: typography, crop, spacing, responsive navigation, and image treatment cannot be truthfully signed off from rendered evidence.
+  Fix: reopen the local route after the browser restriction is cleared, capture 1280×720 and 390×844, compare both images together with the source, and resolve any P1/P2 differences.
+
+## Required fidelity surfaces
+
+- Fonts and typography: implemented with a condensed display treatment plus Aurora Sans; rendered comparison pending.
+- Spacing and layout rhythm: implemented for desktop and mobile breakpoints; rendered comparison pending.
+- Colors and visual tokens: original slate, oxidized teal, forest, and amber system implemented; rendered comparison pending.
+- Image quality and asset fidelity: original Verdant Afterfall key art is integrated through Next Image at configured 90 quality; rendered crop comparison pending.
+- Copy and content: original Aurora Arcade naming and slot-world copy implemented; no copied brand or protected game text.
+
+## Primary interactions to retest visually
+
+- Set the Verdant Afterfall launch reminder.
+- Change slot category filters and verify pressed state.
+- Open Pharaoh Oasis from its feature card.
+- Complete one server-authoritative spin and verify wallet change.
+- Confirm `scrollWidth === innerWidth` at 1280×720 and 390×844.
+- Check browser console for warnings and errors.
+
+## Comparison history
+
+- Earlier source/prototype captures belonged to the previous Aurora lobby and are not accepted as evidence for this redesign.
+- The current implementation was built and runtime-verified, but no post-fix screenshot could be captured because localhost navigation was blocked by the browser policy.
 
 ## Follow-up polish
 
-- P3: Season-specific hero merchandising should come from Remote Config instead of the current local catalog metadata.
-- P3: Low-card symbols follow the Flutter client's typographic fallback; dedicated raster art can replace them in a later slot-art package.
-- P3: Sound controls are wired as UI state; production audio banks remain a separate content package.
+- P3: Add Rive-authored ambient fog, vault light shafts, and reward micro-interactions after the static visual baseline passes.
+- P3: Move seasonal merchandising copy and hero scheduling into Remote Config.
 
-final result: passed
+final result: blocked

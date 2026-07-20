@@ -8,6 +8,7 @@ import { z } from "zod";
 import { SlotEngine, auroraConfig, classicConfig, themedConfigs, type SlotConfig } from "@aurora/slot-engine";
 import type { Authenticator } from "./auth.js";
 import type { IdentityService } from "./identity/identity-service.js";
+import { ExternalIdentityInvalidError, ExternalIdentityUnavailableError } from "./identity/identity-service.js";
 import type { SpinStore } from "./spins/spin-store.js";
 import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spins/spin-store.js";
@@ -47,6 +48,16 @@ const guestAuthBody = z.object({
   installationId: z.string().uuid(),
   platform: z.enum(["ios", "android", "web"]),
 });
+const providerAuthBody = z.object({
+  provider: z.enum(["apple", "google", "email"]),
+  providerAccessToken: z.string().min(32).max(8192),
+  installationId: z.string().uuid(),
+  platform: z.enum(["ios", "android", "web"]),
+}).strict();
+const cloudSaveBody = z.object({
+  expectedVersion: z.number().int().min(0),
+  data: z.record(z.string().min(1).max(80), z.unknown()),
+}).strict().refine((value) => Buffer.byteLength(JSON.stringify(value.data), "utf8") <= 65_536, "Cloud save exceeds 64 KiB");
 const refreshAuthBody = z.object({ refreshToken: z.string().min(32).max(512) });
 const friendRequestBody = z.object({ playerId: z.string().uuid() });
 const clanBody = z.object({
@@ -227,6 +238,22 @@ export function buildApp(dependencies: AppDependencies) {
       await dependencies.identityService.createGuest(body.data.installationId, body.data.platform),
     );
   });
+  app.post("/v1/auth/provider", async (request, reply) => {
+    if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
+    const body = providerAuthBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    const currentPlayerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    try {
+      return reply.code(201).send(await dependencies.identityService.signInWithProvider({ ...body.data, currentPlayerId }));
+    } catch (error) {
+      if (error instanceof ExternalIdentityUnavailableError) return reply.code(503).send({ code: "EXTERNAL_IDENTITY_UNAVAILABLE" });
+      if (error instanceof ExternalIdentityInvalidError) return reply.code(401).send({ code: "INVALID_PROVIDER_TOKEN" });
+      if (error instanceof Error && error.message === "IDENTITY_ALREADY_LINKED") {
+        return reply.code(409).send({ code: "IDENTITY_ALREADY_LINKED" });
+      }
+      throw error;
+    }
+  });
   app.post("/v1/auth/refresh", async (request, reply) => {
     if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
     const body = refreshAuthBody.safeParse(request.body);
@@ -261,6 +288,43 @@ export function buildApp(dependencies: AppDependencies) {
     const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     return { revokedSessions: await dependencies.identityService.logoutAll(playerId) };
+  });
+  app.get("/v1/auth/account", async (request, reply) => {
+    if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const account = await dependencies.identityService.getAccount(playerId);
+    return account ? { account } : reply.code(404).send({ code: "ACCOUNT_NOT_FOUND" });
+  });
+  app.get("/v1/auth/devices", async (request, reply) => {
+    if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return { devices: await dependencies.identityService.listDevices(playerId) };
+  });
+  app.get("/v1/auth/cloud-save", async (request, reply) => {
+    if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    return { cloudSave: await dependencies.identityService.getCloudSave(playerId) };
+  });
+  app.put("/v1/auth/cloud-save", async (request, reply) => {
+    if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const body = cloudSaveBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    const cloudSave = await dependencies.identityService.updateCloudSave(playerId, body.data.expectedVersion, body.data.data);
+    return cloudSave ? { cloudSave } : reply.code(409).send({ code: "CLOUD_SAVE_VERSION_CONFLICT" });
+  });
+  app.get("/v1/auth/privacy-export", async (request, reply) => {
+    if (!dependencies.identityService) return reply.code(503).send({ code: "IDENTITY_UNAVAILABLE" });
+    const playerId = await dependencies.authenticator.authenticate(request.headers.authorization);
+    if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    const exported = await dependencies.identityService.exportAccount(playerId);
+    return exported
+      ? reply.header("content-disposition", `attachment; filename=aurora-data-${playerId}.json`).send(exported)
+      : reply.code(404).send({ code: "ACCOUNT_NOT_FOUND" });
   });
   app.get("/v1/lobby", async () => ({
     games: [...configs.values()].map((config) => ({

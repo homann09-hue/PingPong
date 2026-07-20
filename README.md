@@ -333,6 +333,16 @@ assets fail during the release build rather than at runtime.
 
 For local persistence, start PostgreSQL with `docker compose up -d postgres`,
 apply `infra/postgres/001_core.sql`, and provide the variables from `.env.example`.
+Apply `infra/postgres/032_account_cloud_save.sql` for versioned cross-device
+preferences. Apple, Google and email account linking additionally require
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the
+player web app; the API accepts the corresponding `SUPABASE_*` names and uses
+them only to verify provider tokens. See `docs/adr/0031-federated-player-accounts.md`.
+Native builds receive the same public values through
+`--dart-define=SUPABASE_URL=...` and
+`--dart-define=SUPABASE_PUBLISHABLE_KEY=...`. Supabase must allow
+`com.aurora.socialcasino://login-callback` for iOS/Android and the web
+`/auth/callback` URL. No service-role credential belongs in either client.
 
 ## Scope
 

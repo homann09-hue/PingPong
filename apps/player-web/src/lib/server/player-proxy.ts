@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const accessCookie = "aurora_web_access";
-const refreshCookie = "aurora_web_refresh";
-const installationCookie = "aurora_web_installation";
-const upstream = process.env.AURORA_API_URL ?? "http://127.0.0.1:8080";
+export const accessCookie = "aurora_web_access";
+export const refreshCookie = "aurora_web_refresh";
+export const installationCookie = "aurora_web_installation";
+export const playerApiUrl = process.env.AURORA_API_URL ?? "http://127.0.0.1:8080";
 
-interface Tokens {
+export interface Tokens {
   readonly accessToken: string;
   readonly accessTokenExpiresIn: number;
   readonly refreshToken: string;
@@ -21,6 +21,8 @@ const allowedRoutes = [
   /^jackpots$/,
   /^events$/,
   /^missions$/,
+  /^auth\/(account|sessions|devices|cloud-save|privacy-export|logout-all)$/,
+  /^auth\/sessions\/[0-9a-f-]{36}$/,
   /^slots\/[a-z0-9-]+\/paytable$/,
   /^slots\/[a-z0-9-]+\/spins$/,
 ];
@@ -29,15 +31,26 @@ export function isAllowedPlayerPath(path: string): boolean {
   return allowedRoutes.some((pattern) => pattern.test(path));
 }
 
-function cookieOptions(maxAge: number) {
+export function cookieOptions(maxAge: number) {
   return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge };
 }
 
-async function issueTokens(request: NextRequest): Promise<{ tokens: Tokens; installationId: string }> {
+export function setTokenCookies(response: NextResponse, tokens: Tokens, installationId: string): void {
+  response.cookies.set(accessCookie, tokens.accessToken, cookieOptions(tokens.accessTokenExpiresIn));
+  response.cookies.set(refreshCookie, tokens.refreshToken, cookieOptions(30 * 24 * 60 * 60));
+  response.cookies.set(installationCookie, installationId, cookieOptions(365 * 24 * 60 * 60));
+}
+
+export function clearTokenCookies(response: NextResponse): void {
+  response.cookies.set(accessCookie, "", cookieOptions(0));
+  response.cookies.set(refreshCookie, "", cookieOptions(0));
+}
+
+export async function issueTokens(request: NextRequest): Promise<{ tokens: Tokens; installationId: string }> {
   const installationId = request.cookies.get(installationCookie)?.value ?? randomUUID();
   const currentRefresh = request.cookies.get(refreshCookie)?.value;
   if (currentRefresh) {
-    const refreshed = await fetch(`${upstream}/v1/auth/refresh`, {
+    const refreshed = await fetch(`${playerApiUrl}/v1/auth/refresh`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ refreshToken: currentRefresh }),
@@ -45,7 +58,7 @@ async function issueTokens(request: NextRequest): Promise<{ tokens: Tokens; inst
     });
     if (refreshed.ok) return { tokens: await refreshed.json() as Tokens, installationId };
   }
-  const created = await fetch(`${upstream}/v1/auth/guest`, {
+  const created = await fetch(`${playerApiUrl}/v1/auth/guest`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ installationId, platform: "web" }),
@@ -62,7 +75,7 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
   if (request.method === "POST" && path.endsWith("/spins")) {
     headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
   }
-  return fetch(`${upstream}/v1/${path}`, {
+  return fetch(`${playerApiUrl}/v1/${path}`, {
     method: request.method,
     headers,
     body,
@@ -92,9 +105,7 @@ export async function proxyPlayerRequest(request: NextRequest, path: string): Pr
       headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
     });
     if (replacement) {
-      outgoing.cookies.set(accessCookie, replacement.tokens.accessToken, cookieOptions(replacement.tokens.accessTokenExpiresIn));
-      outgoing.cookies.set(refreshCookie, replacement.tokens.refreshToken, cookieOptions(30 * 24 * 60 * 60));
-      outgoing.cookies.set(installationCookie, replacement.installationId, cookieOptions(365 * 24 * 60 * 60));
+      setTokenCookies(outgoing, replacement.tokens, replacement.installationId);
     }
     outgoing.headers.set("cache-control", "private, no-store");
     return outgoing;

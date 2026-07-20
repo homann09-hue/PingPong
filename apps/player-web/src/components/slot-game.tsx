@@ -2,7 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ArrowsClockwise, Lightning, Minus, Play, Plus, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft";
+import { ArrowsClockwise } from "@phosphor-icons/react/dist/csr/ArrowsClockwise";
+import { Lightning } from "@phosphor-icons/react/dist/csr/Lightning";
+import { Minus } from "@phosphor-icons/react/dist/csr/Minus";
+import { Play } from "@phosphor-icons/react/dist/csr/Play";
+import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
+import { SpeakerHigh } from "@phosphor-icons/react/dist/csr/SpeakerHigh";
+import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { useMemo, useState } from "react";
 import { AppShell } from "./app-shell";
 import { initialGrid, type SpinResult } from "@/lib/contracts";
