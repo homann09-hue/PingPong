@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { coinNumber, compactNumber, describeMission, missionTierLabel, timeLeft } from "./format";
 
+const normalizeSpaces = (value: string) => value.replace(/\u00a0/g, " ");
+
 describe("wallet formatting", () => {
   it("keeps exact coin balances readable in German locale", () => expect(coinNumber(8_399_900)).toBe("8.399.900"));
-  it("compacts lobby jackpot values in German locale", () => expect(compactNumber(72_450_000)).toBe("72,5 Mio."));
+  it("compacts lobby jackpot values in German locale", () => expect(normalizeSpaces(compactNumber(72_450_000))).toBe("72,5 Mio."));
 });
 
 describe("mission copy", () => {
