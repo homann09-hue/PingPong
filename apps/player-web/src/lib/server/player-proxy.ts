@@ -21,6 +21,10 @@ const allowedRoutes = [
   /^jackpots$/,
   /^events$/,
   /^missions$/,
+  /^missions\/[a-z0-9-]+\/claim$/,
+  /^rewards\/(hourly|daily)$/,
+  /^rewards\/(hourly|daily)\/claim$/,
+  /^rewards\/[a-z0-9-]+\/claims$/,
   /^auth\/(account|sessions|devices|cloud-save|privacy-export|logout-all)$/,
   /^auth\/sessions\/[0-9a-f-]{36}$/,
   /^slots\/[a-z0-9-]+\/paytable$/,
@@ -72,7 +76,9 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
   const headers = new Headers({ authorization: `Bearer ${accessToken}` });
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
-  if (request.method === "POST" && path.endsWith("/spins")) {
+  const needsIdempotencyKey = request.method === "POST"
+    && (path.endsWith("/spins") || path.endsWith("/claim") || path.endsWith("/claims"));
+  if (needsIdempotencyKey) {
     headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
   }
   return fetch(`${playerApiUrl}/v1/${path}`, {

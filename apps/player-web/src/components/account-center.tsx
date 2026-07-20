@@ -22,6 +22,12 @@ interface Session { id: string; deviceId: string; platform: string; createdAt: s
 interface Device { id: string; platform: string; createdAt: string; lastSeenAt: string; activeSessions: number }
 interface CloudSave { version: number; updatedAt: string; data: Record<string, unknown> }
 
+const oauthErrorMessages: Readonly<Record<string, string>> = {
+  missing_code: "Der Login wurde abgebrochen, bevor er abgeschlossen war. Bitte versuch es noch einmal.",
+  oauth_failed: "Der Login konnte nicht bestätigt werden. Bitte versuch es noch einmal.",
+  auth_unavailable: "Der Login-Dienst ist gerade nicht erreichbar. Bitte versuch es später erneut.",
+};
+
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
   if (!response.ok) throw new Error((await response.json().catch(() => null) as { code?: string } | null)?.code ?? "REQUEST_FAILED");
@@ -54,11 +60,20 @@ export function AccountCenter() {
 
   const exchange = useCallback(async (provider: Provider, accessToken: string) => {
     await jsonRequest("/api/account", { method: "POST", body: JSON.stringify({ action: "exchange", provider, providerAccessToken: accessToken }) });
-    setNotice({ tone: "good", text: "Account connected. Your progress is now protected across devices." });
+    setNotice({ tone: "good", text: "Konto verbunden. Dein Fortschritt ist jetzt auf allen Geraeten geschuetzt." });
     await load();
   }, [load]);
 
-  useEffect(() => { setRecovering(new URLSearchParams(window.location.search).get("recovery") === "1"); void load().catch(() => setNotice({ tone: "bad", text: "Account service is temporarily unavailable." })); }, [load]);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    setRecovering(query.get("recovery") === "1");
+    const oauthError = query.get("error");
+    if (oauthError) {
+      setNotice({ tone: "bad", text: oauthErrorMessages[oauthError] ?? "Der Login ist fehlgeschlagen. Bitte versuch es noch einmal." });
+      window.history.replaceState({}, "", "/account");
+    }
+    void load().catch(() => setNotice({ tone: "bad", text: "Der Konto-Dienst ist gerade nicht erreichbar." }));
+  }, [load]);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("connected") !== "1") return;
     void (async () => {
@@ -69,46 +84,46 @@ export function AccountCenter() {
         if (!data.session || !["apple", "google", "email"].includes(String(provider))) throw new Error("OAUTH_SESSION_MISSING");
         await exchange(provider!, data.session.access_token);
         window.history.replaceState({}, "", "/account");
-      } catch { setNotice({ tone: "bad", text: "The login could not be completed. Please try again." }); }
+      } catch { setNotice({ tone: "bad", text: "Der Login konnte nicht abgeschlossen werden. Bitte versuch es noch einmal." }); }
       finally { setBusy(null); }
     })();
   }, [exchange]);
 
   async function oauth(provider: "apple" | "google") {
-    if (!supabaseReady) return setNotice({ tone: "bad", text: "Supabase Auth is not configured for this build." });
+    if (!supabaseReady) return setNotice({ tone: "bad", text: "Supabase Auth ist fuer diesen Build nicht konfiguriert." });
     setBusy(provider); setNotice(null);
     try {
       const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider,
         options: { redirectTo: `${window.location.origin}/auth/callback` } });
       if (error) throw error;
-    } catch { setBusy(null); setNotice({ tone: "bad", text: `${provider === "apple" ? "Apple" : "Google"} login is not available yet.` }); }
+    } catch { setBusy(null); setNotice({ tone: "bad", text: `Der Login mit ${provider === "apple" ? "Apple" : "Google"} ist gerade nicht verfuegbar.` }); }
   }
 
   async function emailAction(action: "signin" | "signup" | "reset") {
-    if (!supabaseReady) return setNotice({ tone: "bad", text: "Supabase Auth is not configured for this build." });
+    if (!supabaseReady) return setNotice({ tone: "bad", text: "Supabase Auth ist fuer diesen Build nicht konfiguriert." });
     setBusy(action); setNotice(null);
     try {
       const supabase = createSupabaseBrowserClient();
       if (action === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account?recovery=1")}` });
         if (error) throw error;
-        setNotice({ tone: "good", text: "Password reset link sent. Check your inbox." });
+        setNotice({ tone: "good", text: "Link zum Zuruecksetzen verschickt. Schau in dein Postfach." });
       } else {
         const result = action === "signin"
           ? await supabase.auth.signInWithPassword({ email, password })
           : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
         if (result.error) throw result.error;
         if (result.data.session) await exchange("email", result.data.session.access_token);
-        else setNotice({ tone: "good", text: "Confirm the email we sent you, then return here to finish linking." });
+        else setNotice({ tone: "good", text: "Bestaetige die E-Mail, die wir dir geschickt haben, und komm dann hierher zurueck." });
       }
-    } catch { setNotice({ tone: "bad", text: "Email or password was rejected. Check the details and try again." }); }
+    } catch { setNotice({ tone: "bad", text: "E-Mail oder Passwort wurde abgelehnt. Pruefe die Angaben und versuch es erneut." }); }
     finally { setBusy(null); }
   }
 
   async function changePassword() {
     setBusy("password");
     const { error } = await createSupabaseBrowserClient().auth.updateUser({ password: newPassword });
-    setBusy(null); setNotice(error ? { tone: "bad", text: "Password could not be changed." } : { tone: "good", text: "Password updated." });
+    setBusy(null); setNotice(error ? { tone: "bad", text: "Das Passwort konnte nicht geaendert werden." } : { tone: "good", text: "Passwort aktualisiert." });
   }
 
   async function syncCloud() {
@@ -118,8 +133,8 @@ export function AccountCenter() {
       const result = await jsonRequest<{ cloudSave: CloudSave }>("/api/player/auth/cloud-save", { method: "PUT",
         body: JSON.stringify({ expectedVersion: cloudSave.version, data: { ...cloudSave.data, locale: navigator.language,
           reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches, lastWebSyncAt: new Date().toISOString() } }) });
-      setCloudSave(result.cloudSave); setNotice({ tone: "good", text: "Cloud Save is current on every device." });
-    } catch (error) { setNotice({ tone: "bad", text: error instanceof Error && error.message === "CLOUD_SAVE_VERSION_CONFLICT" ? "Newer cloud data exists. Reload before syncing." : "Cloud sync failed." }); }
+      setCloudSave(result.cloudSave); setNotice({ tone: "good", text: "Cloud Save ist auf allen Geraeten aktuell." });
+    } catch (error) { setNotice({ tone: "bad", text: error instanceof Error && error.message === "CLOUD_SAVE_VERSION_CONFLICT" ? "Es gibt neuere Cloud-Daten. Lade die Seite neu, bevor du synchronisierst." : "Die Cloud-Synchronisierung ist fehlgeschlagen." }); }
     finally { setBusy(null); }
   }
 
@@ -129,12 +144,12 @@ export function AccountCenter() {
   }
 
   async function accountAction(action: "logout" | "logoutAll" | "delete") {
-    if (action === "delete" && !window.confirm("Permanently delete this account and revoke every session? This cannot be undone.")) return;
+    if (action === "delete" && !window.confirm("Dieses Konto endgueltig loeschen und alle Sitzungen beenden? Das kann nicht rueckgaengig gemacht werden.")) return;
     setBusy(action);
     const response = await fetch("/api/account", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
     if (!response.ok) {
       setBusy(null);
-      setNotice({ tone: "bad", text: "Account action failed. Please try again." });
+      setNotice({ tone: "bad", text: "Die Konto-Aktion ist fehlgeschlagen. Bitte versuch es erneut." });
       return;
     }
     if (supabaseReady) await createSupabaseBrowserClient().auth.signOut().catch(() => undefined);
@@ -143,33 +158,33 @@ export function AccountCenter() {
 
   async function downloadExport() {
     const response = await fetch("/api/player/auth/privacy-export");
-    if (!response.ok) return setNotice({ tone: "bad", text: "Data export failed." });
+    if (!response.ok) return setNotice({ tone: "bad", text: "Der Datenexport ist fehlgeschlagen." });
     const url = URL.createObjectURL(await response.blob());
-    const link = document.createElement("a"); link.href = url; link.download = `aurora-data-${account?.playerId ?? "account"}.json`; link.click(); URL.revokeObjectURL(url);
+    const link = document.createElement("a"); link.href = url; link.download = `aurora-daten-${account?.playerId ?? "konto"}.json`; link.click(); URL.revokeObjectURL(url);
   }
 
   const providers = new Set(account?.providers ?? []);
   return <AppShell profile={profile}>
-    <section className="account-hero"><div><span className="eyebrow"><LockKey weight="fill" /> Account protection</span><h1>Your Aurora account</h1><p>One secure identity, every device, all worlds and rewards.</p></div>
-      <div className={account?.isGuest ? "account-state guest" : "account-state protected"}>{account?.isGuest ? <WarningCircle weight="fill" /> : <CheckCircle weight="fill" />}<span><small>{account?.isGuest ? "Guest account" : "Cloud protected"}</small><strong>{account?.isGuest ? "Link now to protect progress" : "Progress follows you everywhere"}</strong></span></div></section>
+    <section className="account-hero"><div><span className="eyebrow"><LockKey weight="fill" /> Kontoschutz</span><h1>Dein Aurora-Konto</h1><p>Eine sichere Identitaet, jedes Geraet, alle Welten und Belohnungen.</p></div>
+      <div className={account?.isGuest ? "account-state guest" : "account-state protected"}>{account?.isGuest ? <WarningCircle weight="fill" /> : <CheckCircle weight="fill" />}<span><small>{account?.isGuest ? "Gastkonto" : "Cloud-geschuetzt"}</small><strong>{account?.isGuest ? "Jetzt verknuepfen und Fortschritt sichern" : "Dein Fortschritt begleitet dich ueberall"}</strong></span></div></section>
     {notice && <div className={`account-notice ${notice.tone}`} role="status">{notice.text}</div>}
 
     <div className="account-grid">
-      <section className="account-card account-connect"><header><div><span className="account-kicker">Login & recovery</span><h2>Connected identities</h2></div><span>{providers.size} linked</span></header>
-        {!supabaseReady && <div className="account-config-warning">Connect Supabase Auth env vars to enable Apple, Google and email login.</div>}
-        <div className="provider-row"><button onClick={() => void oauth("apple")} disabled={!supabaseReady || busy !== null || providers.has("apple")}><AppleLogo weight="fill" />{providers.has("apple") ? "Apple connected" : "Continue with Apple"}</button>
-          <button onClick={() => void oauth("google")} disabled={!supabaseReady || busy !== null || providers.has("google")}><GoogleLogo weight="bold" />{providers.has("google") ? "Google connected" : "Continue with Google"}</button></div>
-        <div className="email-login"><label><span>Email</span><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label>
-          <label><span>Password</span><input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" /></label>
-          <div><button className="primary-action" onClick={() => void emailAction("signin")} disabled={!supabaseReady || !email || !password || busy !== null}><EnvelopeSimple weight="bold" /> Sign in</button><button onClick={() => void emailAction("signup")} disabled={!supabaseReady || !email || password.length < 8 || busy !== null}>Create account</button><button className="text-action" onClick={() => void emailAction("reset")} disabled={!supabaseReady || !email || busy !== null}>Forgot password?</button></div></div>
-        {recovering && <div className="password-reset"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password" /><button onClick={() => void changePassword()} disabled={newPassword.length < 8}>Set new password</button></div>}
+      <section className="account-card account-connect"><header><div><span className="account-kicker">Login & Wiederherstellung</span><h2>Verbundene Identitaeten</h2></div><span>{providers.size} verknuepft</span></header>
+        {!supabaseReady && <div className="account-config-warning">Hinterlege die Supabase-Auth-Umgebungsvariablen, um Apple-, Google- und E-Mail-Login zu aktivieren.</div>}
+        <div className="provider-row"><button onClick={() => void oauth("apple")} disabled={!supabaseReady || busy !== null || providers.has("apple")}><AppleLogo weight="fill" />{providers.has("apple") ? "Apple verbunden" : "Mit Apple fortfahren"}</button>
+          <button onClick={() => void oauth("google")} disabled={!supabaseReady || busy !== null || providers.has("google")}><GoogleLogo weight="bold" />{providers.has("google") ? "Google verbunden" : "Mit Google fortfahren"}</button></div>
+        <div className="email-login"><label><span>E-Mail</span><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="du@beispiel.de" /></label>
+          <label><span>Passwort</span><input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mindestens 8 Zeichen" /></label>
+          <div><button className="primary-action" onClick={() => void emailAction("signin")} disabled={!supabaseReady || !email || !password || busy !== null}><EnvelopeSimple weight="bold" /> Anmelden</button><button onClick={() => void emailAction("signup")} disabled={!supabaseReady || !email || password.length < 8 || busy !== null}>Konto erstellen</button><button className="text-action" onClick={() => void emailAction("reset")} disabled={!supabaseReady || !email || busy !== null}>Passwort vergessen?</button></div></div>
+        {recovering && <div className="password-reset"><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Neues Passwort" /><button onClick={() => void changePassword()} disabled={newPassword.length < 8}>Neues Passwort setzen</button></div>}
       </section>
 
-      <section className="account-card cloud-card"><header><div><span className="account-kicker">Cross-device state</span><h2>Cloud Save</h2></div><CloudArrowUp weight="fill" /></header><div className="cloud-version"><strong>Version {cloudSave?.version ?? 0}</strong><span>{cloudSave?.version ? `Updated ${new Date(cloudSave.updatedAt).toLocaleString()}` : "Ready for first sync"}</span></div><p>Coins, gems, XP and gameplay progress are always server-authoritative. Preferences use conflict-safe versioning.</p><button className="primary-action" onClick={() => void syncCloud()} disabled={busy !== null}><CloudArrowUp weight="bold" /> {busy === "cloud" ? "Syncing…" : "Sync this device"}</button></section>
+      <section className="account-card cloud-card"><header><div><span className="account-kicker">Geraeteuebergreifend</span><h2>Cloud Save</h2></div><CloudArrowUp weight="fill" /></header><div className="cloud-version"><strong>Version {cloudSave?.version ?? 0}</strong><span>{cloudSave?.version ? `Aktualisiert ${new Date(cloudSave.updatedAt).toLocaleString("de-DE")}` : "Bereit fuer die erste Synchronisierung"}</span></div><p>Coins, Gems, XP und Spielfortschritt sind immer server-autoritativ. Einstellungen nutzen konfliktsichere Versionierung.</p><button className="primary-action" onClick={() => void syncCloud()} disabled={busy !== null}><CloudArrowUp weight="bold" /> {busy === "cloud" ? "Synchronisiert …" : "Dieses Geraet synchronisieren"}</button></section>
 
-      <section className="account-card device-card"><header><div><span className="account-kicker">Security</span><h2>Devices & sessions</h2></div><span>{devices.length} devices</span></header><div className="device-list">{sessions.map((session) => <article key={session.id}><DeviceMobile weight="fill" /><div><strong>{session.platform === "web" ? "Web browser" : session.platform === "ios" ? "iPhone / iPad" : "Android device"}</strong><span>Active {new Date(session.lastUsedAt).toLocaleString()} · expires {new Date(session.expiresAt).toLocaleDateString()}</span></div><button onClick={() => void revokeSession(session.id)}>Sign out</button></article>)}</div><button className="danger-outline" onClick={() => void accountAction("logoutAll")}><SignOut weight="bold" /> Log out on all devices</button></section>
+      <section className="account-card device-card"><header><div><span className="account-kicker">Sicherheit</span><h2>Geraete & Sitzungen</h2></div><span>{devices.length} Geraete</span></header><div className="device-list">{sessions.map((session) => <article key={session.id}><DeviceMobile weight="fill" /><div><strong>{session.platform === "web" ? "Webbrowser" : session.platform === "ios" ? "iPhone / iPad" : "Android-Geraet"}</strong><span>Aktiv {new Date(session.lastUsedAt).toLocaleString("de-DE")} · laeuft ab {new Date(session.expiresAt).toLocaleDateString("de-DE")}</span></div><button onClick={() => void revokeSession(session.id)}>Abmelden</button></article>)}</div><button className="danger-outline" onClick={() => void accountAction("logoutAll")}><SignOut weight="bold" /> Auf allen Geraeten abmelden</button></section>
 
-      <section className="account-card privacy-card"><header><div><span className="account-kicker">Privacy controls</span><h2>Your data</h2></div></header><button onClick={() => void downloadExport()}><DownloadSimple weight="bold" /><span><strong>Download data export</strong><small>Account, wallet history, sessions and game activity as JSON</small></span></button><button className="delete-account" onClick={() => void accountAction("delete")}><Trash weight="bold" /><span><strong>Delete account</strong><small>Permanently removes access and revokes every device</small></span></button><button className="text-action logout-current" onClick={() => void accountAction("logout")}><SignOut /> Log out on this device</button></section>
+      <section className="account-card privacy-card"><header><div><span className="account-kicker">Datenschutz</span><h2>Deine Daten</h2></div></header><button onClick={() => void downloadExport()}><DownloadSimple weight="bold" /><span><strong>Datenexport herunterladen</strong><small>Konto, Wallet-Verlauf, Sitzungen und Spielaktivitaet als JSON</small></span></button><button className="delete-account" onClick={() => void accountAction("delete")}><Trash weight="bold" /><span><strong>Konto loeschen</strong><small>Entfernt den Zugang endgueltig und meldet alle Geraete ab</small></span></button><button className="text-action logout-current" onClick={() => void accountAction("logout")}><SignOut /> Auf diesem Geraet abmelden</button></section>
     </div>
   </AppShell>;
 }
