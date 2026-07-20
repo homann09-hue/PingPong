@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
-import { buildApp } from "./app.js";
+import { buildApp } from "./http-app.js";
 import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { InMemorySocialStore } from "./social/in-memory-social-store.js";
 import { ClanOfficerLimitError } from "./social/social-store.js";

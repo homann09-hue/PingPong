@@ -1,4 +1,4 @@
-import { buildApp } from "./app.js";
+import { buildApp } from "./http-app.js";
 import { PostgresSpinStore } from "./spins/postgres-spin-store.js";
 import { InMemorySpinStore } from "./spins/in-memory-spin-store.js";
 import { IdentityService } from "./identity/identity-service.js";

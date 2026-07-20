@@ -161,7 +161,7 @@ export interface AppDependencies {
   readonly storeWebhookToken?: string;
 }
 
-/** Builds the HTTP composition root with explicit, replaceable infrastructure ports. */
+/** Builds the Fastify composition root with explicit, replaceable infrastructure ports. */
 export function buildApp(dependencies: AppDependencies) {
   const app = Fastify({ logger: { redact: ["req.headers.authorization", "req.headers.cookie"] } });
   void app.register(cors, {
