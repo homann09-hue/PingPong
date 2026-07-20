@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import staticFiles from "@fastify/static";
 import { z } from "zod";
@@ -35,6 +35,10 @@ import type { EconomyAdminStore } from "./admin/economy-admin-store.js";
 import { EconomyFourEyesViolationError, EconomyGrantNotFoundError, EconomyGrantStateError, EconomyPlayerNotFoundError } from "./admin/economy-admin-store.js";
 import type { OperationsStore } from "./operations/operations-store.js";
 import { achievementById, achievementViews, canClaimAchievement } from "./achievements/achievement-system.js";
+
+export function createHttpLoggerOptions() {
+  return { redact: ["req.headers.authorization", "req.headers.cookie"] };
+}
 
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
@@ -162,8 +166,10 @@ export interface AppDependencies {
 }
 
 /** Builds the Fastify composition root with explicit, replaceable infrastructure ports. */
-export function buildApp(dependencies: AppDependencies) {
-  const app = Fastify({ logger: { redact: ["req.headers.authorization", "req.headers.cookie"] } });
+export function buildApp(
+  dependencies: AppDependencies,
+  app: FastifyInstance = Fastify({ logger: createHttpLoggerOptions() }),
+) {
   void app.register(cors, {
     origin: process.env.DEMO_MODE === "true" ? true : false,
     methods: ["GET", "POST", "PUT", "DELETE"],
