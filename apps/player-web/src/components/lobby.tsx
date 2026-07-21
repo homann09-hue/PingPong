@@ -170,7 +170,7 @@ export function Lobby() {
               ? <div className="lock-state"><LockKey weight="fill" /><span>Level {game.unlockLevel}</span></div>
               : offline
                 ? <div className="lock-state offline-state"><Wrench weight="fill" /><span>{availability?.message ?? (availability?.status === "maintenance" ? "Kurz in Wartung" : "Derzeit pausiert")}</span></div>
-                : : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
+                : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
             <div className="game-title"><small>{game.category}</small><h3>{game.name}</h3><p>{game.features}</p></div>
           </div>
         </article>;
