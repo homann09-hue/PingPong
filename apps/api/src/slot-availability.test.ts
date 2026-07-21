@@ -19,6 +19,21 @@ afterAll(async () => app.close());
 const spinHeaders = { authorization: "Bearer valid", ["idempotency-" + "key"]: randomUUID() };
 
 describe("Slot availability", () => {
+  it("exposes status to players without leaking who changed it", async () => {
+    await slotAvailabilityStore.set(
+      { slotId: "midnight-vault", status: "disabled", message: "Kommt bald zurueck", actor: "liveops-anna" },
+      new Date(),
+    );
+
+    const response = await app.inject({ method: "GET", url: "/v1/slots/availability" });
+
+    expect(response.statusCode).toBe(200);
+    const entry = response.json().entries.find((item: { slotId: string }) => item.slotId === "midnight-vault");
+    expect(entry).toEqual({ slotId: "midnight-vault", status: "disabled", message: "Kommt bald zurueck" });
+    // Der Name der Mitarbeiterin, die gesperrt hat, darf den Spieler nie erreichen.
+    expect(JSON.stringify(response.json())).not.toContain("liveops-anna");
+  });
+
   it("blocks spins while a slot is under maintenance and releases them afterwards", async () => {
     const before = await app.inject({ method: "POST", url: "/v1/slots/dragon-peak/spins",
       headers: { ...spinHeaders, ["idempotency-" + "key"]: randomUUID() }, payload: { bet: 100 } });
