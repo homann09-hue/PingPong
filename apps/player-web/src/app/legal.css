@@ -1,0 +1,80 @@
+/* Rechts-Framework: Altersabfrage, Legal-Seiten, Rechtshinweis-Footer. */
+
+.age-gate {
+  position: fixed; z-index: 200; inset: 0; display: grid; place-items: center;
+  padding: 20px; background: rgb(4 2 12 / 88%); backdrop-filter: blur(10px); overflow-y: auto;
+}
+.age-gate-panel {
+  display: grid; gap: 14px; width: min(520px, 100%); padding: 26px 24px;
+  border: 4px solid #ffbe46; border-radius: 24px;
+  background: linear-gradient(180deg, #2c0f3f, #150522); color: white; text-align: center;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 60%), inset 0 3px rgb(255 255 255 / 18%);
+}
+.age-gate-badge {
+  justify-self: center; padding: 6px 16px; border-radius: 999px;
+  background: linear-gradient(180deg, #ff5b35, #ab0b36); color: white;
+  font-size: 18px; font-weight: 950; letter-spacing: .06em;
+}
+.age-gate-panel h1 { margin: 0; font-family: Impact, "Arial Black", sans-serif; font-size: 30px; text-transform: uppercase; }
+.age-gate-lead { margin: 0; color: #d9c8ec; font-size: 13px; line-height: 1.6; text-align: left; }
+.age-gate-lead strong { color: #ffe470; }
+.age-gate-option {
+  display: flex; gap: 11px; align-items: flex-start; padding: 12px 14px;
+  border: 2px solid rgb(255 255 255 / 16%); border-radius: 14px;
+  background: rgb(0 0 0 / 30%); text-align: left; cursor: pointer;
+}
+.age-gate-option input { width: 20px; height: 20px; margin-top: 2px; flex: 0 0 auto; accent-color: #94ff4d; }
+.age-gate-option span { display: grid; gap: 3px; }
+.age-gate-option strong { font-size: 13px; }
+.age-gate-option small { color: #b8a5d1; font-size: 11px; line-height: 1.45; }
+.age-gate-confirm {
+  min-height: 52px; padding: 0 20px; border: 3px solid #dcff74; border-radius: 999px;
+  background: linear-gradient(180deg, #94ff4d, #18a710 58%, #0a5d08); color: white;
+  font-size: 15px; font-weight: 950; text-shadow: 0 2px #063800; cursor: pointer;
+  box-shadow: inset 0 3px rgb(255 255 255 / 42%), 0 5px 0 #074406;
+}
+.age-gate-links { margin: 0; color: #b8a5d1; font-size: 11px; line-height: 1.6; }
+.age-gate-links a { color: #7cd8ff; text-decoration: underline; }
+
+.legal-footer {
+  position: relative; z-index: 1; display: grid; gap: 10px; margin: 26px auto 0;
+  width: min(100%, 1680px); padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
+  border-top: 2px solid rgb(255 255 255 / 16%); background: rgb(6 3 16 / 55%);
+  color: #cbb8e6; font-size: 11px; line-height: 1.6; text-align: center;
+}
+.legal-footer strong { color: #ffe470; }
+.legal-footer nav { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center; }
+.legal-footer a { color: #7cd8ff; font-weight: 800; text-decoration: underline; }
+
+.legal-page { display: grid; gap: 16px; width: min(860px, 100%); margin: 0 auto; padding: 26px 18px 60px; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.legal-nav a {
+  padding: 8px 13px; border: 2px solid rgb(255 255 255 / 20%); border-radius: 999px;
+  background: rgb(10 6 26 / 60%); color: #efe9ff; font-size: 12px; font-weight: 800;
+}
+.legal-nav a.active { border-color: #ffbe46; background: #3a2400; color: #ffe4a3; }
+.legal-article {
+  padding: 24px; border: 3px solid rgb(255 255 255 / 14%); border-radius: 22px;
+  background: linear-gradient(180deg, #180a2a, #0d0518); color: #e8dcf7;
+  box-shadow: inset 0 3px rgb(255 255 255 / 10%);
+}
+.legal-article h1 { margin: 0 0 4px; font-family: Impact, "Arial Black", sans-serif; font-size: 34px; text-transform: uppercase; color: white; }
+.legal-updated { margin: 0 0 14px; color: #9d8bb8; font-size: 11px; }
+.legal-intro { margin: 0 0 18px; color: #cbb8e6; font-size: 14px; line-height: 1.65; }
+.legal-article h2 { margin: 22px 0 8px; font-size: 17px; color: #ffd23e; }
+.legal-article p { margin: 0 0 9px; font-size: 13px; line-height: 1.7; }
+.legal-note {
+  margin-top: 24px; padding: 14px 16px; border: 2px solid rgb(255 190 70 / 40%);
+  border-radius: 14px; background: rgb(58 36 0 / 55%); color: #ffe4a3;
+  font-size: 12px; line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .age-gate { padding: 12px; align-items: start; }
+  .age-gate-panel { padding: 20px 16px; border-radius: 20px; }
+  .age-gate-panel h1 { font-size: 24px; }
+  .legal-page { padding: 18px 10px 40px; }
+  .legal-article { padding: 18px 15px; border-radius: 18px; }
+  .legal-article h1 { font-size: 26px; }
+  .legal-footer { margin-top: 18px; padding: 16px 12px calc(84px + env(safe-area-inset-bottom)); }
+}
