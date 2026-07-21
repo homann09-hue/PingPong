@@ -145,7 +145,8 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(audit.rows[0]?.server_version).toBeTruthy();
     expect(events.rows[0]?.count).toBe("1");
     const transactions = await store.listWalletTransactions(playerId, 10);
-    expect(transactions).toHaveLength(2);
+    // Seit der Multi-Currency-Economy (024) legt jeder Spin zusaetzlich Progression-Waehrungs-Ledger an.
+    expect(transactions.filter((entry) => entry.currency === "coin")).toHaveLength(2);
     expect(transactions.every((entry) => entry.balanceAfter === entry.balanceBefore + entry.amount)).toBe(true);
     const missions = await store.getMissions(playerId, new Date());
     expect(missions.find((mission) => mission.id === missionId)).toMatchObject({ progress: 1, completed: true, claimed: false });
