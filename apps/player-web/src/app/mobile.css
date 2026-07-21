@@ -214,3 +214,29 @@
   /* Etwas flacher, damit der Abstand die Seite nicht unnoetig verlaengert. */
   .reel-frame { min-height: min(36vh, 290px); }
 }
+/* ---------- Tippziele in der Lobby ---------- */
+
+/* Gemessen auf 402px: die Kategorie-Chips (38px hoch) und der Coin-Kauf-Knopf
+   (32px) lagen unter der 44px-Grenze. Beides ist haeufig getippte Steuerung,
+   nicht Beiwerk. Die Fusszeilen-Textlinks bleiben klein — sie sind Fliesstext,
+   kein Bedienelement, und 44px hohe Rechtslinks saehen falsch aus. */
+
+@media (pointer: coarse) {
+  .category-row button {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+
+  /* Der Plus-Knopf sitzt im Wallet-Pill; er vergroessert das Tippfeld, ohne
+     das Pill-Layout zu sprengen. */
+  .wallet-pill a,
+  .wallet-pill button {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .category-row { touch-action: pan-x; }
+}
