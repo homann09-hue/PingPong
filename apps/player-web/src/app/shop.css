@@ -98,3 +98,18 @@
   .shop-card { padding: 14px 10px; }
   .shop-coins { font-size: 1.05rem; }
 }
+
+/* Event-Meilensteine: erreichte, aber noch nicht abgeholte Stufen bekommen
+   einen Knopf statt eines Hakens. Ein Haken suggeriert Erledigung — solange
+   die Belohnung im Server liegt, ist nichts erledigt. */
+
+.milestone-claim {
+  padding: 4px 12px;
+  min-height: 0;
+  font-size: 0.72rem;
+  border-radius: 999px;
+}
+
+.event-card li.claimed {
+  opacity: 0.55;
+}
