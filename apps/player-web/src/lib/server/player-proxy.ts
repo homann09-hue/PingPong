@@ -25,6 +25,15 @@ const allowedRoutes = [
   /^rewards\/(hourly|daily)$/,
   /^rewards\/(hourly|daily)\/claim$/,
   /^rewards\/[a-z0-9-]+\/claims$/,
+  // Boost-Center: Sammelmarken, Booster, Loyalitaetstausch und High Roller Club.
+  /^economy\/check-win$/,
+  /^economy\/check-win\/claim$/,
+  /^economy\/boosters$/,
+  /^economy\/boosters\/(craft|activate)$/,
+  /^economy\/loyalty-rewards$/,
+  /^economy\/loyalty-rewards\/[a-z0-9-]+\/redeem$/,
+  /^economy\/high-roller-club$/,
+  /^economy\/high-roller-club\/activate$/,
   /^auth\/(account|sessions|devices|cloud-save|privacy-export|logout-all)$/,
   /^auth\/sessions\/[0-9a-f-]{36}$/,
   /^slots\/[a-z0-9-]+\/paytable$/,
@@ -77,7 +86,8 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   const needsIdempotencyKey = request.method === "POST"
-    && (path.endsWith("/spins") || path.endsWith("/claim") || path.endsWith("/claims"));
+    && (path.endsWith("/spins") || path.endsWith("/claim") || path.endsWith("/claims")
+      || path.endsWith("/craft") || path.endsWith("/activate") || path.endsWith("/redeem"));
   if (needsIdempotencyKey) {
     headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
   }
