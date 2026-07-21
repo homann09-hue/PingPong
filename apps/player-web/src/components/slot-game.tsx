@@ -114,7 +114,10 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     } finally { setSpinning(false); }
   }
 
-  const themeStyle = { "--slot-primary": game.primary, "--slot-secondary": game.secondary } as React.CSSProperties;
+  const themeStyle = { "--slot-primary": game.primary, "--slot-secondary": game.secondary,
+    // Die Cover-Kunst des Slots dient als Blickfang am Bildrand — eigene
+    // Grafik, kein zusaetzliches Asset noetig.
+    "--slot-cover": `url("${game.cover}")` } as React.CSSProperties;
   return <AppShell profile={profile}>
     <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
