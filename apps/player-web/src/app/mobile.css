@@ -198,3 +198,19 @@
   /* Der Rechtshinweis wandert unter die angeheftete Steuerung. */
   .play-money-notice { padding-bottom: 4px; }
 }
+/* ---------- Freiraum unter den Walzen ---------- */
+
+/* Dritte Nachmessung: die angeheftete Steuerung verdeckte 16px der untersten
+   Symbolreihe. Bei einem Slot ist das ein echter Mangel — man muss alle drei
+   Reihen vollstaendig sehen, um eine Gewinnlinie nachvollziehen zu koennen.
+
+   Ursache: bei kurzer Seite haftet die Steuerung ueber ihrer Flussposition
+   und schwebt dadurch ueber das Raster. Der Abstand darunter loest das
+   deterministisch — unabhaengig von Bildschirmhoehe und Inhaltslaenge. */
+
+@media (max-width: 820px) {
+  .reel-frame { margin-bottom: 104px; }
+
+  /* Etwas flacher, damit der Abstand die Seite nicht unnoetig verlaengert. */
+  .reel-frame { min-height: min(36vh, 290px); }
+}
