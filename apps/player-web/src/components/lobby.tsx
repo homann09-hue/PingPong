@@ -9,6 +9,7 @@ import { Diamond } from "@phosphor-icons/react/dist/csr/Diamond";
 import { Fire } from "@phosphor-icons/react/dist/csr/Fire";
 import { Gift } from "@phosphor-icons/react/dist/csr/Gift";
 import { LockKey } from "@phosphor-icons/react/dist/csr/LockKey";
+import { Wrench } from "@phosphor-icons/react/dist/csr/Wrench";
 import { Play } from "@phosphor-icons/react/dist/csr/Play";
 import { Sparkle } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { Star } from "@phosphor-icons/react/dist/csr/Star";
@@ -20,6 +21,7 @@ import { AppShell } from "./app-shell";
 import { games } from "@/lib/catalog";
 import { coinNumber, describeMission, missionTierLabel, timeLeft } from "@/lib/format";
 import { BoostCenter } from "@/components/boost-center";
+import { useSlotAvailability } from "@/hooks/use-slot-availability";
 import { useLobbyData, postClaim } from "@/hooks/use-lobby-data";
 import { usePlayer } from "@/hooks/use-player";
 
@@ -38,6 +40,7 @@ function scrollToSection(id: string) {
 export function Lobby() {
   const { profile, error, refresh } = usePlayer();
   const { missions, events, jackpots, refresh: refreshLobby } = useLobbyData();
+  const slotAvailability = useSlotAvailability();
   const [category, setCategory] = useState<(typeof categories)[number]>("Alle");
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
@@ -127,6 +130,10 @@ export function Lobby() {
         <div className="recent-slot-list">
           {recentlyPlayed.map((game) => {
             const locked = level < game.unlockLevel;
+      const availability = slotAvailability.get(game.id);
+      // Der Server erzwingt die Sperre beim Spin; hier geht es nur darum, dass
+      // der Spieler nicht erst nach dem Klick merkt, dass der Slot nicht laeuft.
+      const offline = availability !== undefined && availability.status !== "live";
             return <Link href={`/slots/${game.id}`} key={game.id} className={locked ? "locked-mini" : ""}>
               <span className="jackpot-number">{locked ? `AB LEVEL ${game.unlockLevel}` : game.name.toUpperCase()}</span>
               <Image src={game.cover} alt={`${game.name} Cover`} width={156} height={92} quality={76} />
@@ -158,10 +165,12 @@ export function Lobby() {
           <div className="game-cover">
             <Image src={game.cover} alt={`${game.name} Slot-Cover`} fill sizes="(max-width: 600px) 66vw, (max-width: 1100px) 33vw, 19vw" quality={78} />
             <div className="game-cover-vignette" />
-            <div className="card-badges">{game.isNew && <span>Neu</span>}{game.highRoller && <span className="vip-badge"><Star weight="fill" /> VIP</span>}</div>
+            <div className="card-badges">{game.isNew && <span>Neu</span>}{game.highRoller && <span className="vip-badge"><Star weight="fill" /> VIP</span>}{offline && <span className="offline-badge">{availability?.status === "maintenance" ? "Wartung" : "Pause"}</span>}</div>
             {locked
               ? <div className="lock-state"><LockKey weight="fill" /><span>Level {game.unlockLevel}</span></div>
-              : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
+              : offline
+                ? <div className="lock-state offline-state"><Wrench weight="fill" /><span>{availability?.message ?? (availability?.status === "maintenance" ? "Kurz in Wartung" : "Derzeit pausiert")}</span></div>
+                : : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
             <div className="game-title"><small>{game.category}</small><h3>{game.name}</h3><p>{game.features}</p></div>
           </div>
         </article>;
