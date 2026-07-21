@@ -561,7 +561,10 @@ export function buildApp(
   app.get("/v1/slots/availability", async (_request, reply) => {
     if (!dependencies.slotAvailabilityStore) return { entries: [] };
     reply.header("cache-control", "public, max-age=30");
-    return { entries: await dependencies.slotAvailabilityStore.list() };
+    const entries = await dependencies.slotAvailabilityStore.list();
+      // Der oeffentliche Endpunkt gibt bewusst kein updatedBy/updatedAt heraus:
+      // wer einen Slot gesperrt hat, geht Spieler nichts an.
+      return { entries: entries.map(({ slotId, status, message }) => ({ slotId, status, message })) };
   });
   app.get("/admin/v1/slots/availability", async (request, reply) => {
     if (!dependencies.slotAvailabilityStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
