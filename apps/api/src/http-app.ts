@@ -346,6 +346,12 @@ export function buildApp(
     const { slotId } = request.params as { slotId: string };
     const config = configs.get(slotId);
     if (!config) return reply.code(404).send({ code: "SLOT_NOT_FOUND" });
+    // Begrenzt automatisierte Spin-Fluten pro Spieler; normales Spiel bleibt unbeeintraechtigt.
+    const spinRate = authRateLimiter.consume(`spin:${playerId}`, 120, 60_000);
+    reply.header("x-ratelimit-remaining", spinRate.remaining);
+    if (!spinRate.allowed) {
+      return reply.header("retry-after", spinRate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    }
     const variableRows = config.features?.variableRows;
     const minimumWays = variableRows?.optionsByReel.reduce((ways, options) => ways * options[0]!, 1);
     const maximumWays = variableRows?.optionsByReel.reduce(
