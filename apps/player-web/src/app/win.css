@@ -1,0 +1,109 @@
+/* Gewinn-Inszenierung: der Moment gehoert dem Gewinn.
+ *
+ * Vorher lag die Feier als absolut positioniertes Element ueber den Walzen —
+ * der Rest der Seite blieb hell und voller Bedienelemente. Dadurch war sie
+ * ein Hinweis, kein Ereignis.
+ *
+ * Jetzt uebernimmt sie den ganzen Bildschirm: die Welt dahinter wird
+ * abgedunkelt, entsaettigt und leicht unscharf, davor stehen Strahlenkranz
+ * und Banner. Das ist derselbe Kniff, den Spielautomaten seit jeher nutzen —
+ * nicht mehr Licht auf den Gewinn, sondern weniger auf alles andere.
+ *
+ * Die Feier bleibt jederzeit wegklickbar; sie haelt niemanden auf.
+ */
+
+.win-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(255, 199, 44, 0.20) 0%,
+      rgba(8, 3, 18, 0.72) 46%, rgba(4, 1, 10, 0.94) 100%);
+  backdrop-filter: blur(4px) saturate(0.45) brightness(0.55);
+  -webkit-backdrop-filter: blur(4px) saturate(0.45) brightness(0.55);
+}
+
+/* Breite Lichtschaefte statt duenner Speichen. Zwei gegenlaeufige Ebenen mit
+   unterschiedlichem Tempo — das erzeugt Flimmern, ohne dass eine einzelne
+   Ebene schnell laufen muss. */
+.win-burst {
+  width: min(160vw, 1400px);
+  background: conic-gradient(from 0deg,
+    transparent 0deg 5deg,
+    rgba(255, 232, 150, 0.34) 5deg 17deg,
+    transparent 17deg 30deg);
+  mask-image: radial-gradient(circle, transparent 8%, black 26%, transparent 72%);
+  animation: arc-rays 16s linear infinite;
+  opacity: 0.9;
+}
+
+.win-celebration::before {
+  content: "";
+  position: absolute;
+  width: min(150vw, 1200px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(from 12deg,
+    transparent 0deg 9deg,
+    rgba(255, 180, 60, 0.22) 9deg 20deg,
+    transparent 20deg 40deg);
+  mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 68%);
+  animation: win-rays-reverse 25s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes win-rays-reverse {
+  to { transform: rotate(-360deg); }
+}
+
+/* Warmer Lichtkern direkt hinter der Schrift, damit das Banner nicht auf dem
+   dunklen Grund flach wirkt. */
+.win-celebration::after {
+  content: "";
+  position: absolute;
+  width: min(90vw, 620px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 214, 92, 0.42) 0%,
+    rgba(255, 140, 40, 0.16) 38%, transparent 68%);
+  animation: win-core-breathe 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes win-core-breathe {
+  0%, 100% { transform: scale(0.94); opacity: 0.82; }
+  50%      { transform: scale(1.06); opacity: 1; }
+}
+
+.win-content {
+  z-index: 3;
+  padding: 0 24px;
+}
+
+/* Je hoeher die Stufe, desto mehr Buehne. */
+.win-celebration.tier-mega .win-burst,
+.win-celebration.tier-epic .win-burst,
+.win-celebration.tier-max .win-burst {
+  animation-duration: 11s;
+  opacity: 1;
+}
+
+.win-celebration.tier-epic,
+.win-celebration.tier-max {
+  backdrop-filter: blur(6px) saturate(0.3) brightness(0.42);
+  -webkit-backdrop-filter: blur(6px) saturate(0.3) brightness(0.42);
+}
+
+.win-hint {
+  margin-top: 14px;
+  opacity: 0.62;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win-burst,
+  .win-celebration::before,
+  .win-celebration::after { animation: none; }
+  .win-celebration { backdrop-filter: brightness(0.6); -webkit-backdrop-filter: brightness(0.6); }
+}
