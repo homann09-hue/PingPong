@@ -73,9 +73,9 @@ Hinweis: `next/image`-Optimierung auf Cloudflare ueber Cloudflare Images oder `i
 
 ## Skalierung auf 100.000+ Nutzer
 
-- **API**: Railway horizontal (Replicas erhoehen). Achtung: der eingebaute `FixedWindowRateLimiter` ist prozess-lokal — ab >1 Replica zusaetzlich Cloudflare Rate Limiting Rules vor `api.<domain>` (z.B. 100 req/min/IP auf `/v1/*`, strenger auf `/v1/auth/*`).
+- **API**: Railway horizontal (Replicas erhoehen). **Umgesetzt:** Die Spin-Route hat ein Per-Player-Limit (120/min, HTTP 429). Der eingebaute `FixedWindowRateLimiter` ist prozess-lokal — ab >1 Replica zusaetzlich Cloudflare Rate Limiting Rules vor `api.<domain>` (z.B. 100 req/min/IP auf `/v1/*`, strenger auf `/v1/auth/*`).
 - **DB**: Supabase Pooler (Transaction Mode); `PostgresSpinStore` nutzt bereits Idempotenz + kurze Transaktionen. Ab ~5k Spins/min: Read-Replicas fuer Profile/Leaderboards.
-- **Push-Worker**: laeuft im Railway-Container weiter (war auf Vercel faktisch tot — Serverless beendet den Interval-Worker!). Bei mehreren Replicas: Worker nur auf einem Service laufen lassen (eigener Railway-Service mit gleichem Image und Env `WORKER_ONLY=true` — kleiner Code-Schalter, siehe offene Punkte).
+- **Push-Worker**: laeuft im Railway-Container weiter (war auf Vercel faktisch tot — Serverless beendet den Interval-Worker). **Umgesetzt:** `PUSH_WORKER_ENABLED` steuert den Start. Bei mehreren Repliken: HTTP-Dienste mit `PUSH_WORKER_ENABLED=false` betreiben und einen dedizierten Worker-Dienst (gleiches Image) mit `PUSH_WORKER_ENABLED=true`. Standard ist `true` (Einzelinstanz).
 - **Metriken**: `/internal/metrics` (Prometheus) an Grafana Cloud Free anbinden; Railway-Logs -> Logtail/Axiom.
 - **Error-Monitoring**: Sentry SDK (`@sentry/node`, `@sentry/nextjs`) — lokal installieren (Lockfile!), DSN als Env. Bis dahin: Fastify-Logger (pino, aktiv) + Vercel/Railway-Logs.
 
