@@ -95,7 +95,7 @@ Volatilitäten: Candy Carnival zahlt oft klein, Pirate Bay selten gross.
 - **2 Slots bis zum DoD-Ziel** von 10. Die Produktionspipeline (Config +
   Feature-Module) steht, es fehlt die inhaltliche Ausarbeitung zweier Themen.
 - **Clans:** Backend-Routen freigeschaltet, keine Oberfläche. Clans
-  sind mit 13 Routen der grösste UI-Rest. (**Korrektur 22.07.:** Turniere haben
+  sind mit 13 Routen der grösste UI-Rest.
 - **Audio:** nur synthetische Töne, kein produziertes Sounddesign.
 - **Admin-Dashboard:** nur Slot-Verfügbarkeit. Der Vollumfang aus Abschnitt 13
   (RTP-Versionierung, Events, Promo-Codes, Telemetrie …) ist offen.
