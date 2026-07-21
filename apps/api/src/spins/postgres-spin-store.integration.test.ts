@@ -23,6 +23,30 @@ function winningSpin(configId: string): SpinResult {
   };
 }
 
+const migrationFiles = [
+  "002_spin_progression.sql",
+  "003_spin_audit.sql",
+  "004_wallet_ledger_audit.sql",
+  "006_timed_rewards.sql",
+  "007_bonus_wheels.sql",
+  "008_missions.sql",
+  "009_mission_tiers.sql",
+  "010_live_events.sql",
+  "011_tournaments.sql",
+  "012_progressive_jackpots.sql",
+  "025_major_progressive_jackpot.sql",
+  "013_shop_purchases.sql",
+  "018_store_monetization.sql",
+  "019_native_store_semantics.sql",
+  "024_multi_currency_economy.sql",
+  "026_check_win_rewards.sql",
+  "027_xp_boosters.sql",
+  "028_loyalty_rewards.sql",
+  "029_mission_tracks.sql",
+  "030_high_roller_club.sql",
+  "031_store_high_roller_points.sql",
+];
+
 databaseSuite("PostgresSpinStore integration", () => {
   const pool = new Pool({ connectionString: databaseUrl });
   const store = new PostgresSpinStore(pool);
@@ -42,86 +66,10 @@ databaseSuite("PostgresSpinStore integration", () => {
       const migration = await readFile(new URL("../../../../infra/postgres/001_core.sql", import.meta.url), "utf8");
       await pool.query(migration);
     }
-    const progressionMigration = await readFile(
-      new URL("../../../../infra/postgres/002_spin_progression.sql", import.meta.url), "utf8",
-    );
-    await pool.query(progressionMigration);
-    const auditMigration = await readFile(
-      new URL("../../../../infra/postgres/003_spin_audit.sql", import.meta.url), "utf8",
-    );
-    await pool.query(auditMigration);
-    const walletLedgerMigration = await readFile(
-      new URL("../../../../infra/postgres/004_wallet_ledger_audit.sql", import.meta.url), "utf8",
-    );
-    await pool.query(walletLedgerMigration);
-    const timedRewardMigration = await readFile(
-      new URL("../../../../infra/postgres/006_timed_rewards.sql", import.meta.url), "utf8",
-    );
-    await pool.query(timedRewardMigration);
-    const wheelMigration = await readFile(
-      new URL("../../../../infra/postgres/007_bonus_wheels.sql", import.meta.url), "utf8",
-    );
-    await pool.query(wheelMigration);
-    const missionMigration = await readFile(
-      new URL("../../../../infra/postgres/008_missions.sql", import.meta.url), "utf8",
-    );
-    await pool.query(missionMigration);
-    const missionTierMigration = await readFile(
-      new URL("../../../../infra/postgres/009_mission_tiers.sql", import.meta.url), "utf8",
-    );
-    await pool.query(missionTierMigration);
-    const liveEventMigration = await readFile(
-      new URL("../../../../infra/postgres/010_live_events.sql", import.meta.url), "utf8",
-    );
-    await pool.query(liveEventMigration);
-    const tournamentMigration = await readFile(
-      new URL("../../../../infra/postgres/011_tournaments.sql", import.meta.url), "utf8",
-    );
-    await pool.query(tournamentMigration);
-    const jackpotMigration = await readFile(
-      new URL("../../../../infra/postgres/012_progressive_jackpots.sql", import.meta.url), "utf8",
-    );
-    await pool.query(jackpotMigration);
-    const majorJackpotMigration = await readFile(
-      new URL("../../../../infra/postgres/025_major_progressive_jackpot.sql", import.meta.url), "utf8",
-    );
-    await pool.query(majorJackpotMigration);
-    const shopMigration = await readFile(
-      new URL("../../../../infra/postgres/013_shop_purchases.sql", import.meta.url), "utf8",
-    );
-    await pool.query(shopMigration);
-    const storeMigration = await readFile(
-      new URL("../../../../infra/postgres/018_store_monetization.sql", import.meta.url), "utf8",
-    );
-    await pool.query(storeMigration);
-    const nativeStoreMigration = await readFile(
-      new URL("../../../../infra/postgres/019_native_store_semantics.sql", import.meta.url), "utf8",
-    );
-    await pool.query(nativeStoreMigration);
-    const multiCurrencyMigration = await readFile(
-      new URL("../../../../infra/postgres/024_multi_currency_economy.sql", import.meta.url), "utf8",
-    );
-    await pool.query(multiCurrencyMigration);
-    const checkWinMigration = await readFile(
-      new URL("../../../../infra/postgres/026_check_win_rewards.sql", import.meta.url), "utf8",
-    );
-    await pool.query(checkWinMigration);
-    const boosterMigration = await readFile(
-      new URL("../../../../infra/postgres/027_xp_boosters.sql", import.meta.url), "utf8",
-    );
-    await pool.query(boosterMigration);
-    const loyaltyMigration = await readFile(
-      new URL("../../../../infra/postgres/028_loyalty_rewards.sql", import.meta.url), "utf8",
-    );
-    await pool.query(loyaltyMigration);
-    const missionTracksMigration = await readFile(
-      new URL("../../../../infra/postgres/029_mission_tracks.sql", import.meta.url), "utf8",
-    );
-    await pool.query(missionTracksMigration);
-    const highRollerMigration = await readFile(
-      new URL("../../../../infra/postgres/030_high_roller_club.sql", import.meta.url), "utf8",
-    );
-    await pool.query(highRollerMigration);
+    for (const file of migrationFiles) {
+      const migration = await readFile(new URL(`../../../../infra/postgres/${file}`, import.meta.url), "utf8");
+      await pool.query(migration);
+    }
     await pool.query("INSERT INTO players (id) VALUES ($1),($2),($3),($4),($5),($6),($7)",
       [playerId, shopPlayerId, concurrentShopPlayerId, storePlayerId, checkWinPlayerId, boostPlayerId, loyaltyPlayerId]);
     await pool.query(
