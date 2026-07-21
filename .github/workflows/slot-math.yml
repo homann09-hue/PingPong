@@ -1,0 +1,37 @@
+name: slot-math
+# Deterministische Slot-Simulationen (Seed = Spin-Index) mit Reports in reports/slot-math/.
+# Manuell startbar (Spins waehlbar: 100000 / 1000000 / 10000000) und woechentlich als Regression.
+on:
+  workflow_dispatch:
+    inputs:
+      spins:
+        description: "Spins pro Slot"
+        required: false
+        default: "100000"
+  schedule:
+    - cron: "0 5 * * 1"
+concurrency:
+  group: slot-math
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build -w @aurora/slot-engine
+      - name: Simulation (alle Slots)
+        run: node scripts/simulate-slots.mjs --spins=${{ inputs.spins || '100000' }} --bet=100 > /tmp/simulation.json
+      - name: Reports erzeugen
+        run: node scripts/slot-math-report.mjs /tmp/simulation.json
+      - name: Reports committen
+        run: |
+          git config user.name "slot-math-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add reports/slot-math
+          git diff --cached --quiet && echo "keine Aenderungen" || git commit -m "Slot-Math-Reports (${{ inputs.spins || '100000' }} Spins/Slot, deterministisch)"
+          git push
