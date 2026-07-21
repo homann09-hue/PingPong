@@ -43,6 +43,13 @@ const storeWebhookToken = process.env.STORE_WEBHOOK_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const demoMode = process.env.DEMO_MODE === "true";
+/**
+ * Der Push-Zustellungs-Worker darf nur in genau einer Instanz laufen, sonst wuerden mehrere
+ * Repliken dieselben Zustellungen greifen. Standard: an (Einzelinstanz-Betrieb).
+ * Bei horizontaler Skalierung: PUSH_WORKER_ENABLED=false auf den HTTP-Repliken setzen und
+ * einen dedizierten Worker-Dienst mit PUSH_WORKER_ENABLED=true betreiben.
+ */
+const pushWorkerEnabled = process.env.PUSH_WORKER_ENABLED !== "false";
 if (!demoMode && (!databaseUrl || !jwtSecret || !adminJwtSecret || !metricsToken
   || !pushTokenEncryptionKey || !pushGatewayUrl || !pushGatewayToken || !storeVerificationUrl || !storeGatewayToken || !storeWebhookToken
   || !supabaseUrl || !supabasePublishableKey)) {
@@ -102,7 +109,12 @@ const appReady = app.ready();
 if (!process.env.VERCEL) {
   try {
     await app.listen({ port, host });
-    pushWorker.start();
+    if (pushWorkerEnabled) {
+      pushWorker.start();
+      app.log.info("Push delivery worker started");
+    } else {
+      app.log.info("Push delivery worker disabled (PUSH_WORKER_ENABLED=false)");
+    }
   } catch (error) {
     app.log.error(error);
     process.exitCode = 1;
