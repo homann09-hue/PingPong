@@ -36,6 +36,7 @@ const allowedRoutes = [
   /^economy\/high-roller-club\/activate$/,
   /^auth\/(account|sessions|devices|cloud-save|privacy-export|logout-all)$/,
   /^auth\/sessions\/[0-9a-f-]{36}$/,
+  /^slots\/availability$/,
   /^slots\/[a-z0-9-]+\/paytable$/,
   /^slots\/[a-z0-9-]+\/spins$/,
 ];
