@@ -46,6 +46,7 @@
         <button class="tab" data-view="moderation" type="button">Moderation</button>
         <button class="tab" data-view="economy" type="button">Players &amp; economy</button>
         <button class="tab" data-view="operations" type="button">Operations</button>
+        <button class="tab" data-view="slots" type="button">Slots</button>
       </nav>
 
       <section id="campaigns-view" class="view" aria-labelledby="campaigns-title">
@@ -116,6 +117,15 @@
         <div id="operations-summary" class="operations-summary"><p class="empty">Connect an operations session to load health data.</p></div>
         <div id="operations-metrics" class="health-grid"></div>
       </section>
+      <section id="slots-view" class="view hidden" aria-labelledby="slots-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">GAME OPERATIONS</p><h2 id="slots-title">Slot availability</h2></div>
+          <button id="refresh-slots" type="button">Refresh</button>
+        </div>
+        <p class="muted">Taking a slot offline is enforced by the server: running spins finish, new bets are rejected with a clear message.</p>
+        <div id="slot-availability" class="campaign-grid"><p class="empty">Connect a publisher session to load slots.</p></div>
+      </section>
+
     </main>
   </body>
 </html>

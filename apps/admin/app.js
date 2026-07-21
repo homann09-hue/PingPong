@@ -1,4 +1,4 @@
-const state = { token: "", campaigns: [], moderationCases: [], players: [], economyGrants: [], operations: null };
+const state = { token: "", campaigns: [], moderationCases: [], players: [], economyGrants: [], operations: null, slots: [] };
 const byId = (id) => document.getElementById(id);
 
 function setStatus(element, message, type = "") {
@@ -16,6 +16,7 @@ function operatorError(error) {
     ECONOMY_GRANT_ALREADY_RESOLVED: "This grant was already resolved.",
     PLAYER_NOT_ACTIVE: "The player is no longer active.",
     OPERATIONS_UNAVAILABLE: "Operational health data is not available on this environment.",
+    SLOT_NOT_FOUND: "This slot is not configured on this environment.",
   };
   return messages[error.message] ?? error.message;
 }
@@ -211,6 +212,59 @@ function formatDuration(value) {
   return `${hours}h ${minutes}m`;
 }
 
+const slotStatusBadge = { live: "published", maintenance: "draft", disabled: "draft" };
+
+/** Betriebsstatus aller konfigurierten Slots laden und darstellen. */
+async function loadSlotAvailability() {
+  const container = byId("slot-availability");
+  container.innerHTML = `<p class="empty">Loading slots…</p>`;
+  try {
+    const body = await api("/admin/v1/slots/availability");
+    state.slots = body.entries;
+    if (!state.slots.length) {
+      container.innerHTML = `<p class="empty">No slots are configured.</p>`;
+      return;
+    }
+    const labels = { live: "LIVE", maintenance: "MAINTENANCE", disabled: "DISABLED" };
+    container.innerHTML = state.slots.map((slot) => `
+      <article class="campaign">
+        <header><div><p class="eyebrow">SLOT</p><h3>${escapeHtml(slot.slotId)}</h3></div><span class="badge ${slotStatusBadge[slot.status] ?? "draft"}">${escapeHtml(labels[slot.status] ?? slot.status)}</span></header>
+        ${slot.message ? `<p class="subtitle">${escapeHtml(slot.message)}</p>` : ""}
+        <div class="meta"><span>${slot.updatedBy ? `Last change by ${escapeHtml(slot.updatedBy)}` : "Never changed"}</span><span>${slot.updatedAt ? formatDate(slot.updatedAt) : "—"}</span></div>
+        <footer>
+          ${slot.status === "live"
+            ? `<button data-slot-status="maintenance" data-slot="${escapeHtml(slot.slotId)}" type="button">Maintenance</button><button data-slot-status="disabled" data-slot="${escapeHtml(slot.slotId)}" type="button">Disable</button>`
+            : `<button class="primary" data-slot-status="live" data-slot="${escapeHtml(slot.slotId)}" type="button">Bring back online</button>`}
+        </footer>
+      </article>`).join("");
+    container.querySelectorAll("[data-slot-status]").forEach((button) =>
+      button.addEventListener("click", () => setSlotStatus(button.dataset.slot, button.dataset.slotStatus)));
+  } catch (error) {
+    container.innerHTML = `<p class="empty">${escapeHtml(operatorError(error))}</p>`;
+  }
+}
+
+/** Status aendern. Sperren verlangen eine Bestaetigung und einen Spielerhinweis. */
+async function setSlotStatus(slotId, status) {
+  let message = null;
+  if (status !== "live") {
+    const verb = status === "maintenance" ? "put into maintenance" : "disable";
+    if (!window.confirm(`Really ${verb} "${slotId}"? Players can no longer place bets on it.`)) return;
+    const note = window.prompt("Optional note shown to players (max. 160 characters):", status === "maintenance" ? "Wartung laeuft, wir sind gleich zurueck." : "");
+    if (note === null) return;
+    message = note.trim().slice(0, 160) || null;
+  }
+  try {
+    await api(`/admin/v1/slots/${encodeURIComponent(slotId)}/availability`, {
+      method: "PUT", body: JSON.stringify({ status, message }),
+    });
+    setStatus(byId("session-status"), `Slot "${slotId}" is now ${status}.`, "success");
+    await loadSlotAvailability();
+  } catch (error) {
+    setStatus(byId("session-status"), operatorError(error), "error");
+  }
+}
+
 function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("hidden", view.id !== `${name}-view`));
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === name));
@@ -218,6 +272,7 @@ function showView(name) {
   if (name === "moderation" && state.token) loadModeration();
   if (name === "economy" && state.token) loadEconomyGrants();
   if (name === "operations" && state.token) loadOperations();
+  if (name === "slots" && state.token) loadSlotAvailability();
 }
 
 function connect(token) {
@@ -243,6 +298,7 @@ byId("refresh-audit").addEventListener("click", loadAudit);
 byId("refresh-moderation").addEventListener("click", loadModeration);
 byId("refresh-grants").addEventListener("click", loadEconomyGrants);
 byId("refresh-operations").addEventListener("click", loadOperations);
+byId("refresh-slots").addEventListener("click", loadSlotAvailability);
 byId("player-search").addEventListener("submit", (event) => { event.preventDefault(); searchPlayers(new FormData(event.currentTarget).get("query")); });
 byId("grant-form").addEventListener("submit", submitGrant);
 byId("cancel-grant").addEventListener("click", () => byId("grant-form").classList.add("hidden"));
