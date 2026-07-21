@@ -50,6 +50,15 @@ Das waere schlechter als der aktuelle, veraltete, aber funktionierende Stand.
 3. Danach pruefen: die Lobby muss acht spielbare Slots zeigen (keine
    "coming soon"-Kacheln), Boost-Center, Gluecksrad und Shop muessen erscheinen.
 
+## Bereits umgesetzt (21.07.2026)
+
+- `AURORA_API_URL` gilt jetzt fuer **alle Umgebungen** statt nur fuer Production.
+  Vorschau-Bereitstellungen erreichen damit dasselbe Backend
+  (`https://aurora-game-api.vercel.app`) und sind erstmals wirklich bedienbar.
+- Die Git-Verbindung von `ping-pong-api` wurde **getrennt** (nicht geloescht —
+  Projekt und Konfiguration bleiben erhalten und lassen sich jederzeit wieder
+  verbinden). Damit loest ein Push nur noch zwei Builds statt drei aus.
+
 ### Dauerhafte Entlastung
 
 - Nicht mehr benoetigte Vercel-Projekte entfernen (Entscheidung liegt beim Betreiber).
