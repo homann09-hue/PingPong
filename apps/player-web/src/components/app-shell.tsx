@@ -100,16 +100,6 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
 
     <main className="page-content">{children}</main>
 
-    <footer className="legal-footer">
-      <p><strong>18+ · Soziales Casinospiel mit virtuellem Spielgeld.</strong> Keine Echtgeldeinsaetze, keine Echtgeldgewinne, keine Auszahlung virtueller Waehrungen. Erfolg hier bedeutet nicht, dass du bei echtem Gluecksspiel ebenso erfolgreich waerst.</p>
-      <nav aria-label="Rechtliche Hinweise">
-        <Link href="/legal/nutzungsbedingungen">Nutzungsbedingungen</Link>
-        <Link href="/legal/datenschutz">Datenschutz</Link>
-        <Link href="/legal/impressum">Impressum</Link>
-        <Link href="/legal/verantwortungsvolles-spielen">Verantwortungsvolles Spielen</Link>
-      </nav>
-    </footer>
-
     <nav className="bottom-nav" aria-label="Mobile Navigation">
       {nav.slice(0, 3).map((item) => { const Icon = item.icon; const active = item.href === "/" && pathname === "/"; return <Link key={item.label} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold"} /><span>{item.label}</span></Link>; })}
       <Link href="/#shop"><ShoppingBag weight="bold" /><span>Shop</span></Link>
