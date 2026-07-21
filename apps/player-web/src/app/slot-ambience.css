@@ -1,0 +1,87 @@
+/* Slot-Umgebung: Tiefe statt Flaechenfarbe.
+ *
+ * Der Hintergrund war eine einzelne Farbflaeche. Dadurch schwebte das Geraet
+ * im Nichts — es gab keinen Raum, in dem es steht.
+ *
+ * Drei Ebenen mit unterschiedlichem Tempo erzeugen Parallaxe: ein sehr
+ * langsamer Farbverlauf als Raum, darueber wandernde Glutpunkte, darueber ein
+ * feines Rauschen. Alle drei sind bewusst langsam — der Blick soll auf den
+ * Walzen bleiben, der Hintergrund darf nur atmen.
+ *
+ * Die Farben kommen aus --slot-primary/--slot-secondary, die das Bauteil je
+ * Slot setzt. Dadurch bekommt jedes Thema seine eigene Stimmung, ohne dass
+ * hier pro Slot etwas gepflegt werden muss.
+ */
+
+.slot-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Ebene 1: der Raum. Zwei grosse, langsam wandernde Lichtquellen. */
+.slot-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(42% 38% at 22% 26%,
+      color-mix(in srgb, var(--slot-primary, #7b2cff) 42%, transparent), transparent 68%),
+    radial-gradient(46% 40% at 78% 72%,
+      color-mix(in srgb, var(--slot-secondary, #ff35dc) 34%, transparent), transparent 70%),
+    radial-gradient(60% 50% at 50% 110%, rgba(0, 0, 0, 0.6), transparent 60%);
+  animation: ambience-drift 38s ease-in-out infinite alternate;
+}
+
+@keyframes ambience-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1.04); }
+  to   { transform: translate3d(2%, 1.5%, 0) scale(1.10); }
+}
+
+/* Ebene 2: Glut. Kleine Lichtpunkte, die langsam nach oben ziehen.
+   Ein einzelnes Element mit wiederholtem Verlauf statt vieler DOM-Knoten —
+   das kostet praktisch nichts und laeuft auch auf schwachen Geraeten. */
+.slot-backdrop .ember-layer,
+.slot-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: -40% 0 -10% 0;
+  background-image:
+    radial-gradient(2px 2px at 12% 90%, rgba(255, 214, 140, 0.85), transparent 60%),
+    radial-gradient(1.5px 1.5px at 28% 74%, rgba(255, 190, 110, 0.7), transparent 60%),
+    radial-gradient(2.5px 2.5px at 46% 96%, rgba(255, 232, 180, 0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 63% 82%, rgba(255, 200, 120, 0.75), transparent 60%),
+    radial-gradient(2px 2px at 81% 92%, rgba(255, 224, 160, 0.65), transparent 60%),
+    radial-gradient(1.5px 1.5px at 93% 78%, rgba(255, 190, 100, 0.7), transparent 60%);
+  background-size: 100% 50%;
+  background-repeat: repeat-y;
+  animation: ambience-embers 26s linear infinite;
+  opacity: 0.55;
+}
+
+@keyframes ambience-embers {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+
+/* Vignette: zieht den Blick zur Mitte, ohne dass man sie bemerkt. */
+.slot-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, transparent 42%, rgba(3, 1, 10, 0.55) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-backdrop::before,
+  .slot-backdrop::after { animation: none; }
+}
+
+/* Auf sehr schmalen Geraeten die Glutebene weglassen: dort ist die Flaeche
+   klein, der Effekt kaum sichtbar, die Fuellrate aber knapp. */
+@media (max-width: 480px) {
+  .slot-backdrop::after { display: none; }
+}
