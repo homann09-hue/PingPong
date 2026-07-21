@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "@aurora/design-tokens/tokens.css";
 import "./globals.css";
 import "./fixes.css";
+import { AgeGate } from "@/components/age-gate";
 
 export const metadata: Metadata = {
   title: { default: "Aurora Casino", template: "%s · Aurora Casino" },
@@ -29,5 +30,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="de" data-scroll-behavior="smooth"><body>{children}</body></html>;
+  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate />{children}</body></html>;
 }
