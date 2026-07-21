@@ -20,7 +20,6 @@
     radial-gradient(circle at 50% 44%, rgba(255, 199, 44, 0.20) 0%,
       rgba(8, 3, 18, 0.72) 46%, rgba(4, 1, 10, 0.94) 100%);
   backdrop-filter: blur(4px) saturate(0.45) brightness(0.55);
-  -webkit-backdrop-filter: blur(4px) saturate(0.45) brightness(0.55);
 }
 
 /* Breite Lichtschaefte statt duenner Speichen. Zwei gegenlaeufige Ebenen mit
@@ -91,7 +90,6 @@
 .win-celebration.tier-epic,
 .win-celebration.tier-max {
   backdrop-filter: blur(6px) saturate(0.3) brightness(0.42);
-  -webkit-backdrop-filter: blur(6px) saturate(0.3) brightness(0.42);
 }
 
 .win-hint {
@@ -105,5 +103,4 @@
   .win-burst,
   .win-celebration::before,
   .win-celebration::after { animation: none; }
-  .win-celebration { backdrop-filter: brightness(0.6); -webkit-backdrop-filter: brightness(0.6); }
 }
