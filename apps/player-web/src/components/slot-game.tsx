@@ -19,6 +19,7 @@ import type { Paytable } from "@/lib/paytable";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
 import { coinNumber } from "@/lib/format";
 import { usePlayer } from "@/hooks/use-player";
+import { WinCelebration, winTierFor } from "./win-celebration";
 
 const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
@@ -59,6 +60,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [sound, setSound] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
+  const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
@@ -79,7 +81,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setWinCells(new Set()); setWin(0); setMessage("Walzen drehen …");
+    setSpinning(true); setWinCells(new Set()); setWin(0); setCelebration(null); setMessage("Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -97,6 +99,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       if (body.spin.totalWin > 0) {
         setMessage(`${body.spin.winClass ?? "GEWINN"} · ${coinNumber(body.spin.totalWin)} Coins`);
         if (sound) playTones([523, 659, 784, 1047], 0.1, "triangle", 0.05);
+        const tier = winTierFor(body.spin.winClass, body.spin.totalWin / bet);
+        if (tier) setCelebration({ tier, amount: body.spin.totalWin });
       } else {
         setMessage("Versuch den naechsten Spin");
       }
@@ -147,6 +151,13 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         <button className="spin-button" onClick={spin} disabled={spinning || !profile} aria-label={spinning ? "Walzen drehen" : `Fuer ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? "Dreht" : "Spin"}</span></button>
         <button className="auto-button" disabled><ArrowsClockwise weight="bold" /><span>Auto<em>Bald</em></span></button>
       </div>
+      {celebration?.tier && <WinCelebration
+        tier={celebration.tier}
+        amount={celebration.amount}
+        primary={game.primary}
+        secondary={game.secondary}
+        onDone={() => setCelebration(null)}
+      />}
       <p className="play-money-notice">Nur zur Unterhaltung · Virtuelle Coins haben keinen Geldwert · Ergebnisse kommen vom Server</p>
 
       {infoOpen && <div className="paytable-overlay" role="dialog" aria-modal="true" aria-label="Gewinntabelle" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}>
