@@ -218,11 +218,24 @@ export function Lobby() {
         {events.map((event) => <article className="event-card" key={event.id}>
           <header><strong>{event.title}</strong><small>{timeLeft(event.endsAt) ? `endet in ${timeLeft(event.endsAt)}` : "laeuft"}</small></header>
           <p>{event.subtitle}</p>
-          <ul>{event.milestones.map((milestone) => <li key={milestone.id} className={milestone.completed ? "done" : ""}>
-            <span>{coinNumber(milestone.target)}</span>
-            <b>+{coinNumber(milestone.rewardCoins)}</b>
-            {milestone.completed && <CheckCircle weight="fill" />}
-          </li>)}</ul>
+          <ul>{event.milestones.map((milestone) => {
+            // Abholbar heisst: erreicht und noch nicht eingeloest. Der Server
+            // entscheidet endgueltig — hier geht es nur um die Anzeige.
+            const claimable = milestone.completed && !milestone.claimed;
+            return <li key={milestone.id} className={milestone.claimed ? "done claimed" : milestone.completed ? "done" : ""}>
+              <span>{coinNumber(milestone.target)}</span>
+              <b>+{coinNumber(milestone.rewardCoins)}</b>
+              {claimable
+                ? <button
+                    className="claim-button milestone-claim"
+                    disabled={busy !== null}
+                    onClick={() => void claim(milestone.id, `/api/player/events/${event.id}/milestones/${milestone.id}/claim`)}
+                  >{busy === milestone.id ? "…" : "Abholen"}</button>
+                : milestone.claimed
+                  ? <CheckCircle weight="fill" />
+                  : null}
+            </li>;
+          })}</ul>
         </article>)}
         {tournament && <article className="event-card tournament-card">
           <header><strong>{tournament.name}</strong><small>Preispool {coinNumber(tournament.prizePool)}</small></header>
