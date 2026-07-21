@@ -34,7 +34,7 @@ In-App-Kaeufe und Rewarded Ads fehlen und sind kein CSS-Nachmittag.
 | Missionen | **Ja** — server-abgeleitet (ADR 0011) |
 | Shop technisch | **Teilweise** — Gems→Coins funktioniert, echte IAP fehlen |
 | Rewarded Ads | **Nein** — Backend-Routen frei, keine Ad-Integration |
-_(Turniere sind doch fertig: die Lobby rendert Name, Preispool, Rangliste und eigenen Rang aus `profile.tournament` — meine urspruengliche Aussage hier war falsch.)_
+
 
 | Adminpanel | **Teilweise** — Slot-Verfügbarkeit/Wartung; nicht der volle Umfang aus Abschnitt 13 |
 | Keine kritischen Sicherheitslücken | **Kein Exploit im Spin/Wallet-Pfad gefunden** — aber kein formales security-audit.md |
