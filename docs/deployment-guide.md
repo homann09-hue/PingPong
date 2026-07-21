@@ -52,6 +52,16 @@ Das waere schlechter als der aktuelle, veraltete, aber funktionierende Stand.
 
 ## Bereits umgesetzt (21.07.2026)
 
+- **Neues Projekt `aurora-player-web-live`** angelegt (Root `apps/player-web`,
+  Preset Next.js, `AURORA_API_URL` fuer Production und Preview gesetzt).
+  Grund: die Kontingentsperre gilt **pro Projekt**, nicht pro Konto — waehrend
+  `aurora-player-web` gesperrt war, hat `aurora-game-api` im selben Moment
+  problemlos deployt. Ein frisches Projekt hat ein eigenes Kontingent.
+  URL: `aurora-player-web-live.vercel.app`.
+- Die alte Domain `aurora-player-web.vercel.app` bleibt vorerst am alten Projekt.
+  Das Umhaengen ist eine bewusste Entscheidung und wurde nicht ungefragt gemacht.
+
+
 - `AURORA_API_URL` gilt jetzt fuer **alle Umgebungen** statt nur fuer Production.
   Vorschau-Bereitstellungen erreichen damit dasselbe Backend
   (`https://aurora-game-api.vercel.app`) und sind erstmals wirklich bedienbar.
