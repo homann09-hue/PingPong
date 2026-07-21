@@ -25,6 +25,9 @@ const allowedRoutes = [
   /^rewards\/(hourly|daily)$/,
   /^rewards\/(hourly|daily)\/claim$/,
   /^rewards\/[a-z0-9-]+\/claims$/,
+  // Glucksrad: Status und Dreh. Das Segment bestimmt ausschliesslich der Server.
+  /^rewards\/wheels\/standard$/,
+  /^rewards\/wheels\/standard\/spin$/,
   // Boost-Center: Sammelmarken, Booster, Loyalitaetstausch und High Roller Club.
   /^economy\/check-win$/,
   /^economy\/check-win\/claim$/,
@@ -88,7 +91,8 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
   if (contentType) headers.set("content-type", contentType);
   const needsIdempotencyKey = request.method === "POST"
     && (path.endsWith("/spins") || path.endsWith("/claim") || path.endsWith("/claims")
-      || path.endsWith("/craft") || path.endsWith("/activate") || path.endsWith("/redeem"));
+      || path.endsWith("/craft") || path.endsWith("/activate") || path.endsWith("/redeem")
+      || path.endsWith("/spin"));
   if (needsIdempotencyKey) {
     headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
   }

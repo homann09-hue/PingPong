@@ -20,6 +20,7 @@ import { useState } from "react";
 import { AppShell } from "./app-shell";
 import { games } from "@/lib/catalog";
 import { coinNumber, describeMission, missionTierLabel, timeLeft } from "@/lib/format";
+import { LuckyWheel } from "@/components/lucky-wheel";
 import { BoostCenter } from "@/components/boost-center";
 import { useSlotAvailability } from "@/hooks/use-slot-availability";
 import { useLobbyData, postClaim } from "@/hooks/use-lobby-data";
@@ -233,6 +234,8 @@ export function Lobby() {
         {events.length === 0 && !tournament && <p className="section-empty">Events werden geladen …</p>}
       </div>
     </section>
+
+    <LuckyWheel onRewardGranted={refreshLobby} />
 
     <section className="lobby-section" id="rewards" aria-labelledby="rewards-title">
       <div className="section-heading">

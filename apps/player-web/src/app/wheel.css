@@ -1,0 +1,117 @@
+/* Glucksrad. Die Drehung laeuft ueber eine lange Ease-Out-Kurve, damit das Rad
+   am Ende sichtbar auslaeuft statt abrupt zu stoppen — das ist der Teil, der
+   sich nach Gluck anfuehlt. Bei prefers-reduced-motion faellt sie ganz weg. */
+
+.wheel-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 199, 44, 0.22);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 199, 44, 0.16), transparent 60%),
+    linear-gradient(180deg, rgba(22, 14, 40, 0.95), rgba(9, 7, 20, 0.97));
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45);
+}
+
+.wheel-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.wheel-head strong {
+  font-size: 1.05rem;
+  color: #ffc72c;
+  font-variant-numeric: tabular-nums;
+}
+
+.wheel-stage {
+  position: relative;
+  width: min(280px, 76vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.wheel-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 6px solid rgba(255, 199, 44, 0.85);
+  box-shadow:
+    0 0 0 3px rgba(9, 7, 20, 0.9),
+    0 0 34px rgba(255, 199, 44, 0.32),
+    inset 0 0 26px rgba(0, 0, 0, 0.55);
+  transition: transform 4s cubic-bezier(0.12, 0.72, 0.12, 1);
+  will-change: transform;
+}
+
+.wheel-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: 0 0;
+  width: 96px;
+  margin: -10px 0 0 -48px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0b0718;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+.wheel-label.gem { color: #06212a; }
+
+.wheel-pointer {
+  position: absolute;
+  top: -6px;
+  z-index: 2;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 22px solid #ffc72c;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+}
+
+.wheel-hub {
+  position: relative;
+  z-index: 1;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 34%, #fff3c4, #ffc72c 55%, #b8860b);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+}
+
+.wheel-result {
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: #0b0718;
+  background: linear-gradient(120deg, #ffe07a, #ffc72c);
+  animation: arc-win-pop 420ms ease-out;
+}
+
+.wheel-error {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(255, 182, 182, 0.92);
+  text-align: center;
+  max-width: 30ch;
+}
+
+.wheel-button { min-width: 180px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-disc { transition: none; }
+  .wheel-result { animation: none; }
+}
