@@ -12,6 +12,8 @@ import { PostgresSocialStore } from "./social/postgres-social-store.js";
 import { AdminJwtAuthenticator, DemoAdminAuthenticator } from "./admin/admin-auth.js";
 import { InMemoryLiveOpsStore } from "./liveops/in-memory-liveops-store.js";
 import { PostgresLiveOpsStore } from "./liveops/postgres-liveops-store.js";
+import { InMemorySlotAvailabilityStore } from "./liveops/slot-availability-store.js";
+import { PostgresSlotAvailabilityStore } from "./liveops/postgres-slot-availability-store.js";
 import { InMemoryAnalyticsStore } from "./analytics/in-memory-analytics-store.js";
 import { PostgresAnalyticsStore } from "./analytics/postgres-analytics-store.js";
 import { PrometheusOperationalMetrics } from "./observability/operational-metrics.js";
@@ -91,6 +93,7 @@ const app = buildApp({
   spinStore,
   socialStore,
   liveOpsStore: demoMode ? new InMemoryLiveOpsStore() : PostgresLiveOpsStore.connect(databaseUrl!),
+  slotAvailabilityStore: demoMode ? new InMemorySlotAvailabilityStore() : PostgresSlotAvailabilityStore.connect(databaseUrl!),
   economyAdminStore,
   operationsStore,
   adminAuthenticator: demoMode ? new DemoAdminAuthenticator() : new AdminJwtAuthenticator(adminJwtSecret!),

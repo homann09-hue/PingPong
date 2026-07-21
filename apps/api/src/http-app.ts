@@ -13,6 +13,7 @@ import type { SpinStore } from "./spins/spin-store.js";
 import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spins/spin-store.js";
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
+import type { SlotAvailabilityStore, SlotStatus } from "./liveops/slot-availability-store.js";
 import { standardWheel } from "./rewards/bonus-wheel.js";
 import { activeShopOffers } from "./shop/shop-catalog.js";
 import type { SocialStore } from "./social/social-store.js";
@@ -40,6 +41,10 @@ export function createHttpLoggerOptions() {
   return { redact: ["req.headers.authorization", "req.headers.cookie"] };
 }
 
+const slotAvailabilityBody = z.object({
+  status: z.enum(["live", "maintenance", "disabled"]),
+  message: z.string().trim().max(160).optional().nullable(),
+});
 const spinBody = z.object({
   bet: z.number().int().min(1).max(1_000_000),
   bonusBuy: z.boolean().optional().default(false),
@@ -153,6 +158,7 @@ export interface AppDependencies {
   readonly socialStore?: SocialStore;
   readonly adminAuthenticator?: AdminAuthenticator;
   readonly liveOpsStore?: LiveOpsStore;
+  readonly slotAvailabilityStore?: SlotAvailabilityStore;
   readonly economyAdminStore?: EconomyAdminStore;
   readonly operationsStore?: OperationsStore;
   readonly analyticsStore?: AnalyticsStore;
@@ -551,6 +557,35 @@ export function buildApp(
       if (error instanceof PushCampaignNotPublishableError) return reply.code(409).send({ code: "CAMPAIGN_NOT_PUBLISHED" });
       throw error;
     }
+  });
+  app.get("/v1/slots/availability", async (_request, reply) => {
+    if (!dependencies.slotAvailabilityStore) return { entries: [] };
+    reply.header("cache-control", "public, max-age=30");
+    return { entries: await dependencies.slotAvailabilityStore.list() };
+  });
+  app.get("/admin/v1/slots/availability", async (request, reply) => {
+    if (!dependencies.slotAvailabilityStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAnyAdminRole(principal.roles, ["liveops_auditor", "liveops_publisher", "operations_viewer"])) return reply.code(403).send({ code: "FORBIDDEN" });
+    const configured = [...configs.keys()].sort();
+    const stored = new Map((await dependencies.slotAvailabilityStore.list()).map((entry) => [entry.slotId, entry]));
+    return { entries: configured.map((slotId) => stored.get(slotId) ?? { slotId, status: "live", message: null, updatedBy: null, updatedAt: null }) };
+  });
+  app.put("/admin/v1/slots/:slotId/availability", async (request, reply) => {
+    if (!dependencies.slotAvailabilityStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
+    const principal = await dependencies.adminAuthenticator.authenticate(request.headers.authorization);
+    if (!principal) return reply.code(401).send({ code: "UNAUTHORIZED" });
+    if (!hasAdminRole(principal.roles, "liveops_publisher")) return reply.code(403).send({ code: "FORBIDDEN" });
+    const { slotId } = request.params as { slotId: string };
+    if (!configs.has(slotId)) return reply.code(404).send({ code: "SLOT_NOT_FOUND" });
+    const body = slotAvailabilityBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ code: "INVALID_REQUEST", issues: body.error.issues });
+    const { previous, current } = await dependencies.slotAvailabilityStore.set({
+      slotId, status: body.data.status as SlotStatus, message: body.data.message ?? null, actor: principal.subject,
+    }, new Date());
+    request.log.info({ slotId, previousStatus: previous.status, status: current.status, actor: principal.subject }, "slot availability changed");
+    return current;
   });
   app.get("/admin/v1/audit", async (request, reply) => {
     if (!dependencies.liveOpsStore || !dependencies.adminAuthenticator) return reply.code(503).send({ code: "ADMIN_UNAVAILABLE" });
@@ -1128,6 +1163,16 @@ export function buildApp(
     const config = configs.get(slotId);
     if (!config) return reply.code(404).send({ code: "SLOT_NOT_FOUND" });
     // Begrenzt automatisierte Spin-Fluten pro Spieler; normales Spiel bleibt unbeeintraechtigt.
+    // Betriebsstatus ist server-authoritativ: gesperrte Slots nehmen keine Einsaetze an.
+    if (dependencies.slotAvailabilityStore) {
+      const availability = await dependencies.slotAvailabilityStore.get(slotId);
+      if (availability.status !== "live") {
+        return reply.code(503).send({
+          code: availability.status === "maintenance" ? "SLOT_UNDER_MAINTENANCE" : "SLOT_DISABLED",
+          message: availability.message,
+        });
+      }
+    }
     const spinRate = authRateLimiter.consume(`spin:${playerId}`, 120, 60_000);
     reply.header("x-ratelimit-remaining", spinRate.remaining);
     if (!spinRate.allowed) {
