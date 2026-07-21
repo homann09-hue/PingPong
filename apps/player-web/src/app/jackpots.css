@@ -72,7 +72,11 @@
     padding-right: 202px;
   }
 
-  .jackpot-strip {
+  /* Spezifitaet: slot-theme.css setzt ueber
+     .slot-stage > :not(.slot-backdrop, .slot-overlay) { position: relative }
+     eine hoehere Spezifitaet (0,2,0). Ein blosses .jackpot-strip (0,1,0)
+     verliert dagegen unabhaengig von der Reihenfolge — daher der Kindselektor. */
+  .slot-stage > .jackpot-strip {
     position: absolute;
     top: 84px;
     right: 16px;
