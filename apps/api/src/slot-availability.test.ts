@@ -38,11 +38,11 @@ describe("Slot availability", () => {
 
   it("rejects unknown slots and invalid states on the admin route", async () => {
     const unknown = await app.inject({ method: "PUT", url: "/admin/v1/slots/does-not-exist/availability",
-      headers: { authorization: "Bearer demo-liveops_publisher" }, payload: { status: "maintenance" } });
+      headers: { authorization: "Bearer local-admin-publisher" }, payload: { status: "maintenance" } });
     expect(unknown.statusCode).toBe(404);
 
     const invalid = await app.inject({ method: "PUT", url: "/admin/v1/slots/vegas-gold/availability",
-      headers: { authorization: "Bearer demo-liveops_publisher" }, payload: { status: "paused" } });
+      headers: { authorization: "Bearer local-admin-publisher" }, payload: { status: "paused" } });
     expect(invalid.statusCode).toBe(400);
   });
 
