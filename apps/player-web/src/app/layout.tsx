@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   title: { default: "Aurora Casino", template: "%s · Aurora Casino" },
   description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events, Jackpots und geteiltem Fortschritt.",
   applicationName: "Aurora Casino",
+  metadataBase: new URL("https://aurora-player-web.vercel.app"),
+  alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/assets/ui/player-avatar.png",
