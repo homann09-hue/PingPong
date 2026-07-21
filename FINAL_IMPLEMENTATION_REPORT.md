@@ -34,6 +34,8 @@ In-App-Kaeufe und Rewarded Ads fehlen und sind kein CSS-Nachmittag.
 | Missionen | **Ja** — server-abgeleitet (ADR 0011) |
 | Shop technisch | **Teilweise** — Gems→Coins funktioniert, echte IAP fehlen |
 | Rewarded Ads | **Nein** — Backend-Routen frei, keine Ad-Integration |
+
+
 | Adminpanel | **Teilweise** — Slot-Verfügbarkeit/Wartung; nicht der volle Umfang aus Abschnitt 13 |
 | Keine kritischen Sicherheitslücken | **Kein Exploit im Spin/Wallet-Pfad gefunden** — aber kein formales security-audit.md |
 | Keine TypeScript-/Buildfehler | **Ja** — CI grün |
@@ -92,7 +94,7 @@ Volatilitäten: Candy Carnival zahlt oft klein, Pirate Bay selten gross.
 
 - **2 Slots bis zum DoD-Ziel** von 10. Die Produktionspipeline (Config +
   Feature-Module) steht, es fehlt die inhaltliche Ausarbeitung zweier Themen.
-- **Turniere und Clans:** Backend-Routen freigeschaltet, keine Oberfläche. Clans
+- **Clans:** Backend-Routen freigeschaltet, keine Oberfläche. Clans
   sind mit 13 Routen der grösste UI-Rest.
 - **Audio:** nur synthetische Töne, kein produziertes Sounddesign.
 - **Admin-Dashboard:** nur Slot-Verfügbarkeit. Der Vollumfang aus Abschnitt 13
@@ -126,7 +128,7 @@ Volatilitäten: Candy Carnival zahlt oft klein, Pirate Bay selten gross.
 2. Native Auth-Umstellung (Stufe 2) — der eigentliche Store-Blocker.
 3. `Capacitor einrichten.command` ausführen → Gerätebuild → TestFlight.
 4. Slots 9 und 10 ausarbeiten.
-5. Turnier- und Clan-Oberfläche.
+5. Clan-Oberfläche (Turniere sind bereits in der Lobby umgesetzt).
 6. IAP- und Rewarded-Ads-Brücken.
 7. security-audit.md / threat-model.md verschriftlichen, Sentry anschliessen.
 
