@@ -34,3 +34,22 @@ describe("player BFF allowlist: economy", () => {
     expect(isAllowedPlayerPath(path)).toBe(false);
   });
 });
+
+/**
+ * Der Verfuegbarkeits-Endpunkt ist oeffentlich und darf durch, aber er darf die
+ * Tuer nicht fuer die Admin-Variante derselben Ressource oeffnen.
+ */
+describe("player BFF allowlist: slot availability", () => {
+  it("laesst die oeffentliche Verfuegbarkeitsliste durch", () => {
+    expect(isAllowedPlayerPath("slots/availability")).toBe(true);
+  });
+
+  it.each([
+    "slots",
+    "slots/availability/all",
+    "admin/v1/slots/availability",
+    "slots/dragon-peak/availability",
+  ])("blockiert %s", (path) => {
+    expect(isAllowedPlayerPath(path)).toBe(false);
+  });
+});
