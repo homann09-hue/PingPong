@@ -1,0 +1,97 @@
+/* Wallet-Historie im Konto.
+ *
+ * Eine Ledger-Zeile hat vier Spalten: Richtungspfeil, Grund + Zeit, Betrag +
+ * Waehrung, Kontostand danach. Gutschriften gruen, Abbuchungen gedaempft —
+ * die Farbe traegt die Information, damit man die Liste ueberfliegen kann. */
+
+.ledger-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: 30px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ledger-row + .ledger-row { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+
+.ledger-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 0.9rem;
+}
+
+.ledger-row.credit .ledger-icon {
+  color: #0b0718;
+  background: linear-gradient(160deg, #94ff4d, #35c46b);
+}
+
+.ledger-row.debit .ledger-icon {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.ledger-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ledger-main strong {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledger-main small { color: rgba(255, 255, 255, 0.5); font-size: 0.72rem; }
+
+.ledger-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-row.credit .ledger-amount strong { color: #94ff4d; }
+.ledger-row.debit .ledger-amount strong { color: rgba(255, 255, 255, 0.78); }
+.ledger-amount small { color: rgba(255, 255, 255, 0.42); font-size: 0.66rem; letter-spacing: 0.04em; }
+
+/* Kontostand danach: bewusst leise — Kontext, nicht Hauptzahl. */
+.ledger-balance {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+  text-align: right;
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #ffc72c;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Auf schmalen Geraeten ist die Kontostand-Spalte am ehesten verzichtbar —
+   die eigentliche Buchung (Grund, Betrag) bleibt vollstaendig. */
+@media (max-width: 420px) {
+  .ledger-row { grid-template-columns: 28px 1fr auto; gap: 10px; }
+  .ledger-balance { display: none; }
+}

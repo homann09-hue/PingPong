@@ -15,6 +15,7 @@ import { WarningCircle } from "@phosphor-icons/react/dist/csr/WarningCircle";
 import { AppShell } from "./app-shell";
 import { usePlayer } from "@/hooks/use-player";
 import { createSupabaseBrowserClient, isSupabaseAuthConfigured } from "@/lib/supabase/browser";
+import { WalletHistory } from "@/components/wallet-history";
 
 type Provider = "apple" | "google" | "email";
 interface Account { playerId: string; status: string; createdAt: string; providers: string[]; isGuest: boolean; cloudSaveVersion: number }
@@ -185,6 +186,8 @@ export function AccountCenter() {
       <section className="account-card device-card"><header><div><span className="account-kicker">Sicherheit</span><h2>Geraete & Sitzungen</h2></div><span>{devices.length} Geraete</span></header><div className="device-list">{sessions.map((session) => <article key={session.id}><DeviceMobile weight="fill" /><div><strong>{session.platform === "web" ? "Webbrowser" : session.platform === "ios" ? "iPhone / iPad" : "Android-Geraet"}</strong><span>Aktiv {new Date(session.lastUsedAt).toLocaleString("de-DE")} · laeuft ab {new Date(session.expiresAt).toLocaleDateString("de-DE")}</span></div><button onClick={() => void revokeSession(session.id)}>Abmelden</button></article>)}</div><button className="danger-outline" onClick={() => void accountAction("logoutAll")}><SignOut weight="bold" /> Auf allen Geraeten abmelden</button></section>
 
       <section className="account-card privacy-card"><header><div><span className="account-kicker">Datenschutz</span><h2>Deine Daten</h2></div></header><button onClick={() => void downloadExport()}><DownloadSimple weight="bold" /><span><strong>Datenexport herunterladen</strong><small>Konto, Wallet-Verlauf, Sitzungen und Spielaktivitaet als JSON</small></span></button><button className="delete-account" onClick={() => void accountAction("delete")}><Trash weight="bold" /><span><strong>Konto loeschen</strong><small>Entfernt den Zugang endgueltig und meldet alle Geraete ab</small></span></button><button className="text-action logout-current" onClick={() => void accountAction("logout")}><SignOut /> Auf diesem Geraet abmelden</button></section>
+
+      <WalletHistory />
     </div>
   </AppShell>;
 }
