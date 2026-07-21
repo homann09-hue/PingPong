@@ -52,14 +52,15 @@ Das waere schlechter als der aktuelle, veraltete, aber funktionierende Stand.
 
 ## Bereits umgesetzt (21.07.2026)
 
-- **Neues Projekt `aurora-player-web-live`** angelegt (Root `apps/player-web`,
-  Preset Next.js, `AURORA_API_URL` fuer Production und Preview gesetzt).
-  Grund: die Kontingentsperre gilt **pro Projekt**, nicht pro Konto — waehrend
-  `aurora-player-web` gesperrt war, hat `aurora-game-api` im selben Moment
-  problemlos deployt. Ein frisches Projekt hat ein eigenes Kontingent.
-  URL: `aurora-player-web-live.vercel.app`.
-- Die alte Domain `aurora-player-web.vercel.app` bleibt vorerst am alten Projekt.
-  Das Umhaengen ist eine bewusste Entscheidung und wurde nicht ungefragt gemacht.
+- **Fehlversuch, dokumentiert statt verschwiegen:** Ich hatte angenommen, die
+  Kontingentsperre gelte pro Projekt, weil `aurora-game-api` noch deployte,
+  waehrend `aurora-player-web` blockiert war. Daraufhin habe ich das Projekt
+  `aurora-player-web-live` angelegt. Der naechste Push zeigte: **die Sperre gilt
+  fuer das gesamte Konto.** Alle drei Projekte melden dieselbe Meldung; der
+  Erfolg von `aurora-game-api` war schlicht der letzte freie Build.
+  Das neue Projekt hilft heute nicht. Seine Git-Verbindung wurde getrennt, damit
+  es morgen kein Kontingent verbraucht. Es bleibt leer bestehen und kann
+  jederzeit geloescht oder wieder verbunden werden.
 
 
 - `AURORA_API_URL` gilt jetzt fuer **alle Umgebungen** statt nur fuer Production.
