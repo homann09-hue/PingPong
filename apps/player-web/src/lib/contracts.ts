@@ -84,6 +84,24 @@ export interface LiveEvent {
   }[];
 }
 
+export interface PaytableSymbol {
+  readonly kind?: string;
+  readonly payouts?: Readonly<Record<string, number>>;
+}
+
+/** Vom Server veroeffentlichte Gewinntabelle eines Slots. */
+export interface Paytable {
+  readonly slotId?: string;
+  readonly version?: number;
+  readonly targetRtp: number;
+  readonly volatility?: string;
+  readonly paylines?: number;
+  readonly maxWinMultiplier?: number;
+  readonly betSteps?: readonly number[];
+  readonly bonusBuyMultiplier?: number | null;
+  readonly symbols?: Readonly<Record<string, PaytableSymbol>>;
+}
+
 export interface SpinWin {
   readonly amount: number;
   readonly cells: readonly [number, number][];
