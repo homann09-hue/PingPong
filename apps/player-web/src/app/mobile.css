@@ -162,3 +162,39 @@
     min-height: min(44vh, 330px);
   }
 }
+/* ---------- Die Steuerung bleibt erreichbar ---------- */
+
+/* Zweite Nachmessung: die Walzen sassen richtig, aber die Steuerung rutschte
+   35px hinter die Navigationsleiste. Grund: die Hoehenrechnung der Buehne
+   kennt den Innenabstand von .page-content nicht.
+
+   Statt weiter mit festen Werten zu rechnen — die bei jeder Layout-Aenderung
+   wieder falsch werden — wird die Steuerung angeheftet. Sie ist damit immer
+   erreichbar, unabhaengig davon, wie die Arithmetik darueber ausgeht. Fuer die
+   wichtigste Schaltflaeche der App ist das die robustere Loesung. */
+
+@media (max-width: 820px) {
+  .slot-stage {
+    /* Feste Hoehe wieder freigeben: die Buehne darf so hoch sein wie noetig,
+       das Anheften uebernimmt die Erreichbarkeit. */
+    height: auto;
+    min-height: 0;
+    padding-bottom: 4px;
+  }
+
+  .slot-controls {
+    position: sticky;
+    bottom: calc(var(--bottom-nav-height, 72px) + env(safe-area-inset-bottom, 0px) + 6px);
+    z-index: 5;
+    border-radius: 16px;
+    /* Undurchsichtig, damit durchlaufende Walzen nicht durchscheinen. */
+    background: linear-gradient(180deg, rgba(14, 8, 30, 0.96), rgba(8, 4, 20, 0.99));
+    box-shadow: 0 -8px 22px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Etwas kleiner, damit das Raster nicht mit der Steuerung um Platz ringt. */
+  .reel-frame { min-height: min(40vh, 310px); }
+
+  /* Der Rechtshinweis wandert unter die angeheftete Steuerung. */
+  .play-money-notice { padding-bottom: 4px; }
+}
