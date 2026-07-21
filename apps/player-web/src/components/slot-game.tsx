@@ -135,7 +135,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         })}
       </div>
       <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
-        {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 70}ms` } as React.CSSProperties}>
+        {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
               fest, bevor sich hier etwas bewegt — die Drehung erzaehlt es nur nach. */}
           <div className="reel-strip" aria-hidden="true">
