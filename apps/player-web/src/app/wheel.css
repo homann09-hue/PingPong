@@ -115,3 +115,75 @@
   .wheel-disc { transition: none; }
   .wheel-result { animation: none; }
 }
+/* ---------- Vollbild: der Dreh ist ein Ereignis ---------- */
+
+/* Solange sich das Rad dreht und solange das Ergebnis steht, uebernimmt es
+   den Bildschirm. In der Lobby bleibt es eine Karte unter vielen — waehrend
+   des Drehens soll es das Einzige sein, was zaehlt. */
+
+.wheel-card.is-live {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 140, 30, 0.20) 0%,
+      rgba(10, 3, 16, 0.86) 44%, rgba(3, 1, 8, 0.97) 100%);
+  backdrop-filter: blur(5px) saturate(0.5) brightness(0.5);
+}
+
+.wheel-card.is-live .wheel-stage {
+  width: min(78vh, 88vw, 520px);
+}
+
+/* Feuerring: zwei gegenlaeufige Ebenen in Rot und Gold, dazu ein Flackern
+   ueber die Deckkraft. Bewusst per Filter unscharf — scharfe Flammen aus
+   Verlaeufen sehen billig aus, weiche Glut nicht. */
+.wheel-card.is-live .wheel-stage::before,
+.wheel-card.is-live .wheel-stage::after {
+  content: "";
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(14px);
+}
+
+.wheel-card.is-live .wheel-stage::before {
+  background: conic-gradient(from 0deg,
+    rgba(255, 60, 0, 0.85), rgba(255, 170, 40, 0.55),
+    rgba(255, 40, 0, 0.9), rgba(255, 200, 80, 0.5),
+    rgba(255, 60, 0, 0.85));
+  animation: wheel-fire 7s linear infinite, wheel-flicker 1.7s ease-in-out infinite;
+}
+
+.wheel-card.is-live .wheel-stage::after {
+  inset: -8%;
+  background: conic-gradient(from 180deg,
+    rgba(255, 214, 92, 0.6), transparent 30%,
+    rgba(255, 120, 20, 0.7), transparent 62%,
+    rgba(255, 214, 92, 0.6));
+  animation: wheel-fire-reverse 11s linear infinite;
+}
+
+@keyframes wheel-fire { to { transform: rotate(360deg); } }
+@keyframes wheel-fire-reverse { to { transform: rotate(-360deg); } }
+
+@keyframes wheel-flicker {
+  0%, 100% { opacity: 0.78; }
+  40%      { opacity: 1; }
+  70%      { opacity: 0.86; }
+}
+
+/* Der Zeiger liegt ueber dem Feuer, sonst verschwindet er darin. */
+.wheel-card.is-live .wheel-pointer { z-index: 4; }
+
+.wheel-card.is-live .wheel-head strong { font-size: 1.25rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-card.is-live .wheel-stage::before,
+  .wheel-card.is-live .wheel-stage::after { animation: none; }
+  .wheel-card.is-live { backdrop-filter: brightness(0.55); }
+}

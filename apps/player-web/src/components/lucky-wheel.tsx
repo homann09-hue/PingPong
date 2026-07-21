@@ -105,7 +105,11 @@ export function LuckyWheel({ onRewardGranted }: Readonly<{ onRewardGranted: () =
     ? `conic-gradient(${segments.map((segment, index) => `${palette[index % palette.length]} ${index * slice}deg ${(index + 1) * slice}deg`).join(", ")})`
     : "none";
 
-  return <div className="wheel-card">
+  // Waehrend der Drehung und solange das Ergebnis steht, uebernimmt das Rad
+    // den Bildschirm. Danach faellt es wieder in die Lobby zurueck.
+    const live = spinning || result !== null;
+  
+    return <div className={live ? "wheel-card is-live" : "wheel-card"}>
     <div className="wheel-head">
       <span className="eyebrow"><Confetti weight="fill" /> Glucksrad</span>
       <strong>{status ? `${status.availableSpins} Dreh${status.availableSpins === 1 ? "" : "s"} frei` : "Laedt …"}</strong>
