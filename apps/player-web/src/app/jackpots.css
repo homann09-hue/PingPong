@@ -1,0 +1,88 @@
+/* Jackpot-Leiter.
+ *
+ * Vorher: vier gleich aussehende Kaesten in einer Zeile ueber den Walzen.
+ * Dadurch war nicht erkennbar, dass es sich um eine Rangfolge handelt — Grand
+ * sah aus wie Mini.
+ *
+ * Jetzt: eine senkrechte Leiter rechts neben dem Geraet, Grand oben, jede
+ * Stufe mit eigener Farbe. Die Reihenfolge im Markup bleibt unveraendert
+ * (Mini zuerst, gut fuer Screenreader); nur die Darstellung wird ueber
+ * order umgekehrt.
+ *
+ * Auf schmalen Geraeten bleibt die Zeile — senkrecht wuerde sie dort den
+ * halben Bildschirm fressen. Die Farbstufung greift aber auch dort.
+ */
+
+.jackpot-strip > span {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--jp, #ffc72c) 55%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--jp, #ffc72c) 26%, transparent) 0%,
+      rgba(10, 5, 24, 0.88) 62%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 18px color-mix(in srgb, var(--jp, #ffc72c) 28%, transparent);
+}
+
+.jackpot-strip > span small {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--jp, #ffc72c) 82%, white);
+}
+
+.jackpot-strip > span strong {
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--jp, #ffc72c) 60%, transparent);
+}
+
+/* Rangfolge: Mini → Minor → Major → Grand im Markup, umgekehrt in der Anzeige. */
+.jackpot-strip > span:nth-child(1) { --jp: #35e8ff; order: 4; }
+.jackpot-strip > span:nth-child(2) { --jp: #a86bff; order: 3; }
+.jackpot-strip > span:nth-child(3) { --jp: #ff5a3c; order: 2; }
+.jackpot-strip > span:nth-child(4) { --jp: #ffc72c; order: 1; }
+
+/* Grand bekommt sichtbar mehr Gewicht als die kleineren Stufen. */
+.jackpot-strip > span:nth-child(4) {
+  padding: 10px 12px;
+  animation: jackpot-grand-glow 3.2s ease-in-out infinite;
+}
+
+.jackpot-strip > span:nth-child(4) strong { font-size: 1.12rem; }
+
+@keyframes jackpot-grand-glow {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 0 16px rgba(255,199,44,0.30); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 0 34px rgba(255,199,44,0.65); }
+}
+
+/* ---------- Senkrechte Leiter ab mittlerer Breite ---------- */
+
+@media (min-width: 980px) {
+  .slot-stage {
+    position: relative;
+    /* Platz reservieren, statt die Leiter ueber die Walzen zu legen. */
+    padding-right: 202px;
+  }
+
+  .jackpot-strip {
+    position: absolute;
+    top: 84px;
+    right: 16px;
+    width: 172px;
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    gap: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jackpot-strip > span:nth-child(4) { animation: none; }
+}
