@@ -16,11 +16,11 @@ import { coinNumber } from "@/lib/format";
  * ein Doppelklick kann nichts doppelt einloesen.
  */
 
-interface CheckWinStatus { marks: number; required?: number; claimable: boolean }
-interface BoosterStatus { stamps: number; canCraft: boolean; activeSpins: number; xpMultiplier?: number; boosters?: number }
-interface LoyaltyOffer { id: string; rewardCurrency: string; rewardAmount: number; costLoyaltyPoints: number; canRedeem: boolean }
+interface CheckWinStatus { marks: number; requiredMarks: number; claimable: boolean; rewardCoins: number; rewardStamps: number }
+interface BoosterStatus { stamps: number; stampsPerBooster: number; boosters: number; activeSpins: number; xpMultiplier: number; canCraft: boolean; canActivate: boolean }
+interface LoyaltyOffer { id: string; title: string; rewardCurrency: string; rewardAmount: number; costLoyaltyPoints: number; canRedeem: boolean }
 interface LoyaltyStatus { loyaltyPoints: number; offers: readonly LoyaltyOffer[] }
-interface HighRollerStatus { points: number; entryPoints?: number; active: boolean; activeUntil?: string | null }
+interface HighRollerStatus { points: number; entryPoints: number; eligible: boolean; active: boolean; activeUntil: string | null }
 
 async function readJson<T>(url: string): Promise<T | null> {
   try {
@@ -89,11 +89,11 @@ export function BoostCenter({ onWalletChanged }: Readonly<{ onWalletChanged: () 
     setBusy(null);
   }
 
-  const marksNeeded = checkWin?.required ?? 5;
+  const marksNeeded = checkWin?.requiredMarks ?? 0;
   const marksProgress = checkWin ? Math.min(100, Math.round((checkWin.marks / Math.max(1, marksNeeded)) * 100)) : 0;
-  const stampsNeeded = 3;
+  const stampsNeeded = booster?.stampsPerBooster ?? 0;
   const stampProgress = booster ? Math.min(100, Math.round((booster.stamps / stampsNeeded) * 100)) : 0;
-  const clubProgress = club?.entryPoints ? Math.min(100, Math.round((club.points / club.entryPoints) * 100)) : 0;
+  const clubProgress = club && club.entryPoints > 0 ? Math.min(100, Math.round((club.points / club.entryPoints) * 100)) : 0;
 
   return <section className="lobby-section" id="boost" aria-labelledby="boost-title">
     <div className="section-heading">
@@ -116,13 +116,13 @@ export function BoostCenter({ onWalletChanged }: Readonly<{ onWalletChanged: () 
         <header><span className="boost-icon stamp"><Stamp weight="fill" /></span><div><strong>Stamps &amp; Booster</strong><small>Drei Stamps ergeben einen Booster.</small></div></header>
         <p className="boost-value">{booster ? `${booster.stamps} / ${stampsNeeded}` : "—"}</p>
         <span className="progress-track"><i style={{ width: `${stampProgress}%` }} /></span>
-        {booster && booster.activeSpins > 0 && <p className="boost-active">Aktiv: {booster.activeSpins} Spins mit {booster.xpMultiplier ?? 2}× XP</p>}
+        {booster && booster.activeSpins > 0 && <p className="boost-active">Aktiv: {booster.activeSpins} Spins mit {booster.xpMultiplier}× XP</p>}
         <div className="boost-actions">
           <button className="claim-button" disabled={busy !== null || !booster?.canCraft}
             onClick={() => void run("craft", "/api/player/economy/boosters/craft", "Booster hergestellt.")}>
             {busy === "craft" ? "…" : "Herstellen"}
           </button>
-          <button className="claim-button ghost" disabled={busy !== null || !(booster?.boosters ?? 0)}
+          <button className="claim-button ghost" disabled={busy !== null || !booster?.canActivate}
             onClick={() => void run("activate", "/api/player/economy/boosters/activate", "Booster aktiviert — 20 Spins mit doppelter Erfahrung.")}>
             {busy === "activate" ? "…" : "Aktivieren"}
           </button>
@@ -131,10 +131,10 @@ export function BoostCenter({ onWalletChanged }: Readonly<{ onWalletChanged: () 
 
       <article className="boost-card arc-shine">
         <header><span className="boost-icon crown"><Crown weight="fill" /></span><div><strong>High Roller Club</strong><small>Sieben Tage Cashback und doppelte Liga-Punkte.</small></div></header>
-        <p className="boost-value">{club ? coinNumber(club.points) : "—"}{club?.entryPoints ? ` / ${coinNumber(club.entryPoints)}` : ""}</p>
+        <p className="boost-value">{club ? coinNumber(club.points) : "—"}{club && club.entryPoints > 0 ? ` / ${coinNumber(club.entryPoints)}` : ""}</p>
         <span className="progress-track"><i style={{ width: `${clubProgress}%` }} /></span>
         {club?.active && <p className="boost-active">Mitgliedschaft aktiv{club.activeUntil ? ` bis ${new Date(club.activeUntil).toLocaleDateString("de-DE")}` : ""}</p>}
-        <button className="claim-button" disabled={busy !== null || club?.active || clubProgress < 100}
+        <button className="claim-button" disabled={busy !== null || club?.active || !club?.eligible}
           onClick={() => void run("club", "/api/player/economy/high-roller-club/activate", "Willkommen im High Roller Club.")}>
           {busy === "club" ? "…" : club?.active ? "Aktiv" : "Beitreten"}
         </button>
@@ -147,6 +147,7 @@ export function BoostCenter({ onWalletChanged }: Readonly<{ onWalletChanged: () 
       {!loyalty && <p className="section-empty">Angebote werden geladen …</p>}
       {loyalty?.offers.map((offer) => <article className="loyalty-card" key={offer.id}>
         <strong>{coinNumber(offer.rewardAmount)} {offer.rewardCurrency === "gem" ? "Gems" : "Coins"}</strong>
+        <span className="loyalty-title">{offer.title}</span>
         <small>{coinNumber(offer.costLoyaltyPoints)} Punkte</small>
         <button className="claim-button" disabled={busy !== null || !offer.canRedeem}
           onClick={() => void run(offer.id, `/api/player/economy/loyalty-rewards/${offer.id}/redeem`, "Belohnung eingetauscht.")}>
