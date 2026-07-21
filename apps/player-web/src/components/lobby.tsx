@@ -130,10 +130,6 @@ export function Lobby() {
         <div className="recent-slot-list">
           {recentlyPlayed.map((game) => {
             const locked = level < game.unlockLevel;
-      const availability = slotAvailability.get(game.id);
-      // Der Server erzwingt die Sperre beim Spin; hier geht es nur darum, dass
-      // der Spieler nicht erst nach dem Klick merkt, dass der Slot nicht laeuft.
-      const offline = availability !== undefined && availability.status !== "live";
             return <Link href={`/slots/${game.id}`} key={game.id} className={locked ? "locked-mini" : ""}>
               <span className="jackpot-number">{locked ? `AB LEVEL ${game.unlockLevel}` : game.name.toUpperCase()}</span>
               <Image src={game.cover} alt={`${game.name} Cover`} width={156} height={92} quality={76} />
@@ -161,6 +157,10 @@ export function Lobby() {
       </div>
       <div className="game-grid" id="all-games">{visibleGames.map((game) => {
         const locked = level < game.unlockLevel;
+        const availability = slotAvailability.get(game.id);
+        // Der Server erzwingt die Sperre beim Spin; hier geht es nur darum, dass
+        // der Spieler nicht erst nach dem Klick merkt, dass der Slot nicht laeuft.
+        const offline = availability !== undefined && availability.status !== "live";
         return <article className="game-card" key={game.id}>
           <div className="game-cover">
             <Image src={game.cover} alt={`${game.name} Slot-Cover`} fill sizes="(max-width: 600px) 66vw, (max-width: 1100px) 33vw, 19vw" quality={78} />
@@ -170,7 +170,7 @@ export function Lobby() {
               ? <div className="lock-state"><LockKey weight="fill" /><span>Level {game.unlockLevel}</span></div>
               : offline
                 ? <div className="lock-state offline-state"><Wrench weight="fill" /><span>{availability?.message ?? (availability?.status === "maintenance" ? "Kurz in Wartung" : "Derzeit pausiert")}</span></div>
-                : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
+                : : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
             <div className="game-title"><small>{game.category}</small><h3>{game.name}</h3><p>{game.features}</p></div>
           </div>
         </article>;
