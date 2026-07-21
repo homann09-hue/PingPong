@@ -20,6 +20,7 @@ import { useState } from "react";
 import { AppShell } from "./app-shell";
 import { games } from "@/lib/catalog";
 import { coinNumber, describeMission, missionTierLabel, timeLeft } from "@/lib/format";
+import { ShopSection } from "@/components/shop-section";
 import { LuckyWheel } from "@/components/lucky-wheel";
 import { BoostCenter } from "@/components/boost-center";
 import { useSlotAvailability } from "@/hooks/use-slot-availability";
@@ -270,41 +271,7 @@ export function Lobby() {
 
     <BoostCenter onWalletChanged={refreshLobby} />
 
-    <section className="lobby-section" id="shop" aria-labelledby="shop-title">
-      <div className="section-heading">
-        <div><span className="eyebrow"><Gift weight="fill" /> Spielgeld – keine Echtgeld-Kaeufe</span><h2 id="shop-title">Shop</h2></div>
-      </div>
-      <div className="shop-wallet">
-        <span><Coins weight="fill" /> {profile ? coinNumber(profile.coinBalance) : "—"} Coins</span>
-        <span><Diamond weight="fill" /> {profile ? coinNumber(profile.gemBalance ?? 0) : "—"} Gems</span>
-      </div>
-      <div className="shop-grid">
-        <article className="shop-card free-card">
-          <span className="shop-badge">Gratis</span>
-          <strong>Stuendlicher Bonus</strong>
-          <small>Alle 60 Minuten kostenlose Coins abholen.</small>
-          <button className="claim-button" disabled={busy !== null} onClick={() => void claim("hourly", "/api/player/rewards/hourly/claim")}>{busy === "hourly" ? "…" : "Jetzt abholen"}</button>
-        </article>
-        <article className="shop-card free-card">
-          <span className="shop-badge">Gratis</span>
-          <strong>Tagesbonus</strong>
-          <small>Einmal taeglich – mit Serie steigt die Belohnung.</small>
-          <button className="claim-button" disabled={busy !== null} onClick={() => void claim("daily", "/api/player/rewards/daily/claim")}>{busy === "daily" ? "…" : "Jetzt abholen"}</button>
-        </article>
-        <article className="shop-card">
-          <span className="shop-badge soon">Bald</span>
-          <strong>Coin-Pakete</strong>
-          <small>Groessere Coin-Bundles kommen mit dem Store-Update.</small>
-          <button className="claim-button" disabled aria-disabled="true">Bald verfuegbar</button>
-        </article>
-        <article className="shop-card">
-          <span className="shop-badge soon">Bald</span>
-          <strong>Gem-Angebote</strong>
-          <small>Gems fuer Booster und Extras – in Arbeit.</small>
-          <button className="claim-button" disabled aria-disabled="true">Bald verfuegbar</button>
-        </article>
-      </div>
-    </section>
+    <ShopSection gems={profile?.gemBalance ?? 0} onWalletChanged={refreshLobby} />
 
     <section className="lobby-section" id="clans" aria-labelledby="clans-title">
       <div className="section-heading">

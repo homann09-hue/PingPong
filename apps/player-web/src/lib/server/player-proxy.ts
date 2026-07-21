@@ -42,6 +42,39 @@ const allowedRoutes = [
   /^slots\/availability$/,
   /^slots\/[a-z0-9-]+\/paytable$/,
   /^slots\/[a-z0-9-]+\/spins$/,
+
+  // Shop, Store und Belegpruefung.
+  /^shop\/offers$/,
+  /^shop\/offers\/[A-Za-z0-9_-]{1,64}\/purchase$/,
+  /^store\/products$/,
+  /^store\/purchases\/verify$/,
+
+  // Wallet-Historie und Event-Meilensteine.
+  /^wallet\/transactions$/,
+  /^events\/[A-Za-z0-9_-]{1,64}\/milestones\/[A-Za-z0-9_-]{1,64}\/claim$/,
+
+  // Turniere und LiveOps-Konfiguration.
+  /^tournaments\/active$/,
+  /^liveops$/,
+
+  // Soziales: Freunde und Clans.
+  /^social\/overview$/,
+  /^social\/friend-requests$/,
+  /^social\/friend-requests\/[A-Za-z0-9_-]{1,64}\/accept$/,
+  /^clans$/,
+  /^clans\/(leave|invitations|members|feed|ownership-transfer)$/,
+  /^clans\/[A-Za-z0-9_-]{1,64}\/join$/,
+  /^clans\/invitations\/[A-Za-z0-9_-]{1,64}\/accept$/,
+  /^clans\/members\/[A-Za-z0-9_-]{1,64}(\/role)?$/,
+  /^clans\/feed\/[A-Za-z0-9_-]{1,64}(\/reports)?$/,
+
+  // Push-Einstellungen und Geraeteregistrierung.
+  /^messaging\/preferences$/,
+  /^messaging\/installations$/,
+  /^messaging\/installations\/[A-Za-z0-9_-]{1,64}$/,
+
+  // Telemetrie.
+  /^analytics\/events$/,
 ];
 
 export function isAllowedPlayerPath(path: string): boolean {
@@ -92,7 +125,7 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
   const needsIdempotencyKey = request.method === "POST"
     && (path.endsWith("/spins") || path.endsWith("/claim") || path.endsWith("/claims")
       || path.endsWith("/craft") || path.endsWith("/activate") || path.endsWith("/redeem")
-      || path.endsWith("/spin"));
+      || path.endsWith("/spin") || path.endsWith("/purchase"));
   if (needsIdempotencyKey) {
     headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
   }

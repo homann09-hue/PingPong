@@ -1,0 +1,100 @@
+/* Shop. Das hervorgehobene Tagesangebot bekommt bewusst mehr Gewicht als die
+   Dauerangebote — aber ohne Drucktaktik: kein blinkender Countdown, kein
+   kuenstlicher Knappheitsbalken. Die Restzeit steht ruhig daneben. */
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  border-radius: 20px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(21, 15, 38, 0.94), rgba(9, 7, 20, 0.96));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.4);
+}
+
+.shop-card.featured {
+  border-color: rgba(255, 199, 44, 0.5);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 199, 44, 0.22), transparent 62%),
+    linear-gradient(180deg, rgba(30, 20, 8, 0.94), rgba(10, 7, 20, 0.97));
+}
+
+.shop-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #0b0718;
+  background: linear-gradient(120deg, #ffe07a, #ffc72c);
+}
+
+.shop-card h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.shop-coins {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 1.24rem;
+  font-weight: 800;
+  color: #ffc72c;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-timer {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-card .claim-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.gem-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #9fe8ff;
+  background: rgba(53, 232, 255, 0.12);
+  border: 1px solid rgba(53, 232, 255, 0.28);
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-disclaimer {
+  margin: 16px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 62ch;
+}
+
+@media (max-width: 520px) {
+  .shop-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .shop-card { padding: 14px 10px; }
+  .shop-coins { font-size: 1.05rem; }
+}
