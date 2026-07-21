@@ -85,3 +85,51 @@
 @media (max-width: 480px) {
   .slot-backdrop::after { display: none; }
 }
+/* ---------- Blickfang am Bildrand ---------- */
+
+/* Die Referenz stellt eine gezeichnete Figur neben die Walzen. Eigene
+   Figurengrafiken haben wir nicht, und aus fremdem Material darf nichts
+   uebernommen werden. Stattdessen dient die Cover-Kunst des jeweiligen Slots
+   als Blickfang — sie gehoert dem Projekt, zeigt genau das Thema und ist
+   ohnehin schon geladen.
+
+   Weich ausmaskiert und stark abgedunkelt: sie soll den Raum fuellen, nicht
+   um Aufmerksamkeit mit dem Raster konkurrieren. Erst ab 1200px, darunter
+   fehlt der Platz. */
+
+@media (min-width: 1200px) {
+  .slot-stage .slot-hero,
+  .slot-backdrop .slot-hero { display: block; }
+
+  .slot-backdrop::after {
+    /* Glut bleibt, bekommt aber die Cover-Ebene als Nachbarn. */
+    z-index: 1;
+  }
+
+  .slot-stage::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 34%;
+    height: 100%;
+    background-image: var(--slot-cover, none);
+    background-size: cover;
+    background-position: 60% 40%;
+    opacity: 0.30;
+    filter: saturate(1.15) contrast(1.05);
+    mask-image: linear-gradient(100deg, black 0%, rgba(0,0,0,0.7) 42%, transparent 76%);
+    animation: hero-breathe 30s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+@keyframes hero-breathe {
+  from { transform: scale(1.02) translateX(-1%); }
+  to   { transform: scale(1.08) translateX(1%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-stage::before { animation: none; }
+}
