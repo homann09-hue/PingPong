@@ -111,3 +111,54 @@
 @media (max-width: 820px) {
   html, body { overscroll-behavior-y: none; }
 }
+/* ---------- Nachmessung: die Walzen muessen dominieren ---------- */
+
+/* Nach dem ersten Durchgang passte alles auf den Bildschirm, aber die
+   Symbole waren mit 33px Hoehe bei 111px Breite das kleinste Element der
+   Seite — bei einem Slot genau verkehrt herum. Die Ursachen, gemessen:
+
+   - .slot-actions stapelte die zwei Symbolknoepfe untereinander: 96px, und
+     damit eine 113px hohe Kopfzeile.
+   - .win-panel belegte 52px, auch wenn gar nichts gewonnen wurde.
+
+   Beides zurueckgeholt, und die Walzen bekommen eine Untergrenze, damit sie
+   nicht wieder als Erstes zusammenfallen. */
+
+@media (max-width: 820px) {
+  .slot-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-block: 4px;
+  }
+
+  /* Nebeneinander statt uebereinander. */
+  .slot-header .slot-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .slot-header .icon-button {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .slot-header h1 { font-size: 0.9rem; line-height: 1.15; }
+
+  /* Die Hinweiszeile darf im Ruhezustand nicht so viel kosten wie ein
+     Walzenfeld. Bei einem Gewinn darf sie wachsen. */
+  .win-panel {
+    min-height: 0;
+    padding: 4px 10px;
+    font-size: 0.76rem;
+  }
+
+  /* Untergrenze fuer das Raster: es ist der Grund, warum jemand die Seite
+     ueberhaupt geoeffnet hat. min() deckelt es auf grossen Telefonen. */
+  .reel-frame {
+    min-height: min(44vh, 330px);
+  }
+}
