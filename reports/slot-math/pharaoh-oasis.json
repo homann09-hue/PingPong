@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "pharaoh-oasis",
+  "slotVersion": 3,
+  "mathModelVersion": "3.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9380830,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.938083,
+  "rtpDeviation": -0.0019169999999999465,
+  "rtp95ConfidenceInterval": [
+    0.9104627382526809,
+    0.9657032617473191
+  ],
+  "rtpBreakdown": {
+    "base": 0.676208,
+    "freeSpins": 0.248009,
+    "respins": 0.001116,
+    "cascades": 0,
+    "bonus": 0,
+    "jackpot": 0.01275
+  },
+  "variance": 19.858362635110943,
+  "standardDeviation": 4.456272280181154,
+  "hitFrequency": 0.38713,
+  "lossOrSubBetFrequency": 0.85446,
+  "equalBetFrequency": 0.00076,
+  "profitableSpinFrequency": 0.14478,
+  "freeSpinTriggerFrequency": 0.01928,
+  "bonusTriggerFrequency": 0.00227,
+  "respinTriggerFrequency": 0.00227,
+  "jackpotHitFrequency": 0.00227,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 28600,
+  "maximumObservedWinMultiplier": 286,
+  "maximumWinStreak": 13,
+  "maximumLossStreak": 26,
+  "distribution": {
+    "zero": 0.61287,
+    "under1x": 0.24159,
+    "from1xTo5x": 0.09707,
+    "from5xTo15x": 0.03667,
+    "from15xTo50x": 0.01058,
+    "from50xTo100x": 0.00107,
+    "atLeast100x": 0.00015
+  }
+}

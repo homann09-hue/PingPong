@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "vegas-gold",
+  "slotVersion": 3,
+  "mathModelVersion": "3.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9345485,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.9345485,
+  "rtpDeviation": -0.0054514999999999425,
+  "rtp95ConfidenceInterval": [
+    0.9109228235971957,
+    0.9581741764028043
+  ],
+  "rtpBreakdown": {
+    "base": 0.7796485,
+    "freeSpins": 0,
+    "respins": 0,
+    "cascades": 0,
+    "bonus": 0.1422,
+    "jackpot": 0.0127
+  },
+  "variance": 14.529690376145963,
+  "standardDeviation": 3.8117830966813893,
+  "hitFrequency": 0.52514,
+  "lossOrSubBetFrequency": 0.73343,
+  "equalBetFrequency": 0,
+  "profitableSpinFrequency": 0.26657,
+  "freeSpinTriggerFrequency": 0,
+  "bonusTriggerFrequency": 0.00234,
+  "respinTriggerFrequency": 0,
+  "jackpotHitFrequency": 0.00234,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 16800,
+  "maximumObservedWinMultiplier": 168,
+  "maximumWinStreak": 18,
+  "maximumLossStreak": 14,
+  "distribution": {
+    "zero": 0.47486,
+    "under1x": 0.25857,
+    "from1xTo5x": 0.24408,
+    "from5xTo15x": 0.01863,
+    "from15xTo50x": 0.00206,
+    "from50xTo100x": 0.00158,
+    "atLeast100x": 0.00022
+  }
+}

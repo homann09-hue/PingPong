@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "candy-carnival",
+  "slotVersion": 5,
+  "mathModelVersion": "5.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9379282,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.9379282,
+  "rtpDeviation": -0.002071799999999957,
+  "rtp95ConfidenceInterval": [
+    0.9009804569036062,
+    0.9748759430963938
+  ],
+  "rtpBreakdown": {
+    "base": 0.4161754,
+    "freeSpins": 0.3003273,
+    "respins": 0,
+    "cascades": 0.2012755,
+    "bonus": 0,
+    "jackpot": 0.02015
+  },
+  "variance": 35.53560287164505,
+  "standardDeviation": 5.961174621804418,
+  "hitFrequency": 0.62978,
+  "lossOrSubBetFrequency": 0.81863,
+  "equalBetFrequency": 0,
+  "profitableSpinFrequency": 0.18137,
+  "freeSpinTriggerFrequency": 0.02509,
+  "bonusTriggerFrequency": 0.00343,
+  "respinTriggerFrequency": 0,
+  "jackpotHitFrequency": 0.00343,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 64015,
+  "maximumObservedWinMultiplier": 640.15,
+  "maximumWinStreak": 23,
+  "maximumLossStreak": 11,
+  "distribution": {
+    "zero": 0.37022,
+    "under1x": 0.44841,
+    "from1xTo5x": 0.15113,
+    "from5xTo15x": 0.02335,
+    "from15xTo50x": 0.00555,
+    "from50xTo100x": 0.00092,
+    "atLeast100x": 0.00042
+  }
+}

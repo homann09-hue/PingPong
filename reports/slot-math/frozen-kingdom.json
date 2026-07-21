@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "frozen-kingdom",
+  "slotVersion": 4,
+  "mathModelVersion": "4.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9372395,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.9372395,
+  "rtpDeviation": -0.0027604999999999436,
+  "rtp95ConfidenceInterval": [
+    0.8961061870307405,
+    0.9783728129692595
+  ],
+  "rtpBreakdown": {
+    "base": 0.398573,
+    "freeSpins": 0.5275165,
+    "respins": 0,
+    "cascades": 0,
+    "bonus": 0,
+    "jackpot": 0.01115
+  },
+  "variance": 44.04283204464418,
+  "standardDeviation": 6.6364773822144665,
+  "hitFrequency": 0.46662,
+  "lossOrSubBetFrequency": 0.87371,
+  "equalBetFrequency": 0.00818,
+  "profitableSpinFrequency": 0.11811,
+  "freeSpinTriggerFrequency": 0.01527,
+  "bonusTriggerFrequency": 0.00203,
+  "respinTriggerFrequency": 0,
+  "jackpotHitFrequency": 0.00203,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 48140,
+  "maximumObservedWinMultiplier": 481.4,
+  "maximumWinStreak": 14,
+  "maximumLossStreak": 17,
+  "distribution": {
+    "zero": 0.53338,
+    "under1x": 0.34033,
+    "from1xTo5x": 0.10723,
+    "from5xTo15x": 0.00697,
+    "from15xTo50x": 0.00918,
+    "from50xTo100x": 0.00213,
+    "atLeast100x": 0.00078
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "neon-nights",
+  "slotVersion": 3,
+  "mathModelVersion": "3.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9438235,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.9438235,
+  "rtpDeviation": 0.0038235000000000907,
+  "rtp95ConfidenceInterval": [
+    0.9291880745117892,
+    0.9584589254882109
+  ],
+  "rtpBreakdown": {
+    "base": 0.2929335,
+    "freeSpins": 0.075488,
+    "respins": 0.564052,
+    "cascades": 0,
+    "bonus": 0,
+    "jackpot": 0.01135
+  },
+  "variance": 5.575689275847904,
+  "standardDeviation": 2.3612897483891944,
+  "hitFrequency": 0.48548,
+  "lossOrSubBetFrequency": 0.76223,
+  "equalBetFrequency": 0.01681,
+  "profitableSpinFrequency": 0.22096,
+  "freeSpinTriggerFrequency": 0.01348,
+  "bonusTriggerFrequency": 0.00199,
+  "respinTriggerFrequency": 0.40105,
+  "jackpotHitFrequency": 0.00199,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 6330,
+  "maximumObservedWinMultiplier": 63.3,
+  "maximumWinStreak": 16,
+  "maximumLossStreak": 13,
+  "distribution": {
+    "zero": 0.51452,
+    "under1x": 0.24771,
+    "from1xTo5x": 0.1918,
+    "from5xTo15x": 0.04124,
+    "from15xTo50x": 0.00467,
+    "from50xTo100x": 0.00006,
+    "atLeast100x": 0
+  }
+}

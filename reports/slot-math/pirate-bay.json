@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "pirate-bay",
+  "slotVersion": 4,
+  "mathModelVersion": "4.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9489460,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.948946,
+  "rtpDeviation": 0.00894600000000001,
+  "rtp95ConfidenceInterval": [
+    0.9185201185551006,
+    0.9793718814448993
+  ],
+  "rtpBreakdown": {
+    "base": 0.477959,
+    "freeSpins": 0.1462545,
+    "respins": 0,
+    "cascades": 0.2605125,
+    "bonus": 0.05927,
+    "jackpot": 0.00495
+  },
+  "variance": 24.097622389084478,
+  "standardDeviation": 4.908932917557998,
+  "hitFrequency": 0.29899,
+  "lossOrSubBetFrequency": 0.83898,
+  "equalBetFrequency": 0,
+  "profitableSpinFrequency": 0.16102,
+  "freeSpinTriggerFrequency": 0.01217,
+  "bonusTriggerFrequency": 0.00585,
+  "respinTriggerFrequency": 0,
+  "jackpotHitFrequency": 0.00091,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 37210,
+  "maximumObservedWinMultiplier": 372.1,
+  "maximumWinStreak": 8,
+  "maximumLossStreak": 25,
+  "distribution": {
+    "zero": 0.70101,
+    "under1x": 0.13797,
+    "from1xTo5x": 0.12223,
+    "from5xTo15x": 0.02872,
+    "from15xTo50x": 0.00869,
+    "from50xTo100x": 0.00107,
+    "atLeast100x": 0.00031
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-21T03:51:40.285Z",
+  "slotId": "jungle-temple",
+  "slotVersion": 4,
+  "mathModelVersion": "4.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9367915,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.9367915,
+  "rtpDeviation": -0.0032084999999999475,
+  "rtp95ConfidenceInterval": [
+    0.9060685129037841,
+    0.9675144870962159
+  ],
+  "rtpBreakdown": {
+    "base": 0.415112,
+    "freeSpins": 0.193902,
+    "respins": 0,
+    "cascades": 0.2497475,
+    "bonus": 0.05943,
+    "jackpot": 0.0186
+  },
+  "variance": 24.570541860533385,
+  "standardDeviation": 4.956868150408419,
+  "hitFrequency": 0.32346,
+  "lossOrSubBetFrequency": 0.81671,
+  "equalBetFrequency": 0,
+  "profitableSpinFrequency": 0.18329,
+  "freeSpinTriggerFrequency": 0.01641,
+  "bonusTriggerFrequency": 0.00229,
+  "respinTriggerFrequency": 0,
+  "jackpotHitFrequency": 0.00229,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 50500,
+  "maximumObservedWinMultiplier": 505,
+  "maximumWinStreak": 10,
+  "maximumLossStreak": 31,
+  "distribution": {
+    "zero": 0.67654,
+    "under1x": 0.14017,
+    "from1xTo5x": 0.14581,
+    "from5xTo15x": 0.02611,
+    "from15xTo50x": 0.00982,
+    "from50xTo100x": 0.00102,
+    "atLeast100x": 0.00053
+  }
+}
