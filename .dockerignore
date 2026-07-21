@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+apps/mobile
+apps/admin
+apps/control-center
+apps/player-web/public/assets
+design
+docs
+.git
+.github
+*.md

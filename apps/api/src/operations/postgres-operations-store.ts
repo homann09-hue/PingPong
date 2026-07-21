@@ -18,15 +18,15 @@ export class PostgresOperationsStore implements OperationsStore {
       `SELECT
         (SELECT count(*) FROM players WHERE status='active') active_players,
         (SELECT count(*) FROM players WHERE status='suspended') suspended_players,
-        (SELECT count(*) FROM spins WHERE created_at >= $1 - interval '15 minutes') spins_15m,
-        (SELECT count(*) FROM client_analytics_events WHERE received_at >= $1 - interval '24 hours') analytics_24h,
+        (SELECT count(*) FROM spins WHERE created_at >= $1::timestamptz - interval '15 minutes') spins_15m,
+        (SELECT count(*) FROM client_analytics_events WHERE received_at >= $1::timestamptz - interval '24 hours') analytics_24h,
         (SELECT count(*) FROM economy_grant_requests WHERE status='pending') pending_grants,
         (SELECT count(*) FROM clan_moderation_cases WHERE status='open') open_moderation,
         (SELECT count(*) FROM push_deliveries WHERE status='pending') push_pending,
         (SELECT count(*) FROM push_deliveries WHERE status='processing') push_processing,
-        (SELECT count(*) FROM push_deliveries WHERE status='processing' AND locked_at < $1 - interval '5 minutes') push_stale,
-        (SELECT count(*) FROM push_deliveries WHERE status='failed' AND completed_at >= $1 - interval '24 hours') push_failed_24h,
-        (SELECT count(*) FROM admin_audit_log WHERE created_at >= $1 - interval '24 hours') admin_actions_24h`, [now],
+        (SELECT count(*) FROM push_deliveries WHERE status='processing' AND locked_at < $1::timestamptz - interval '5 minutes') push_stale,
+        (SELECT count(*) FROM push_deliveries WHERE status='failed' AND completed_at >= $1::timestamptz - interval '24 hours') push_failed_24h,
+        (SELECT count(*) FROM admin_audit_log WHERE created_at >= $1::timestamptz - interval '24 hours') admin_actions_24h`, [now],
     );
     const row = result.rows[0]!;
     return {

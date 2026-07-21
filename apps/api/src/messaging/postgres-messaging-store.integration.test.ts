@@ -22,7 +22,15 @@ databaseSuite("PostgresMessagingStore", () => {
     createdAt: new Date().toISOString(), publishedAt: new Date().toISOString(),
   };
 
+  /** The suite must not depend on other integration suites having applied shared migrations first. */
+  async function ensure(table: string, migration: string): Promise<void> {
+    const exists = await pool.query<{ name: string | null }>("SELECT to_regclass($1) name", [`public.${table}`]);
+    if (!exists.rows[0]?.name) await pool.query(await readFile(new URL(`../../../../infra/postgres/${migration}`, import.meta.url), "utf8"));
+  }
+
   beforeAll(async () => {
+    await ensure("players", "001_core.sql");
+    await ensure("liveops_campaigns", "015_liveops_admin.sql");
     const migration = await readFile(new URL("../../../../infra/postgres/017_push_messaging.sql", import.meta.url), "utf8");
     await pool.query(migration);
     await pool.query("INSERT INTO players (id) VALUES ($1) ON CONFLICT DO NOTHING", [playerId]);
