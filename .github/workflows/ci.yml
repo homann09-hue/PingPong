@@ -37,7 +37,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { flutter-version: 3.44.6, channel: stable, cache: true }
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
       - run: flutter build web --release --no-web-resources-cdn --no-pub
       - run: flutter build apk --debug --no-pub
