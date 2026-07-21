@@ -1,44 +1,44 @@
 # Slot-Math-Report: pirate-bay
 
-Erzeugt: 2026-07-21T03:51:40.285Z · Version 4 · Math-Modell 4.0.0
-Stichprobe: **100.000 Spins** · Einsatz 100 · deterministisch (Seed = Spin-Index)
+Erzeugt: 2026-07-21T03:56:37.255Z · Version 4 · Math-Modell 4.0.0
+Stichprobe: **1.000.000 Spins** · Einsatz 100 · deterministisch (Seed = Spin-Index)
 
 | Kennzahl | Wert |
 |---|---|
 | Ziel-RTP | 94.000 % |
-| Simulierter RTP | 94.895 % |
-| Abweichung | 0.895 % ✅ innerhalb ±2 pp |
-| 95%-Konfidenzintervall | 91.852 % – 97.937 % |
-| Standardabweichung (Multiplikator) | 4.909 |
-| Hit-Frequenz | 29.899 % |
-| Profitable Spins (> Einsatz) | 16.102 % |
-| Free-Spin-Trigger | 1.217 % |
-| Bonus-Trigger | 0.585 % |
+| Simulierter RTP | 93.355 % |
+| Abweichung | -0.645 % ✅ innerhalb ±2 pp |
+| 95%-Konfidenzintervall | 92.440 % – 94.270 % |
+| Standardabweichung (Multiplikator) | 4.667 |
+| Hit-Frequenz | 30.013 % |
+| Profitable Spins (> Einsatz) | 16.078 % |
+| Free-Spin-Trigger | 1.163 % |
+| Bonus-Trigger | 0.606 % |
 | Respin-Trigger | 0.000 % |
-| Jackpot-Frequenz | 0.091 % |
+| Jackpot-Frequenz | 0.094 % |
 | Max-Win-Frequenz | 0.000 % |
 | Groesster beobachteter Gewinn | 372.1x |
-| Laengste Verluststrecke | 25 Spins |
+| Laengste Verluststrecke | 38 Spins |
 
 ## RTP-Beitrag nach Phase
 
 | Phase | Beitrag |
 |---|---|
-| base | 47.796 % |
-| freeSpins | 14.625 % |
+| base | 47.698 % |
+| freeSpins | 13.640 % |
 | respins | 0.000 % |
-| cascades | 26.051 % |
-| bonus | 5.927 % |
-| jackpot | 0.495 % |
+| cascades | 25.321 % |
+| bonus | 6.202 % |
+| jackpot | 0.494 % |
 
 ## Gewinnverteilung
 
 | Klasse | Anteil |
 |---|---|
-| zero | 70.101 % |
-| under1x | 13.797 % |
-| from1xTo5x | 12.223 % |
-| from5xTo15x | 2.872 % |
-| from15xTo50x | 0.869 % |
-| from50xTo100x | 0.107 % |
-| atLeast100x | 0.031 % |
+| zero | 69.987 % |
+| under1x | 13.935 % |
+| from1xTo5x | 12.213 % |
+| from5xTo15x | 2.909 % |
+| from15xTo50x | 0.827 % |
+| from50xTo100x | 0.100 % |
+| atLeast100x | 0.030 % |
