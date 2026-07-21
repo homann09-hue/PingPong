@@ -4,6 +4,7 @@ import "./globals.css";
 import "./fixes.css";
 import "./legal.css";
 import "./slot-theme.css";
+import "./arcade.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
