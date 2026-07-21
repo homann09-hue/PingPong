@@ -1,0 +1,169 @@
+/* Walzenoptik.
+ *
+ * Ausgangslage: die Symbole tauschten sich schlagartig aus — keine Drehung,
+ * keine Landung, flache Kacheln ohne Rahmen. Genau das laesst einen Slot
+ * generisch wirken, unabhaengig davon wie gut die Symbolgrafiken sind.
+ *
+ * Der gestaffelte Stopp entsteht hier ohne Zustandslogik: die laufende Walze
+ * blendet ueber transition-delay aus, die echten Symbole ueber dasselbe Delay
+ * ein. Jede Walze hat ihr eigenes --reel-delay, dadurch kommen sie nacheinander
+ * zur Ruhe — der Moment, der einen Spin spannend macht.
+ *
+ * Wichtig: das alles ist reine Inszenierung. Das Ergebnis steht serverseitig
+ * fest, bevor die erste Walze losláuft.
+ */
+
+/* ---------- Kabinett ---------- */
+
+.reel-frame {
+  position: relative;
+  padding: 12px;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, #4a3708 0%, #8a6c18 14%, #e8c964 34%, #a9832a 52%,
+      #e8c964 68%, #7d6115 88%, #352704 100%);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.75),
+    0 22px 52px rgba(0, 0, 0, 0.62),
+    inset 0 0 26px rgba(255, 226, 150, 0.30);
+}
+
+/* Innenwanne: dunkler Schacht, in dem die Walzen laufen. */
+.reel-frame::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #0a0518, #12082c 45%, #0a0518);
+  box-shadow: inset 0 10px 24px rgba(0, 0, 0, 0.85), inset 0 -10px 24px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* Glasreflex ueber dem Schacht — macht aus der Flaeche ein Geraet. */
+.reel-frame::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.05) 22%, transparent 46%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ---------- Walze ---------- */
+
+.reel-frame .reel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  z-index: 1;
+}
+
+.reel-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -100%;
+  height: 300%;
+  display: grid;
+  grid-template-rows: repeat(9, 1fr);
+  gap: inherit;
+  opacity: 0;
+  pointer-events: none;
+  /* Ausblenden erst nach dem walzeneigenen Delay: der gestaffelte Stopp. */
+  transition: opacity 130ms linear var(--reel-delay, 0ms);
+}
+
+.reel-frame.is-spinning .reel-strip {
+  opacity: 1;
+  transition-delay: 0ms;
+  animation: reel-run 300ms linear infinite;
+  filter: blur(1.1px);
+}
+
+/* Neun Zellen auf dreifacher Hoehe: eine Drittel-Verschiebung ist genau ein
+   voller Symbolsatz, dadurch laeuft die Schleife nahtlos. */
+@keyframes reel-run {
+  from { transform: translateY(0); }
+  to   { transform: translateY(33.3333%); }
+}
+
+/* ---------- Symbolzellen ---------- */
+
+.reel-frame .symbol {
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(130% 92% at 50% 8%, rgba(255, 255, 255, 0.16), transparent 62%),
+    linear-gradient(180deg, #2d1866 0%, #1a0d3f 58%, #0f0726 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.5),
+    0 2px 5px rgba(0, 0, 0, 0.55);
+}
+
+/* Landung: die echten Symbole kommen nach dem Walzendelay zurueck und federn
+   dabei kurz nach. */
+.reel-frame .symbol:not(.strip-symbol) {
+  transition:
+    opacity 110ms linear var(--reel-delay, 0ms),
+    transform 420ms cubic-bezier(0.18, 1.6, 0.36, 1) var(--reel-delay, 0ms);
+}
+
+.reel-frame.is-spinning .symbol:not(.strip-symbol) {
+  opacity: 0;
+  transform: translateY(-16%);
+  transition-delay: 0ms;
+}
+
+/* ---------- Gewinnzellen ---------- */
+
+.reel-frame .symbol.winning {
+  border-color: rgba(255, 214, 92, 0.85);
+  background:
+    radial-gradient(130% 92% at 50% 8%, rgba(255, 236, 170, 0.4), transparent 64%),
+    linear-gradient(180deg, #4a2f12 0%, #2a1740 60%, #140a2c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 2px rgba(255, 199, 44, 0.6),
+    0 0 26px rgba(255, 199, 44, 0.55);
+  animation: reel-win-pulse 900ms ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes reel-win-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 0 0 2px rgba(255,199,44,0.6), 0 0 20px rgba(255,199,44,0.45); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 0 3px rgba(255,226,140,0.95), 0 0 40px rgba(255,199,44,0.85); }
+}
+
+/* ---------- Umgebung ---------- */
+
+/* Langsam wandernde Lichtkegel hinter dem Geraet. Bewusst sehr dezent — sie
+   sollen Tiefe geben, nicht vom Raster ablenken. */
+.slot-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    conic-gradient(from 0deg at 50% 40%,
+      transparent 0deg, rgba(255, 199, 44, 0.10) 14deg, transparent 30deg,
+      transparent 90deg, rgba(255, 53, 220, 0.09) 104deg, transparent 120deg,
+      transparent 200deg, rgba(53, 232, 255, 0.08) 214deg, transparent 232deg);
+  animation: slot-rays 44s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes slot-rays {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Ruhige Darstellung ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-frame.is-spinning .reel-strip { animation: none; filter: none; }
+  .reel-frame .symbol.winning { animation: none; }
+  .slot-backdrop::after { animation: none; }
+  .reel-frame .symbol:not(.strip-symbol) { transition-duration: 80ms; }
+}
