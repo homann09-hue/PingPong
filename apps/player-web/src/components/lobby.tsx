@@ -19,6 +19,7 @@ import { useState } from "react";
 import { AppShell } from "./app-shell";
 import { games } from "@/lib/catalog";
 import { coinNumber, describeMission, missionTierLabel, timeLeft } from "@/lib/format";
+import { BoostCenter } from "@/components/boost-center";
 import { useLobbyData, postClaim } from "@/hooks/use-lobby-data";
 import { usePlayer } from "@/hooks/use-player";
 
@@ -254,6 +255,8 @@ export function Lobby() {
         })}
       </div>
     </section>
+
+    <BoostCenter onWalletChanged={refreshLobby} />
 
     <section className="lobby-section" id="shop" aria-labelledby="shop-title">
       <div className="section-heading">
