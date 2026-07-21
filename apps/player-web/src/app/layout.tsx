@@ -11,6 +11,7 @@ import "./shop.css";
 import "./reels.css";
 import "./win.css";
 import "./jackpots.css";
+import "./slot-ambience.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
