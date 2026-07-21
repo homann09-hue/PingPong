@@ -35,6 +35,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Ohne viewport-fit=cover liefert env(safe-area-inset-*) durchgehend 0 —
+  // die Safe-Area-Regeln in mobile.css waeren wirkungslos, und in einer
+  // nativen Huelle laege der Home-Indikator auf der unteren Leiste.
+  viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
   themeColor: "#120b2b",
