@@ -21,6 +21,7 @@ import { AppShell } from "./app-shell";
 import { games } from "@/lib/catalog";
 import { coinNumber, describeMission, missionTierLabel, timeLeft } from "@/lib/format";
 import { ShopSection } from "@/components/shop-section";
+import { ClanSection } from "@/components/clan-section";
 import { LuckyWheel } from "@/components/lucky-wheel";
 import { BoostCenter } from "@/components/boost-center";
 import { useSlotAvailability } from "@/hooks/use-slot-availability";
@@ -286,17 +287,6 @@ export function Lobby() {
 
     <ShopSection gems={profile?.gemBalance ?? 0} onWalletChanged={refreshLobby} />
 
-    <section className="lobby-section" id="clans" aria-labelledby="clans-title">
-      <div className="section-heading">
-        <div><span className="eyebrow"><UsersThree weight="fill" /> Gemeinsam gewinnen</span><h2 id="clans-title">Clans</h2></div>
-      </div>
-      <div className="clans-teaser">
-        <UsersThree weight="fill" />
-        <div>
-          <strong>Clans kommen ins Web</strong>
-          <p>Freunde, Clan-Chat und Clan-Punkte sind in der Aurora-App bereits live. Die Web-Version folgt als Naechstes – dein Fortschritt zaehlt jetzt schon.</p>
-        </div>
-      </div>
-    </section>
+    <ClanSection onChanged={refreshLobby} />
   </AppShell>;
 }

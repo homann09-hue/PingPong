@@ -1,0 +1,75 @@
+/* Clan-Oberflaeche. Zwei Zustaende (Mitglied / Entdecken), gemeinsame Bausteine:
+   Wappen-Chip, Zeilen-Layout, ruhige Feed-Karten. Mobil stapelt sich alles. */
+
+.clan-crest {
+  display: grid;
+  place-items: center;
+  width: 48px; height: 48px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  color: #0b0718;
+  background: linear-gradient(160deg, #ffe07a, #ffc72c);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.22);
+}
+.clan-crest.small { width: 38px; height: 38px; font-size: 0.76rem; border-radius: 11px; }
+
+.clan-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px; margin-top: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,199,44,0.24);
+  background: linear-gradient(180deg, rgba(30,20,8,0.9), rgba(10,7,20,0.95));
+}
+.clan-title { flex: 1 1 auto; min-width: 0; }
+.clan-title strong { display: block; font-size: 1.05rem; }
+.clan-title small { color: rgba(255,255,255,0.6); font-size: 0.76rem; }
+
+.clan-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 16px; margin-top: 14px;
+}
+
+.clan-members ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.clan-members li { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,0.03); }
+.member-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25); }
+.member-dot.online { background: #35e8ff; box-shadow: 0 0 8px rgba(53,232,255,0.7); }
+.member-name { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-meta { display: inline-flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.5); font-size: 0.7rem; white-space: nowrap; }
+
+.feed-compose { display: flex; gap: 8px; margin: 8px 0; }
+.feed-compose input {
+  flex: 1 1 auto; min-width: 0;
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.3); color: inherit; font: inherit;
+}
+.feed-compose input:focus { outline: none; border-color: rgba(255,199,44,0.6); }
+.feed-compose .claim-button { flex: 0 0 auto; min-width: 44px; padding: 0 14px; }
+
+.feed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.feed-list li { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.03); }
+.feed-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.feed-head strong { font-size: 0.85rem; }
+.feed-head small { color: rgba(255,255,255,0.45); font-size: 0.68rem; }
+.feed-list p { margin: 4px 0 0; font-size: 0.9rem; line-height: 1.4; word-break: break-word; }
+
+.clan-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-top: 8px; border-radius: 14px; background: rgba(255,255,255,0.03); }
+.clan-row-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.clan-row-main strong { font-size: 0.92rem; }
+.clan-row-main small { color: rgba(255,255,255,0.55); font-size: 0.72rem; }
+.clan-row .claim-button { flex: 0 0 auto; }
+
+.clan-invites { margin-top: 8px; }
+
+.clan-note { margin: 16px 0 0; font-size: 0.72rem; color: rgba(255,255,255,0.45); }
+
+/* Mobil: Mitglieder ueber den Feed stapeln, nicht daneben quetschen. */
+@media (max-width: 720px) {
+  .clan-grid { grid-template-columns: 1fr; }
+  .clan-banner { flex-wrap: wrap; }
+  .clan-banner .claim-button { width: 100%; }
+}

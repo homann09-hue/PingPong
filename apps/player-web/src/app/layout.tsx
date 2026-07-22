@@ -13,6 +13,7 @@ import "./win.css";
 import "./jackpots.css";
 import "./slot-ambience.css";
 import "./wallet-history.css";
+import "./clans-ui.css";
 import "./mobile.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
