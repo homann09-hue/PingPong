@@ -33,6 +33,8 @@ const calibratedHitFrequency: Readonly<Record<string, number>> = {
   "frozen-kingdom": 0.467,
   "jungle-temple": 0.323,
   "vegas-gold": 0.52,
+  "midnight-saloon": 0.424,
+  "cosmic-voyage": 0.496,
 };
 
 function scalePaytable(paytable: Paytable, factor: number): Paytable {
@@ -302,7 +304,38 @@ export const vegasGoldConfig = game(
   { version: 3, mathModelVersion: "3.0.0" },
 );
 
+export const midnightSaloonConfig = game(
+  "midnight-saloon", "Midnight Saloon", "high",
+  reelStrips([
+    "AKQJAWKQASJBQJAKSWQAKJQA", "KQAJKWQASJBQAJKSAWQKJAQK", "QAJKWSAQKJBAKQSAWJKQAJKA",
+    "JAKQWJASKQBAQJKSWAKQJAQA", "AQJKWSAKQJBAQKSWAJKQJAKA",
+  ]),
+  scalePaytable(balanced, 2.52),
+  {
+    expandingWild: { symbols: ["W"] },
+    respins: { triggerSymbol: "B", minimumCount: 3, count: 2 },
+    freeSpins: { scatterSymbol: "S", awards: { 3: 8, 4: 12, 5: 20 }, maxTotal: 100, winMultiplier: 2 },
+  },
+  { version: 3, mathModelVersion: "3.0.0" },
+);
+
+export const cosmicVoyageConfig = game(
+  "cosmic-voyage", "Cosmic Voyage", "low",
+  reelStrips([
+    "AKQJAWKQMSJAQJAKMSWQAKJQ", "KQAJKWMQASJAQJKMSAWQKJAQ", "QAJKWMSAQKJAKQMSAWJKQAJK",
+    "JAKQWMJASKQAQJMKSWAKQJAQ", "AQJKWMSAKQJAQKMSWAJKQJAK",
+  ]),
+  scalePaytable(balanced, 2.03),
+  {
+    walkingWild: { symbol: "W", direction: "right", maxSteps: 4 },
+    multiplierSymbols: { symbols: [{ symbol: "M", multiplier: 2 }], combination: "add", maxTotalMultiplier: 8 },
+    freeSpins: { scatterSymbol: "S", awards: { 3: 8, 4: 14, 5: 22 }, maxTotal: 100, winMultiplier: 2 },
+  },
+  { version: 3, mathModelVersion: "3.0.0" },
+);
+
 export const themedConfigs = [
   pharaohOasisConfig, dragonPeakConfig, candyCarnivalConfig, pirateBayConfig,
   neonNightsConfig, frozenKingdomConfig, jungleTempleConfig, vegasGoldConfig,
+  midnightSaloonConfig, cosmicVoyageConfig,
 ] as const;
