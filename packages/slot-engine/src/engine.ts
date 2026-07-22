@@ -1,5 +1,5 @@
 import { DeterministicRng } from "./rng.js";
-import type { EngineEvent, LineWin, ScatterWin, SlotConfig, SpinRequest, SpinResult, SpinRound, WaysWin, Win } from "./types.js";
+import type { EngineEvent, LineWin, ScatterWin, SlotConfig, SpinRequest, SpinResult, SpinRound, WaysWin, ClusterWin, Win } from "./types.js";
 
 /** Pure deterministic evaluator and bounded feature state machine. */
 export class SlotEngine {
@@ -380,7 +380,9 @@ export class SlotEngine {
     grid: readonly (readonly string[])[], bet: number, includeScatter: boolean,
     events: EngineEvent[], roundMultiplier = 1,
   ): Win[] {
-    const wins: Win[] = this.config.features?.ways
+    const wins: Win[] = this.config.features?.cluster
+      ? this.evaluateClusters(grid, bet, events, roundMultiplier)
+      : this.config.features?.ways
       ? this.evaluateWays(grid, bet, events, roundMultiplier)
       : this.evaluateLines(grid, bet, events, roundMultiplier);
     if (includeScatter) {
@@ -437,6 +439,84 @@ export class SlotEngine {
       if (left && right && left.symbol === right.symbol && left.count === values.length && right.count === values.length) return [left];
       return [left, right].filter((win): win is LineWin => win !== null);
     });
+  }
+
+  // Cluster Pays: Gewinne durch orthogonal zusammenhaengende Gruppen gleicher
+  // Symbole statt ueber Linien oder Ways. Opt-in ueber features.cluster — kein
+  // bestehender Slot nutzt es, deren Auswertung bleibt damit unveraendert.
+  // Cluster Pays: Gewinne durch orthogonal zusammenhaengende Gruppen gleicher
+  // Symbole statt ueber Linien oder Ways. Opt-in ueber features.cluster — kein
+  // bestehender Slot nutzt es, deren Auswertung bleibt damit unveraendert.
+  private evaluateClusters(
+    grid: readonly (readonly string[])[],
+    bet: number,
+    events: EngineEvent[],
+    roundMultiplier: number,
+  ): ClusterWin[] {
+    const feature = this.config.features?.cluster;
+    if (!feature) return [];
+    const wilds = new Set(
+      Object.entries(this.config.symbols)
+        .filter(([, value]) => value.kind === "wild")
+        .map(([key]) => key),
+    );
+    const reels = grid.length;
+    const wins: ClusterWin[] = [];
+    // Wilds bleiben teilbar (koennen zu mehreren Clustern gehoeren) und werden
+    // nicht global gesperrt; regulaere Zellen schon, sonst zaehlte ein Cluster
+    // mehrfach.
+    const claimed: boolean[][] = grid.map((reel) => reel.map(() => false));
+    for (let reel = 0; reel < reels; reel += 1) {
+      const reelCells = grid[reel];
+      const claimedReel = claimed[reel];
+      if (!reelCells || !claimedReel) continue;
+      for (let row = 0; row < reelCells.length; row += 1) {
+        const symbol = reelCells[row];
+        if (symbol === undefined || claimedReel[row] || wilds.has(symbol)) continue;
+        const payouts = this.config.symbols[symbol]?.payouts;
+        if (!payouts) continue;
+        // Flood-Fill ueber orthogonale Nachbarn mit gleichem Symbol oder Wild.
+        const stack: [number, number][] = [[reel, row]];
+        const cells: [number, number][] = [];
+        const seen = new Set<string>([`${reel}:${row}`]);
+        while (stack.length > 0) {
+          const current = stack.pop();
+          if (!current) break;
+          const [r, c] = current;
+          cells.push([r, c]);
+          const neighbours: [number, number][] = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+          for (const [nr, nc] of neighbours) {
+            if (nr < 0 || nr >= reels) continue;
+            const neighbourReel = grid[nr];
+            if (!neighbourReel || nc < 0 || nc >= neighbourReel.length) continue;
+            const key = `${nr}:${nc}`;
+            if (seen.has(key)) continue;
+            const candidate = neighbourReel[nc];
+            if (candidate !== undefined && (candidate === symbol || wilds.has(candidate))) {
+              seen.add(key);
+              stack.push([nr, nc]);
+            }
+          }
+        }
+        // Nur die regulaeren Zellen des Symbols als verbraucht markieren.
+        for (const [r, c] of cells) {
+          const claimRow = claimed[r];
+          if (grid[r]?.[c] === symbol && claimRow) claimRow[c] = true;
+        }
+        const count = cells.length;
+        if (count < feature.minimumCluster) continue;
+        // Groesste definierte Auszahlungsstufe, die <= Clustergroesse ist.
+        const tiers = Object.keys(payouts).map(Number).filter((n) => n <= count).sort((a, b) => b - a);
+        const topTier = tiers[0];
+        const payout = topTier === undefined ? 0 : (payouts[topTier] ?? 0);
+        if (payout <= 0) continue;
+        const amount = Math.floor((payout * bet * roundMultiplier) / feature.betDivisor);
+        if (amount <= 0) continue;
+        wins.push({ kind: "cluster", symbol, count, amount, cells });
+        events.push({ type: "cluster.win", data: { symbol, count } });
+      }
+    }
+    return wins;
   }
 
   private evaluateWays(

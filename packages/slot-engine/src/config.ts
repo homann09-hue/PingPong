@@ -40,6 +40,10 @@ const schema = z.object({
       minimumReels: z.number().int().min(2).max(12),
       betDivisor: z.number().int().positive().max(1_000_000),
     }).optional(),
+    cluster: z.object({
+      minimumCluster: z.number().int().min(2).max(400),
+      betDivisor: z.number().int().positive().max(1_000_000),
+    }).optional(),
     expandingWild: z.object({ symbols: z.array(z.string()).min(1) }).optional(),
     stackedWild: z.object({
       symbol: z.string(),
