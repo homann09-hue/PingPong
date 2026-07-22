@@ -1,0 +1,155 @@
+/* ===== Aurora Vegas-Stilschicht =====
+   Premium-Optik und Dauer-Animation ueber die bestehende Slot-Struktur.
+   Zuletzt importiert, damit sie gezielt ueberschreibt. Aendert keine Logik. */
+
+/* --- Buehne: atmender Farbverlauf statt flacher Flaeche --- */
+.slot-stage {
+  background: radial-gradient(120% 80% at 50% 0%, #5a1580, #2a0a4a 45%, #12062a 75%, #0a0418);
+}
+.slot-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(60% 40% at 50% 12%, rgba(255, 120, 255, 0.2), transparent 70%);
+  animation: aurora-breathe 4.5s ease-in-out infinite;
+}
+@keyframes aurora-breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+/* --- Walzenrahmen: goldenes Kabinett mit laufendem Glanz --- */
+.reel-frame {
+  position: relative;
+  border-radius: 18px;
+  padding: 9px;
+  background: linear-gradient(180deg, #ffe08a, #c8862f 35%, #7a4a12 65%, #ffd76a);
+  box-shadow: 0 0 28px rgba(255, 180, 60, 0.45), 0 10px 26px rgba(0, 0, 0, 0.7);
+}
+.reel-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: aurora-shine 3.4s linear infinite;
+}
+@keyframes aurora-shine { 0% { background-position: -60% 0; } 100% { background-position: 160% 0; } }
+.reel-frame > * { position: relative; z-index: 1; }
+
+/* --- Symbole: fett, glaenzend, dunkel konturiert --- */
+.symbol {
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.45);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.32));
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -6px 11px rgba(0, 0, 0, 0.4);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.symbol.winning {
+  animation: aurora-winpulse 0.75s ease-in-out infinite;
+  z-index: 3;
+}
+@keyframes aurora-winpulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.13); filter: brightness(1.5) drop-shadow(0 0 14px #ffd76a); }
+}
+.low-symbol {
+  font-weight: 900;
+  color: #ffe9a8;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 12px rgba(255, 199, 44, 0.5);
+}
+
+/* --- Jackpot-Leiste: farbcodiert mit Licht-Sweep --- */
+.jackpot-strip span {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, #c07bff, #5a1f9e);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.jackpot-strip span::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: aurora-sweep 3s linear infinite;
+}
+@keyframes aurora-sweep { to { left: 120%; } }
+.jackpot-strip span:nth-child(1) { background: linear-gradient(180deg, #64e8a4, #12734a); }
+.jackpot-strip span:nth-child(2) { background: linear-gradient(180deg, #4fe6ff, #0a6c8a); }
+.jackpot-strip span:nth-child(3) { background: linear-gradient(180deg, #ff7bd0, #a8237a); }
+.jackpot-strip span:nth-child(4) { background: linear-gradient(180deg, #ffd76a, #c8862f); }
+.jackpot-strip strong { color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.jackpot-strip small { color: rgba(255, 255, 255, 0.92); letter-spacing: 0.08em; }
+
+/* --- Dreh-Button: der Blickfang --- */
+.spin-button {
+  position: relative;
+  border: none;
+  background: radial-gradient(circle at 34% 28%, #ff8b7a, #ff3b52 45%, #a30f24);
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 26px rgba(255, 60, 90, 0.75), 0 6px 14px rgba(0, 0, 0, 0.7),
+    inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -8px 15px rgba(0, 0, 0, 0.35);
+  animation: aurora-spinpulse 1.9s ease-in-out infinite;
+}
+@keyframes aurora-spinpulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.spin-button::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 215, 106, 0.6);
+  animation: aurora-rot 7s linear infinite;
+  pointer-events: none;
+}
+@keyframes aurora-rot { to { transform: rotate(360deg); } }
+.spin-button:disabled { animation: none; filter: saturate(0.5) brightness(0.7); }
+.spin-button:disabled::after { animation-play-state: paused; }
+
+/* --- Gewinnanzeige --- */
+.win-panel strong {
+  color: #ffd76a;
+  font-weight: 900;
+  text-shadow: 0 0 16px rgba(255, 199, 44, 0.85);
+  animation: aurora-winpop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes aurora-winpop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* --- Einsatz- und Nebenbuttons: goldene Pillen --- */
+.bet-control {
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 199, 44, 0.5);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.75));
+}
+.bet-control button {
+  background: linear-gradient(180deg, #ffe9a8, #e0a63c);
+  color: #2a0d4a;
+  font-weight: 900;
+  border: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+.bet-control strong { color: #ffe9a8; }
+.turbo-button.selected, .auto-button.running {
+  border-color: rgba(255, 199, 44, 0.8);
+  box-shadow: 0 0 16px rgba(255, 199, 44, 0.6);
+}
+
+/* --- Bewegung respektieren --- */
+@media (prefers-reduced-motion: reduce) {
+  .slot-stage::after, .reel-frame::before, .jackpot-strip span::after,
+  .spin-button, .spin-button::after, .symbol.winning, .win-panel strong {
+    animation: none !important;
+  }
+}
