@@ -153,3 +153,66 @@
     animation: none !important;
   }
 }
+
+/* ===== Themen-Symbole: Glow, Funkeln, Lande-Bounce, Gewinn ===== */
+.slot-sym {
+  width: 82%;
+  height: 82%;
+  overflow: visible;
+  filter: drop-shadow(0 0 3px rgba(255, 215, 106, 0.3));
+  animation: aurora-symLand 0.5s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+@keyframes aurora-symLand {
+  0% { transform: translateY(-26%) scaleY(1.16) scaleX(0.9); }
+  55% { transform: translateY(0) scaleY(0.88) scaleX(1.1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Wild: schwebt und leuchtet dauerhaft */
+.slot-sym-wild {
+  animation: aurora-symLand 0.5s cubic-bezier(0.22, 1.4, 0.36, 1), aurora-wildGlow 1.9s ease-in-out 0.5s infinite;
+}
+@keyframes aurora-wildGlow {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(120, 220, 255, 0.7)) drop-shadow(0 0 20px rgba(80, 140, 255, 0.45)); transform: translateY(0); }
+  50% { filter: drop-shadow(0 0 20px rgba(160, 240, 255, 1)) drop-shadow(0 0 42px rgba(90, 160, 255, 0.8)); transform: translateY(-4px); }
+}
+
+/* Scatter und Bonus: goldener Puls */
+.slot-sym-scatter {
+  animation: aurora-symLand 0.5s cubic-bezier(0.22, 1.4, 0.36, 1), aurora-scatterGlow 2.2s ease-in-out 0.5s infinite;
+}
+@keyframes aurora-scatterGlow {
+  0%, 100% { filter: drop-shadow(0 0 7px rgba(255, 199, 44, 0.6)) drop-shadow(0 0 16px rgba(255, 150, 40, 0.35)); }
+  50% { filter: drop-shadow(0 0 16px rgba(255, 215, 106, 1)) drop-shadow(0 0 34px rgba(255, 150, 40, 0.7)); }
+}
+
+/* Gewinn: kraeftiger Puls, ueberschreibt die Ruhe-Animation */
+.slot-sym-win {
+  animation: aurora-symWin 0.75s ease-in-out infinite !important;
+  z-index: 3;
+}
+@keyframes aurora-symWin {
+  0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 8px rgba(255, 215, 106, 0.7)); }
+  50% { transform: scale(1.16); filter: brightness(1.6) drop-shadow(0 0 22px rgba(255, 235, 150, 1)) drop-shadow(0 0 44px rgba(255, 170, 40, 0.85)); }
+}
+
+/* Strahlenkranz hinter dem Gewinnsymbol */
+.symbol.winning::before {
+  content: "";
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, rgba(255, 215, 106, 0.8) 0 6deg, transparent 6deg 30deg);
+  animation: aurora-rays 5s linear infinite;
+  opacity: 0.7;
+  mask: radial-gradient(circle, transparent 38%, #000 42%, #000 70%, transparent 76%);
+  -webkit-mask: radial-gradient(circle, transparent 38%, #000 42%, #000 70%, transparent 76%);
+}
+@keyframes aurora-rays { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-sym, .slot-sym-wild, .slot-sym-scatter, .slot-sym-win, .symbol.winning::before {
+    animation: none !important;
+  }
+}
