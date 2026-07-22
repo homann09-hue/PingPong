@@ -326,3 +326,17 @@ html { scroll-padding-top: 96px; }
   .legal-article h1 { font-size: 26px; }
   .legal-footer { margin-top: 18px; padding: 16px 12px calc(84px + env(safe-area-inset-bottom)); }
 }
+
+/* Autoplay laeuft: der Knopf ist jetzt aktiv (nicht mehr der alte disabled-
+   Platzhalter). Der laufende Zustand pulsiert dezent und zeigt die Restrunden. */
+.auto-button:not(:disabled) { cursor: pointer; opacity: 1; }
+.auto-button.running {
+  border-color: rgba(255, 199, 44, 0.7);
+  color: #ffc72c;
+  box-shadow: 0 0 0 1px rgba(255, 199, 44, 0.5), 0 0 16px rgba(255, 199, 44, 0.35);
+  animation: auto-pulse 1.4s ease-in-out infinite;
+}
+.auto-button.running svg { animation: auto-spin 1.4s linear infinite; }
+@keyframes auto-pulse { 0%, 100% { box-shadow: 0 0 0 1px rgba(255,199,44,0.5), 0 0 12px rgba(255,199,44,0.3); } 50% { box-shadow: 0 0 0 2px rgba(255,199,44,0.8), 0 0 22px rgba(255,199,44,0.55); } }
+@keyframes auto-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .auto-button.running, .auto-button.running svg { animation: none; } }
