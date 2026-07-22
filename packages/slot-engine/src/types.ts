@@ -36,6 +36,10 @@ export interface FeatureConfig {
     readonly minimumReels: number;
     readonly betDivisor: number;
   };
+  readonly cluster?: {
+    readonly minimumCluster: number;
+    readonly betDivisor: number;
+  };
   readonly expandingWild?: { readonly symbols: readonly string[] };
   readonly stackedWild?: { readonly symbol: string; readonly minimumSize: number };
   readonly stickyWild?: { readonly symbol: string; readonly maxSticky: number };
@@ -182,10 +186,18 @@ export interface WaysWin {
   readonly cells: readonly [number, number][];
 }
 
-export type Win = LineWin | ScatterWin | WaysWin;
+export interface ClusterWin {
+  readonly kind: "cluster";
+  readonly symbol: string;
+  readonly count: number;
+  readonly amount: number;
+  readonly cells: readonly [number, number][];
+}
+
+export type Win = LineWin | ScatterWin | WaysWin | ClusterWin;
 
 export interface EngineEvent {
-  readonly type: "layout.changed" | "wild.expanded" | "wild.stacked" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "symbol.upgraded" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached";
+  readonly type: "layout.changed" | "wild.expanded" | "wild.stacked" | "wild.stuck" | "wild.walked" | "multiplier.applied" | "scatter.hit" | "free_spins.awarded" | "free_spins.modified" | "mystery.revealed" | "symbol.upgraded" | "ways.win" | "respin.started" | "cascade.started" | "bonus.awarded" | "max_win.reached" | "cluster.win";
   readonly data: Readonly<Record<string, number | string>>;
 }
 
