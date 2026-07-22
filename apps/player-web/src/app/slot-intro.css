@@ -1,0 +1,74 @@
+.slot-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.4rem;
+  padding: 1.5rem;
+  background: linear-gradient(180deg, rgba(6, 4, 18, 0.92), rgba(6, 4, 18, 0.97));
+  background: radial-gradient(120% 90% at 50% 35%, color-mix(in srgb, var(--slot-primary, #1a1140) 55%, transparent), transparent 70%), linear-gradient(180deg, rgba(6, 4, 18, 0.92), rgba(6, 4, 18, 0.97));
+  backdrop-filter: blur(6px);
+  animation: slot-intro-in 260ms ease-out;
+}
+
+@keyframes slot-intro-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.slot-intro-emblem {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 215, 106, 0.55);
+  border: 3px solid color-mix(in srgb, var(--slot-secondary, #ffd76a) 70%, transparent);
+  border-top-color: var(--slot-secondary, #ffd76a);
+  box-shadow: 0 0 32px rgba(255, 215, 106, 0.4);
+  box-shadow: 0 0 32px color-mix(in srgb, var(--slot-secondary, #ffd76a) 45%, transparent);
+  animation: slot-intro-spin 900ms linear infinite;
+}
+
+@keyframes slot-intro-spin {
+  to { transform: rotate(360deg); }
+}
+
+.slot-intro-name {
+  margin: 0;
+  font-size: clamp(1.3rem, 5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 18px rgba(6, 4, 18, 0.85);
+}
+
+.slot-intro-bar {
+  position: relative;
+  width: min(220px, 60vw);
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.slot-intro-bar i {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--slot-secondary, #ffd76a), transparent);
+  animation: slot-intro-sweep 1100ms ease-in-out infinite;
+}
+
+@keyframes slot-intro-sweep {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(320%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-intro { animation: none; }
+  .slot-intro-emblem,
+  .slot-intro-bar i { animation-duration: 0.001ms; animation-iteration-count: 1; }
+}
