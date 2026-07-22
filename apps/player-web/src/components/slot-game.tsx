@@ -138,6 +138,13 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
+      {!paytable && (
+        <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}>
+          <span className="slot-intro-emblem" aria-hidden="true" />
+          <p className="slot-intro-name">{game.name}</p>
+          <span className="slot-intro-bar" aria-hidden="true"><i /></span>
+        </div>
+      )}
       <header className="slot-header">
         <Link href="/" className="back-link" aria-label="Zurueck zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
         <div><span>{game.name}</span><h1 id="slot-title">Grand {grand ? coinNumber(grand.amount) : "—"}</h1></div>
