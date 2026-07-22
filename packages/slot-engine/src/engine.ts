@@ -444,6 +444,9 @@ export class SlotEngine {
   // Cluster Pays: Gewinne durch orthogonal zusammenhaengende Gruppen gleicher
   // Symbole statt ueber Linien oder Ways. Opt-in ueber features.cluster — kein
   // bestehender Slot nutzt es, deren Auswertung bleibt damit unveraendert.
+  // Cluster Pays: Gewinne durch orthogonal zusammenhaengende Gruppen gleicher
+  // Symbole statt ueber Linien oder Ways. Opt-in ueber features.cluster — kein
+  // bestehender Slot nutzt es, deren Auswertung bleibt damit unveraendert.
   private evaluateClusters(
     grid: readonly (readonly string[])[],
     bet: number,
@@ -459,15 +462,17 @@ export class SlotEngine {
     );
     const reels = grid.length;
     const wins: ClusterWin[] = [];
-    // Regulaere Zellen, die bereits zu einem Cluster gezaehlt wurden, nicht
-    // erneut als Startpunkt verwenden. Wilds bleiben teilbar — sie koennen zu
-    // mehreren Clustern verschiedener Symbole gehoeren — und werden daher nicht
-    // global gesperrt.
+    // Wilds bleiben teilbar (koennen zu mehreren Clustern gehoeren) und werden
+    // nicht global gesperrt; regulaere Zellen schon, sonst zaehlte ein Cluster
+    // mehrfach.
     const claimed: boolean[][] = grid.map((reel) => reel.map(() => false));
     for (let reel = 0; reel < reels; reel += 1) {
-      for (let row = 0; row < grid[reel].length; row += 1) {
-        const symbol = grid[reel][row];
-        if (claimed[reel][row] || wilds.has(symbol)) continue;
+      const reelCells = grid[reel];
+      const claimedReel = claimed[reel];
+      if (!reelCells || !claimedReel) continue;
+      for (let row = 0; row < reelCells.length; row += 1) {
+        const symbol = reelCells[row];
+        if (symbol === undefined || claimedReel[row] || wilds.has(symbol)) continue;
         const payouts = this.config.symbols[symbol]?.payouts;
         if (!payouts) continue;
         // Flood-Fill ueber orthogonale Nachbarn mit gleichem Symbol oder Wild.
@@ -475,15 +480,19 @@ export class SlotEngine {
         const cells: [number, number][] = [];
         const seen = new Set<string>([`${reel}:${row}`]);
         while (stack.length > 0) {
-          const [r, c] = stack.pop() as [number, number];
+          const current = stack.pop();
+          if (!current) break;
+          const [r, c] = current;
           cells.push([r, c]);
           const neighbours: [number, number][] = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
           for (const [nr, nc] of neighbours) {
-            if (nr < 0 || nr >= reels || nc < 0 || nc >= grid[nr].length) continue;
+            if (nr < 0 || nr >= reels) continue;
+            const neighbourReel = grid[nr];
+            if (!neighbourReel || nc < 0 || nc >= neighbourReel.length) continue;
             const key = `${nr}:${nc}`;
             if (seen.has(key)) continue;
-            const candidate = grid[nr][nc];
-            if (candidate === symbol || wilds.has(candidate)) {
+            const candidate = neighbourReel[nc];
+            if (candidate !== undefined && (candidate === symbol || wilds.has(candidate))) {
               seen.add(key);
               stack.push([nr, nc]);
             }
@@ -491,13 +500,15 @@ export class SlotEngine {
         }
         // Nur die regulaeren Zellen des Symbols als verbraucht markieren.
         for (const [r, c] of cells) {
-          if (grid[r][c] === symbol) claimed[r][c] = true;
+          const claimRow = claimed[r];
+          if (grid[r]?.[c] === symbol && claimRow) claimRow[c] = true;
         }
         const count = cells.length;
         if (count < feature.minimumCluster) continue;
         // Groesste definierte Auszahlungsstufe, die <= Clustergroesse ist.
         const tiers = Object.keys(payouts).map(Number).filter((n) => n <= count).sort((a, b) => b - a);
-        const payout = tiers.length > 0 ? payouts[tiers[0]] : 0;
+        const topTier = tiers[0];
+        const payout = topTier === undefined ? 0 : (payouts[topTier] ?? 0);
         if (payout <= 0) continue;
         const amount = Math.floor((payout * bet * roundMultiplier) / feature.betDivisor);
         if (amount <= 0) continue;
@@ -766,4 +777,4 @@ export class SlotEngine {
   }
 
   private awardEvent(count: number): EngineEvent { return { type: "free_spins.awarded", data: { count } }; }
-                                                                     }
+}
