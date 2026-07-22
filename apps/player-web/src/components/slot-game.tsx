@@ -12,7 +12,7 @@ import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
 import { SpeakerHigh } from "@phosphor-icons/react/dist/csr/SpeakerHigh";
 import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
 import { initialGrid, type JackpotTier, type SpinResult } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
@@ -78,6 +78,22 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, [game.id]);
+
+  // Autoplay: dreht bis zu N Runden automatisch. Der "latest ref"-Zeiger haelt
+  // stets die aktuelle spin-Funktion, damit kein veralteter Closure-Stand
+  // (Einsatz, Kontostand) verwendet wird. Der Effekt startet die naechste Runde
+  // erst, wenn die vorige fertig ist — keine Timer-Kollision, terminiert nach N.
+  const [autoRemaining, setAutoRemaining] = useState(0);
+  const spinRef = useRef(spin);
+  useEffect(() => { spinRef.current = spin; });
+  useEffect(() => {
+    if (autoRemaining <= 0 || spinning) return undefined;
+    const timer = setTimeout(() => {
+      void spinRef.current();
+      setAutoRemaining((remaining) => remaining - 1);
+    }, turbo ? 320 : 780);
+    return () => clearTimeout(timer);
+  }, [autoRemaining, spinning, turbo]);
 
   async function spin() {
     if (spinning) return;
@@ -165,7 +181,12 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         <div className="bet-control"><button disabled={spinning || betIndex === 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhoehen"><Plus weight="bold" /></button></div>
         <button className={`turbo-button ${turbo ? "selected" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo}><Lightning weight="fill" /><span>Turbo</span></button>
         <button className="spin-button" onClick={spin} disabled={spinning || !profile} aria-label={spinning ? "Walzen drehen" : `Fuer ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? "Dreht" : "Spin"}</span></button>
-        <button className="auto-button" disabled><ArrowsClockwise weight="bold" /><span>Auto<em>Bald</em></span></button>
+        <button
+            className={autoRemaining > 0 ? "auto-button running" : "auto-button"}
+            onClick={() => (autoRemaining > 0 ? setAutoRemaining(0) : setAutoRemaining(10))}
+            disabled={!profile}
+            aria-label={autoRemaining > 0 ? "Autoplay stoppen" : "10 Runden automatisch drehen"}
+          ><ArrowsClockwise weight="bold" /><span>Auto<em>{autoRemaining > 0 ? autoRemaining : "10x"}</em></span></button>
       </div>
       {celebration?.tier && <WinCelebration
         tier={celebration.tier}
