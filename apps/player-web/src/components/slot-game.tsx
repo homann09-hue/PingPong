@@ -114,6 +114,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [win, setWin] = useState(0);
   const [message, setMessage] = useState("Setz deinen Einsatz und dreh los");
   const [spinning, setSpinning] = useState(false);
+  const [stoppedReels, setStoppedReels] = useState(initialGrid.length);
   const [turbo, setTurbo] = useState(false);
   const [sound, setSound] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -159,7 +160,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setWinCells(new Set()); setWinPaths([]); setWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
+    setSpinning(true); setStoppedReels(0); setWinCells(new Set()); setWinPaths([]); setWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -171,6 +172,12 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       if (!response.ok) throw new Error(body.code ?? "SPIN_FAILED");
       await new Promise((resolve) => window.setTimeout(resolve, turbo ? 160 : 720));
       setGrid(body.spin.grid);
+      for (let reel = 1; reel <= body.spin.grid.length; reel += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, turbo ? 55 : 145));
+        setStoppedReels(reel);
+        if (sound && !turbo) playTones([245 + reel * 18], 0.045, "square", 0.018);
+      }
+      setSpinning(false);
       setWin(body.spin.totalWin);
       setWinPaths(body.spin.wins);
       setWinCells(new Set(body.spin.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
@@ -194,7 +201,9 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       else if (code === "HIGH_ROLLER_MEMBERSHIP_REQUIRED") setMessage("Dieser Slot ist dem High Roller Club vorbehalten.");
       else if (code === "RATE_LIMITED") setMessage("Zu viele Spins in kurzer Zeit. Kurz durchatmen und weiter geht es.");
       else setMessage("Der Spin konnte nicht abgeschlossen werden. Dein Guthaben ist sicher.");
-    } finally { setSpinning(false); }
+      setStoppedReels(grid.length);
+      setSpinning(false);
+    }
   }
 
   const themeStyle = { "--slot-primary": game.primary, "--slot-secondary": game.secondary,
@@ -286,7 +295,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
             style={{ "--line-index": index, "--line-y": `${18 + (index % 5) * 16}%` } as React.CSSProperties}
           />)}
         </div>}
-        {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
+        {reels.map(({ column, reel }) => <div className={`reel ${stoppedReels > reel ? "is-stopped" : ""}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
               fest, bevor sich hier etwas bewegt â die Drehung erzaehlt es nur nach. */}
           <div className="reel-strip" aria-hidden="true">
