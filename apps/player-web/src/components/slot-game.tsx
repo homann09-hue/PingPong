@@ -139,11 +139,18 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     // Grafik, kein zusaetzliches Asset noetig.
     "--slot-cover": `url("${game.cover}")` } as React.CSSProperties;
   return <AppShell profile={profile}>
-    <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
+    <section
+      className={`slot-stage ${spinning ? "slot-is-spinning" : ""} ${win > 0 ? "slot-has-win" : ""}`}
+      aria-labelledby="slot-title"
+      style={themeStyle}
+    >
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
       <div className="slot-cinematic-rig" aria-hidden="true">
         <i /><i /><i /><i />
+      </div>
+      <div className="stage-coin-burst" aria-hidden="true">
+        {Array.from({ length: 34 }, (_, index) => <i key={index} style={{ "--coin-index": index } as React.CSSProperties} />)}
       </div>
       {presentationOpen && (
         <div className="slot-presentation" aria-hidden="true">
@@ -176,6 +183,11 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         </div>
       </header>
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
+      <div className="slot-motion-hud" aria-hidden="true">
+        <span className="hud-badge">VIP BOOM</span>
+        <strong>{game.name}</strong>
+        <span className="hud-badge hud-badge-hot">FREE SPINS</span>
+      </div>
       <div className="jackpot-strip" aria-label="Progressive Jackpots">
         {jackpotOrder.map((tier) => {
           const entry = jackpots.find((jackpot) => jackpot.tier === tier);
@@ -193,6 +205,16 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         <em>SUPER FEATURE</em>
         <strong>FREE SPINS</strong>
       </div>
+      <aside className="slot-reward-ladder" aria-hidden="true">
+        <strong>REWARDS</strong>
+        {[...jackpotOrder].reverse().map((tier, index) => {
+          const entry = jackpots.find((jackpot) => jackpot.tier === tier);
+          return <span key={tier} style={{ "--ladder-index": index } as React.CSSProperties}>
+            <small>{jackpotLabels[tier]}</small>
+            <em>{entry ? coinNumber(entry.amount) : "—"}</em>
+          </span>;
+        })}
+      </aside>
       <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${win > 0 ? "has-win" : ""} ${turbo ? "is-turbo" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
         <div className="cabinet-bulbs" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</div>
         {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
@@ -214,6 +236,11 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
               ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} />
               : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}</div>;
         })}</div>)}
+      </div>
+      <div className="feature-tease-panel" aria-hidden="true">
+        <span>Pick a Vault</span>
+        <strong>{win > 0 ? "Reward unlocked!" : spinning ? "Hold for feature!" : "3 bonus symbols unlock"}</strong>
+        <i />
       </div>
       <div className="win-panel" aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(win)}</strong>}</div>
       <div className="slot-controls">
