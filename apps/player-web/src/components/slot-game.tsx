@@ -126,6 +126,14 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
   const grand = jackpots.find((entry) => entry.tier === "GRAND");
+  const visibleFeatureSymbols = useMemo(
+    () => grid
+      .slice(0, stoppedReels)
+      .flat()
+      .filter((symbol) => symbol === "S" || symbol === "B").length,
+    [grid, stoppedReels],
+  );
+  const anticipation = spinning && stoppedReels >= 2 && stoppedReels < grid.length && visibleFeatureSymbols >= 2;
 
   useEffect(() => {
     let cancelled = false;
@@ -212,7 +220,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     "--slot-cover": `url("${game.cover}")` } as React.CSSProperties;
   return <AppShell profile={profile}>
     <section
-      className={`slot-stage ${spinning ? "slot-is-spinning" : ""} ${win > 0 ? "slot-has-win" : ""}`}
+      className={`slot-stage ${spinning ? "slot-is-spinning" : ""} ${win > 0 ? "slot-has-win" : ""} ${anticipation ? "slot-anticipation" : ""}`}
       aria-labelledby="slot-title"
       style={themeStyle}
     >
@@ -257,8 +265,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
       <div className="slot-motion-hud" aria-hidden="true">
         <span className="hud-badge">VIP BOOM</span>
-        <strong>{game.name}</strong>
-        <span className="hud-badge hud-badge-hot">FREE SPINS</span>
+        <strong>{anticipation ? "BONUS CHANCE" : game.name}</strong>
+        <span className="hud-badge hud-badge-hot">{anticipation ? `${visibleFeatureSymbols}/3` : "FREE SPINS"}</span>
       </div>
       <div className="jackpot-strip" aria-label="Progressive Jackpots">
         {jackpotOrder.map((tier) => {
@@ -287,8 +295,12 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
           </span>;
         })}
       </aside>
-      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${win > 0 ? "has-win" : ""} ${turbo ? "is-turbo" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
+      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${win > 0 ? "has-win" : ""} ${turbo ? "is-turbo" : ""} ${anticipation ? "is-anticipating" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
         <div className="cabinet-bulbs" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</div>
+        {anticipation && <div className="anticipation-fx" aria-hidden="true">
+          <strong>BONUS CHANCE</strong>
+          {Array.from({ length: 10 }, (_, index) => <i key={index} style={{ "--spark-index": index } as React.CSSProperties} />)}
+        </div>}
         {winPaths.length > 0 && <div className="payline-fx" aria-hidden="true">
           {winPaths.slice(0, 8).map((path, index) => <span
             key={`${index}-${path.amount}-${path.cells.map(([reel, row]) => `${reel}:${row}`).join("-")}`}
@@ -317,7 +329,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </div>
       <div className="feature-tease-panel" aria-hidden="true">
         <span>Pick a Vault</span>
-        <strong>{win > 0 ? "Reward unlocked!" : spinning ? "Hold for feature!" : "3 bonus symbols unlock"}</strong>
+        <strong>{win > 0 ? "Reward unlocked!" : anticipation ? "Noch ein Symbol fuer Feature!" : spinning ? "Hold for feature!" : "3 bonus symbols unlock"}</strong>
         <i />
       </div>
       <div className="win-panel" aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(win)}</strong>}</div>

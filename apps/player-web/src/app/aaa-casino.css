@@ -2019,6 +2019,147 @@ body {
   animation-delay: calc(var(--symbol-row, 0) * 42ms);
 }
 
+.slot-anticipation {
+  animation:
+    aaa-anticipation-stage-pulse .32s ease-in-out infinite,
+    aaa-anticipation-stage-shake .12s linear infinite;
+}
+
+.slot-anticipation .slot-backdrop {
+  filter: blur(2px) saturate(1.75) contrast(1.14) brightness(1.02) !important;
+}
+
+.slot-anticipation .slot-cinematic-rig i {
+  animation-duration: .72s;
+  opacity: 1;
+  filter: blur(8px) brightness(1.7);
+}
+
+.slot-anticipation .slot-motion-hud {
+  border-color: #fff7a8;
+  background:
+    radial-gradient(circle at 50% 20%, rgb(255 255 255 / 34%), transparent 36%),
+    linear-gradient(180deg, #ff2f42, #7f0014 52%, #ca00e6);
+  box-shadow:
+    inset 0 4px rgb(255 255 255 / 44%),
+    inset 0 -8px rgb(0 0 0 / 26%),
+    0 7px 0 #6b0010,
+    0 18px 34px rgb(0 0 0 / 48%),
+    0 0 54px rgb(255 216 77 / 76%);
+}
+
+.slot-anticipation .slot-motion-hud strong {
+  animation: aaa-anticipation-title .48s ease-in-out infinite alternate;
+}
+
+.reel-frame.is-anticipating {
+  box-shadow:
+    0 0 0 5px #fff7a8,
+    0 0 0 9px #ff35ef,
+    0 16px 0 #720077,
+    0 38px 72px rgb(0 0 0 / 70%),
+    0 0 92px rgb(255 216 77 / 92%),
+    inset 0 6px rgb(255 255 255 / 50%),
+    inset 0 -12px rgb(0 0 0 / 36%) !important;
+}
+
+.reel-frame.is-anticipating .reel:not(.is-stopped) {
+  animation:
+    aaa-reel-stage-rumble .09s linear infinite,
+    aaa-reel-depth-sway .24s ease-in-out infinite alternate !important;
+}
+
+.reel-frame.is-anticipating .reel:not(.is-stopped) .reel-strip {
+  animation-duration: .22s;
+  filter: saturate(1.8) brightness(1.3);
+}
+
+.reel-frame.is-anticipating .symbol-code-s,
+.reel-frame.is-anticipating .symbol-code-b {
+  animation: aaa-feature-symbol-beacon .42s ease-in-out infinite alternate;
+}
+
+.anticipation-fx {
+  position: absolute;
+  z-index: 18;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.anticipation-fx strong {
+  padding: 10px 18px;
+  border: 4px solid #fff7a8;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff3838, #b00025 58%, #5b0012);
+  color: #fff;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(22px, 4.4vw, 58px);
+  letter-spacing: .08em;
+  -webkit-text-stroke: 1px #4a0010;
+  text-shadow:
+    0 4px 0 #52000d,
+    0 10px 16px rgb(0 0 0 / 62%),
+    0 0 28px rgb(255 216 77 / 92%);
+  box-shadow:
+    inset 0 4px rgb(255 255 255 / 36%),
+    0 8px 0 #610012,
+    0 22px 44px rgb(0 0 0 / 54%),
+    0 0 48px rgb(255 53 239 / 82%);
+  transform: rotate(-2deg);
+  animation: aaa-anticipation-card-pop .5s cubic-bezier(.18, 1.5, .3, 1) infinite alternate;
+}
+
+.anticipation-fx i {
+  --spark-x: calc((var(--spark-index) * 31) % 100);
+  position: absolute;
+  left: calc(var(--spark-x) * 1%);
+  bottom: 4%;
+  width: clamp(8px, 1vw, 15px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 16%, #fff078 18% 48%, #ff35ef 52% 100%);
+  box-shadow: 0 0 18px #fff078, 0 0 32px #ff35ef;
+  opacity: 0;
+  animation: aaa-anticipation-spark 1s ease-out infinite;
+  animation-delay: calc(var(--spark-index) * .08s);
+}
+
+@keyframes aaa-anticipation-stage-pulse {
+  0%, 100% { filter: saturate(1.04) brightness(1); }
+  50% { filter: saturate(1.24) brightness(1.08); }
+}
+
+@keyframes aaa-anticipation-stage-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  33% { transform: translate3d(-1px, 1px, 0); }
+  66% { transform: translate3d(1px, -1px, 0); }
+}
+
+@keyframes aaa-anticipation-title {
+  from { transform: scale(1); filter: brightness(1); }
+  to { transform: scale(1.065); filter: brightness(1.28); }
+}
+
+@keyframes aaa-feature-symbol-beacon {
+  from { transform: scale(1); filter: brightness(1); }
+  to { transform: scale(1.075); filter: brightness(1.35); }
+}
+
+@keyframes aaa-anticipation-card-pop {
+  from { transform: translateY(0) rotate(-2deg) scale(1); }
+  to { transform: translateY(-5px) rotate(2deg) scale(1.055); }
+}
+
+@keyframes aaa-anticipation-spark {
+  0% { opacity: 0; transform: translateY(0) scale(.45) rotate(0); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-52vh) scale(1.3) rotate(520deg); }
+}
+
 .reel-frame.is-spinning .reel:nth-of-type(2) { animation-delay: .06s, .04s !important; }
 .reel-frame.is-spinning .reel:nth-of-type(3) { animation-delay: .12s, .08s !important; }
 .reel-frame.is-spinning .reel:nth-of-type(4) { animation-delay: .18s, .12s !important; }
@@ -2201,12 +2342,19 @@ body {
   .reel-frame.is-spinning .reel,
   .reel-frame.is-spinning .reel-strip,
   .reel-frame:not(.is-spinning) .reel,
+  .slot-anticipation,
+  .slot-anticipation .slot-motion-hud strong,
+  .reel-frame.is-anticipating .symbol-code-s,
+  .reel-frame.is-anticipating .symbol-code-b,
+  .anticipation-fx strong,
+  .anticipation-fx i,
   .payline-fx span,
   .slot-has-win .win-panel {
     animation: none !important;
   }
 
   .reel-strip,
+  .anticipation-fx,
   .payline-fx {
     display: none !important;
   }
