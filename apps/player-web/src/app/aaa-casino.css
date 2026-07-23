@@ -2313,6 +2313,77 @@ body {
   animation: aaa-win-panel-slam .52s cubic-bezier(.18, 1.5, .3, 1) 2;
 }
 
+.win-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.win-panel.is-counting {
+  border-color: #fff7a8;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 244 160 / 34%), transparent 42%),
+    radial-gradient(circle at 20% 60%, rgb(255 53 239 / 20%), transparent 36%),
+    linear-gradient(180deg, #7f0099, #21002b 58%, #510063);
+}
+
+.win-count {
+  position: relative;
+  z-index: 3;
+  animation: aaa-win-count-pop .42s cubic-bezier(.18, 1.5, .3, 1) infinite alternate;
+}
+
+.win-count::after {
+  content: "";
+  position: absolute;
+  right: -10%;
+  bottom: -18%;
+  left: -10%;
+  height: 32%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgb(255 216 77 / 70%), transparent 70%);
+  filter: blur(12px);
+  z-index: -1;
+}
+
+.win-coin-flyout {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.win-coin-flyout i {
+  --coin-x: calc((var(--win-coin-index) * 29) % 100);
+  position: absolute;
+  left: calc(var(--coin-x) * 1%);
+  bottom: -18px;
+  width: clamp(10px, 1.2vw, 18px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, #fffbd1 0 18%, #ffd84d 20% 58%, #b55900 60% 100%);
+  box-shadow:
+    inset 0 0 0 2px rgb(96 48 0 / 45%),
+    0 0 14px rgb(255 216 77 / 82%),
+    0 0 26px rgb(255 53 239 / 44%);
+  opacity: 0;
+  animation: aaa-win-coin-fly 1.4s cubic-bezier(.16, .84, .24, 1) infinite;
+  animation-delay: calc(var(--win-coin-index) * .055s);
+}
+
+@keyframes aaa-win-count-pop {
+  from { transform: translateY(0) scale(1); filter: brightness(1); }
+  to { transform: translateY(-2px) scale(1.035); filter: brightness(1.18); }
+}
+
+@keyframes aaa-win-coin-fly {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.45) rotate(0); }
+  14% { opacity: 1; }
+  78% { opacity: .86; }
+  100% { opacity: 0; transform: translate3d(calc((50 - var(--coin-x)) * .42px), -94px, 0) scale(1.18) rotate(740deg); }
+}
+
 @keyframes aaa-win-panel-slam {
   0%, 100% { transform: translateX(clamp(-42px, -4vw, -12px)) scale(1); }
   42% { transform: translateX(clamp(-42px, -4vw, -12px)) scale(1.045) rotate(-.6deg); }
@@ -2348,6 +2419,8 @@ body {
   .reel-frame.is-anticipating .symbol-code-b,
   .anticipation-fx strong,
   .anticipation-fx i,
+  .win-count,
+  .win-coin-flyout i,
   .payline-fx span,
   .slot-has-win .win-panel {
     animation: none !important;

@@ -112,6 +112,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [winCells, setWinCells] = useState<Set<string>>(new Set());
   const [winPaths, setWinPaths] = useState<readonly SpinWin[]>([]);
   const [win, setWin] = useState(0);
+  const [displayedWin, setDisplayedWin] = useState(0);
   const [message, setMessage] = useState("Setz deinen Einsatz und dreh los");
   const [spinning, setSpinning] = useState(false);
   const [stoppedReels, setStoppedReels] = useState(initialGrid.length);
@@ -134,6 +135,31 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     [grid, stoppedReels],
   );
   const anticipation = spinning && stoppedReels >= 2 && stoppedReels < grid.length && visibleFeatureSymbols >= 2;
+
+  useEffect(() => {
+    if (win <= 0) {
+      setDisplayedWin(0);
+      return undefined;
+    }
+
+    const startValue = displayedWin;
+    const difference = win - startValue;
+    const startTime = performance.now();
+    const duration = Math.min(1800, Math.max(620, Math.abs(difference) * 2.4));
+    let frame = 0;
+
+    const tick = (time: number) => {
+      const progress = Math.min(1, (time - startTime) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayedWin(Math.round(startValue + difference * eased));
+      if (progress < 1) frame = window.requestAnimationFrame(tick);
+    };
+
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  // displayedWin is intentionally captured as animation start value when win changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [win]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,7 +194,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setStoppedReels(0); setWinCells(new Set()); setWinPaths([]); setWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
+    setSpinning(true); setStoppedReels(0); setWinCells(new Set()); setWinPaths([]); setWin(0); setDisplayedWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -332,7 +358,15 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         <strong>{win > 0 ? "Reward unlocked!" : anticipation ? "Noch ein Symbol fuer Feature!" : spinning ? "Hold for feature!" : "3 bonus symbols unlock"}</strong>
         <i />
       </div>
-      <div className="win-panel" aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(win)}</strong>}</div>
+      <div className={`win-panel ${win > 0 ? "is-counting" : ""}`} aria-live="polite">
+        <span>{message}</span>
+        {win > 0 && <>
+          <strong className="win-count">GEWINN {coinNumber(displayedWin)}</strong>
+          <div className="win-coin-flyout" aria-hidden="true">
+            {Array.from({ length: 18 }, (_, index) => <i key={index} style={{ "--win-coin-index": index } as React.CSSProperties} />)}
+          </div>
+        </>}
+      </div>
       <div className="slot-controls">
         <div className="bet-control"><button disabled={spinning || betIndex === 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhoehen"><Plus weight="bold" /></button></div>
         <button className={`turbo-button ${turbo ? "selected" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo}><Lightning weight="fill" /><span>Turbo</span></button>
