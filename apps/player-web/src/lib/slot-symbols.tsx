@@ -137,7 +137,13 @@ export function SlotSymbol({
   const art = SETS[set]?.[code as SymbolCode];
   if (!art) return null;
   const accent = HIGHLIGHT[code];
-  const classes = ["slot-sym", accent ? `slot-sym-${accent}` : "", winning ? "slot-sym-win" : ""]
+  const classes = [
+    "slot-sym",
+    `slot-sym-set-${set}`,
+    `slot-sym-code-${code.toLowerCase()}`,
+    accent ? `slot-sym-${accent}` : "",
+    winning ? "slot-sym-win" : "",
+  ]
     .filter(Boolean)
     .join(" ");
   return (

@@ -161,7 +161,14 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
           return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "â"}</strong></span>;
         })}
       </div>
-      <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
+      <div className="slot-fx-layer" aria-hidden="true">
+        {Array.from({ length: 18 }, (_, index) => <span key={index} style={{ "--fx-index": index } as React.CSSProperties} />)}
+      </div>
+      <div className="premium-cabinet-top" aria-hidden="true">
+        <i /><strong>{game.name}</strong><i />
+      </div>
+      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${win > 0 ? "has-win" : ""} ${turbo ? "is-turbo" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
+        <div className="cabinet-bulbs" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</div>
         {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
               fest, bevor sich hier etwas bewegt â die Drehung erzaehlt es nur nach. */}

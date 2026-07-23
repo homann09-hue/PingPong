@@ -1,0 +1,725 @@
+/* ============================================================
+   AAA CASINO SKIN — highest-priority visual pass
+
+   Ziel: eigene, extrem saftige Social-Casino-Sprache mit mehr Cabinet-Tiefe,
+   Neon, Gold, Partikeln und tastbaren Buttons. Keine Marken-/Layout-Kopie:
+   nur Qualitätsmerkmale moderner Mobile-Slots.
+   ============================================================ */
+
+:root {
+  --aaa-pink: #ff35ef;
+  --aaa-purple: #7400a8;
+  --aaa-blue: #00d7ff;
+  --aaa-gold: #ffd84d;
+  --aaa-orange: #ff7a00;
+  --aaa-green: #65ff37;
+  --aaa-black: #050009;
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 9%, rgb(0 226 255 / 42%), transparent 25%),
+    radial-gradient(circle at 84% 6%, rgb(255 50 238 / 38%), transparent 28%),
+    linear-gradient(180deg, #09cfff 0%, #176dd9 41%, #15904e 73%, #650081 100%);
+}
+
+.app-shell {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 8% 13%, rgb(255 255 255 / 45%) 0 2%, transparent 12%),
+    radial-gradient(circle at 88% 13%, rgb(255 255 255 / 36%) 0 2%, transparent 12%),
+    linear-gradient(180deg, #14cfff 0%, #0b86ec 38%, #19a654 70%, #830097 100%) !important;
+}
+
+.app-shell::after {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 102%, rgb(117 255 86 / 48%) 0 12%, transparent 32%),
+    repeating-linear-gradient(92deg, transparent 0 54px, rgb(255 255 255 / 12%) 56px 58px, transparent 60px 118px),
+    linear-gradient(180deg, rgb(255 255 255 / 22%), transparent 24%);
+  mix-blend-mode: screen;
+  opacity: .9;
+}
+
+.topbar {
+  min-height: 82px;
+  border-bottom: 4px solid #ff66ff !important;
+  background:
+    radial-gradient(circle at 46% 0%, rgb(255 120 255 / 50%), transparent 38%),
+    linear-gradient(180deg, #9b00b3 0%, #340032 50%, #c700da 100%) !important;
+  box-shadow:
+    inset 0 4px rgb(255 255 255 / 42%),
+    inset 0 -8px rgb(55 0 60 / 55%),
+    0 10px 28px rgb(0 0 0 / 42%) !important;
+}
+
+.wallet-pill,
+.search-trigger,
+.icon-button,
+.streak-pill {
+  transform: translateZ(0);
+  box-shadow:
+    inset 0 3px rgb(255 255 255 / 32%),
+    inset 0 -5px rgb(0 0 0 / 30%),
+    0 5px 0 rgb(0 0 0 / 42%),
+    0 12px 18px rgb(0 0 0 / 28%) !important;
+}
+
+.wallet-pill {
+  border-width: 3px !important;
+  font-family: Impact, "Arial Black", sans-serif;
+  letter-spacing: .025em;
+}
+
+.store-button {
+  animation: aaa-buy-bounce 2.2s ease-in-out infinite;
+}
+
+@keyframes aaa-buy-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-2px) scale(1.035); }
+}
+
+.casino-lobby-stage {
+  perspective: 1200px;
+}
+
+.live-events-panel,
+.quest-king-panel,
+.recently-played-panel,
+.golden-promo-card,
+.miner-card,
+.game-cover,
+.event-card,
+.mission-item {
+  border-width: 3px !important;
+  border-color: rgb(255 235 122 / 72%) !important;
+  box-shadow:
+    0 0 0 2px rgb(110 0 130 / 84%),
+    0 9px 0 rgb(84 0 103 / 62%),
+    0 22px 42px rgb(0 0 0 / 42%),
+    inset 0 3px rgb(255 255 255 / 24%) !important;
+}
+
+.golden-promo-card,
+.quest-king-panel,
+.miner-card,
+.game-cover {
+  filter: saturate(1.22) contrast(1.08);
+}
+
+.golden-promo-card::after,
+.quest-king-panel::after,
+.game-cover::after {
+  position: absolute;
+  z-index: 4;
+  inset: -45% auto -45% -75%;
+  width: 44%;
+  content: "";
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 54%), transparent);
+  transform: rotate(13deg);
+  animation: aaa-card-sweep 4.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes aaa-card-sweep {
+  0%, 54% { left: -75%; }
+  100% { left: 130%; }
+}
+
+.game-card:nth-child(3n + 2) .game-cover::after { animation-delay: .9s; }
+.game-card:nth-child(3n + 3) .game-cover::after { animation-delay: 1.8s; }
+
+.game-card:hover .game-cover {
+  transform: translateY(-9px) rotateX(3deg) rotateY(-2deg) scale(1.025) !important;
+  box-shadow:
+    0 0 0 3px rgb(255 246 180 / 88%),
+    0 11px 0 rgb(105 0 126 / 72%),
+    0 30px 54px rgb(0 0 0 / 52%),
+    0 0 42px rgb(255 54 239 / 55%),
+    inset 0 3px rgb(255 255 255 / 28%) !important;
+}
+
+.game-title h3,
+.marquee-title strong,
+.quest-king-panel h2,
+.section-heading h2,
+.slot-header h1,
+.premium-cabinet-top strong {
+  -webkit-text-stroke: 1px rgb(32 0 41 / 65%);
+  text-shadow:
+    0 3px 0 #5b006b,
+    0 7px 12px rgb(0 0 0 / 55%),
+    0 0 20px rgb(255 226 94 / 42%) !important;
+}
+
+.cover-play,
+.claim-button,
+.hero-cta,
+.quest-king-panel a,
+.spin-button {
+  overflow: hidden;
+}
+
+.cover-play::before,
+.claim-button::before,
+.hero-cta::before,
+.quest-king-panel a::before,
+.spin-button::before {
+  position: absolute;
+  inset: -60% auto -60% -80%;
+  width: 58%;
+  content: "";
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 56%), transparent);
+  transform: rotate(16deg);
+  animation: aaa-button-sweep 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes aaa-button-sweep {
+  0%, 45% { left: -80%; }
+  100% { left: 135%; }
+}
+
+/* ---------- Slot screen ---------- */
+
+.slot-stage {
+  overflow: hidden;
+  border: 4px solid var(--slot-primary, var(--aaa-gold)) !important;
+  border-radius: 30px !important;
+  background:
+    radial-gradient(circle at 50% 6%, color-mix(in srgb, var(--slot-primary, #ffd84d) 38%, transparent), transparent 24%),
+    radial-gradient(circle at 16% 16%, rgb(0 220 255 / 26%), transparent 26%),
+    radial-gradient(circle at 82% 14%, rgb(255 40 236 / 28%), transparent 24%),
+    linear-gradient(180deg, #150027, #080012 56%, #180022) !important;
+  box-shadow:
+    0 0 0 3px rgb(80 0 94 / 82%),
+    0 25px 60px rgb(0 0 0 / 58%),
+    inset 0 3px rgb(255 255 255 / 16%) !important;
+}
+
+.slot-backdrop {
+  opacity: .46 !important;
+  filter: blur(7px) saturate(1.45) contrast(1.12) !important;
+  transform: scale(1.08) !important;
+}
+
+.slot-overlay {
+  background:
+    radial-gradient(ellipse at 50% 20%, rgb(255 255 255 / 9%), transparent 34%),
+    linear-gradient(180deg, rgb(20 0 38 / 38%), rgb(5 0 10 / 84%)) !important;
+}
+
+.slot-fx-layer {
+  position: absolute !important;
+  z-index: 1 !important;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.slot-fx-layer span {
+  --x: calc((var(--fx-index) * 47) % 100);
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  bottom: -24px;
+  width: 10px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, #fff8bf 0 18%, #ffd84d 20% 58%, #b55900 60% 100%);
+  box-shadow: 0 0 12px rgb(255 216 77 / 74%);
+  opacity: .0;
+  animation: aaa-float-coin calc(5.5s + var(--fx-index) * .17s) linear infinite;
+  animation-delay: calc(var(--fx-index) * -0.42s);
+}
+
+@keyframes aaa-float-coin {
+  0% { transform: translate3d(0, 0, 0) scale(.55) rotate(0); opacity: 0; }
+  9% { opacity: .9; }
+  86% { opacity: .75; }
+  100% { transform: translate3d(calc((50 - var(--x)) * .22px), -92vh, 0) scale(1.12) rotate(720deg); opacity: 0; }
+}
+
+.premium-cabinet-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  width: min(820px, calc(100% - 32px));
+  margin: 12px auto -2px;
+  color: #fff;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.premium-cabinet-top i {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--slot-primary, #ffd84d), transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--slot-primary, #ffd84d) 75%, transparent);
+}
+
+.premium-cabinet-top strong {
+  padding: 6px 18px;
+  border: 3px solid #ff65ff;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #3d0061, #120018);
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(15px, 2vw, 25px);
+  letter-spacing: .08em;
+}
+
+.reel-frame {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: clamp(5px, .8vw, 11px) !important;
+  width: min(860px, calc(100% - 24px)) !important;
+  padding: clamp(10px, 1.4vw, 18px) !important;
+  border: 0 !important;
+  border-radius: 26px !important;
+  background:
+    radial-gradient(circle at 50% 0%, #fff7b6 0 2%, transparent 14%),
+    linear-gradient(180deg, #fff2a0 0%, #ffca35 13%, #9a4a00 39%, #4d0064 52%, #21001e 73%, #ffc83a 100%) !important;
+  box-shadow:
+    0 0 0 5px #3a003f,
+    0 0 0 8px #ff55f3,
+    0 14px 0 #4b0055,
+    0 32px 58px rgb(0 0 0 / 64%),
+    0 0 44px color-mix(in srgb, var(--slot-primary, #ffd84d) 50%, transparent),
+    inset 0 4px rgb(255 255 255 / 42%),
+    inset 0 -10px rgb(0 0 0 / 38%) !important;
+}
+
+.reel-frame::before {
+  inset: clamp(10px, 1.4vw, 18px) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 52%) 0 1px, transparent 1px),
+    linear-gradient(180deg, #050008, #15001f 50%, #050008) !important;
+  background-size: calc(20% - 1px) 100%, auto !important;
+}
+
+.reel-frame::after {
+  inset: clamp(10px, 1.4vw, 18px) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(118deg, rgb(255 255 255 / 30%) 0 10%, transparent 24% 76%, rgb(255 255 255 / 12%) 88%, transparent),
+    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 18%), transparent 32%) !important;
+}
+
+.cabinet-bulbs {
+  position: absolute;
+  z-index: 5;
+  inset: -8px 7px auto;
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  gap: 5px;
+  pointer-events: none;
+}
+
+.cabinet-bulbs i {
+  height: 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle, #fff9d4 0 23%, #ffd84d 25% 56%, #ff7a00 62% 100%);
+  box-shadow: 0 0 10px #ffd84d, 0 0 22px #ff3df2;
+  animation: aaa-bulb-chase 1.2s ease-in-out infinite;
+}
+
+.cabinet-bulbs i:nth-child(2n) { animation-delay: .16s; }
+.cabinet-bulbs i:nth-child(3n) { animation-delay: .32s; }
+
+@keyframes aaa-bulb-chase {
+  0%, 100% { opacity: .55; filter: brightness(.8); }
+  50% { opacity: 1; filter: brightness(1.7); }
+}
+
+.reel-frame .reel {
+  gap: clamp(5px, .7vw, 10px) !important;
+  padding: clamp(5px, .6vw, 9px);
+  border-radius: 16px !important;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 10%), transparent 14% 84%, rgb(0 0 0 / 34%)),
+    linear-gradient(180deg, #24003a, #07000d);
+  box-shadow:
+    inset 0 0 0 2px rgb(255 255 255 / 12%),
+    inset 0 16px 22px rgb(255 255 255 / 5%),
+    inset 0 -18px 28px rgb(0 0 0 / 70%),
+    0 6px 14px rgb(0 0 0 / 56%);
+}
+
+.reel-frame .symbol {
+  isolation: isolate;
+  overflow: visible !important;
+  border: 3px solid rgb(255 236 152 / 58%) !important;
+  border-radius: 18px !important;
+  background:
+    radial-gradient(circle at 50% 18%, rgb(255 255 255 / 35%), transparent 35%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--slot-secondary, #7b2cff) 60%, transparent), transparent 56%),
+    linear-gradient(180deg, #6616ca 0%, #25005a 58%, #070013 100%) !important;
+  box-shadow:
+    inset 0 4px rgb(255 255 255 / 34%),
+    inset 0 -10px rgb(0 0 0 / 34%),
+    0 5px 0 rgb(22 0 35 / 72%),
+    0 11px 16px rgb(0 0 0 / 48%) !important;
+  transform-style: preserve-3d;
+}
+
+.reel-frame .symbol::before,
+.reel-frame .symbol::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.reel-frame .symbol::before {
+  z-index: 1;
+  background:
+    linear-gradient(130deg, rgb(255 255 255 / 46%), transparent 24% 62%, rgb(255 255 255 / 16%) 70%, transparent 78%),
+    radial-gradient(circle at 50% 112%, rgb(255 214 77 / 34%), transparent 48%);
+  mix-blend-mode: screen;
+}
+
+.reel-frame .symbol::after {
+  z-index: 3;
+  inset: -8%;
+  background:
+    conic-gradient(from 230deg, transparent, rgb(255 229 105 / 0), rgb(255 229 105 / 72%), transparent 32%),
+    radial-gradient(circle at 50% 50%, transparent 45%, rgb(255 85 246 / 28%) 74%, transparent 76%);
+  opacity: .42;
+  filter: blur(2px);
+  animation: aaa-symbol-shimmer 2.8s ease-in-out infinite;
+}
+
+.reel-frame .symbol:nth-child(2)::after { animation-delay: .45s; }
+.reel-frame .symbol:nth-child(3)::after { animation-delay: .9s; }
+
+@keyframes aaa-symbol-shimmer {
+  0%, 100% { opacity: .12; transform: rotate(-5deg) scale(.96); }
+  50% { opacity: .56; transform: rotate(5deg) scale(1.03); }
+}
+
+.reel-frame .symbol img,
+.slot-sym {
+  position: relative;
+  z-index: 2;
+  filter:
+    drop-shadow(0 5px 0 rgb(0 0 0 / 38%))
+    drop-shadow(0 10px 12px rgb(0 0 0 / 38%))
+    saturate(1.18)
+    contrast(1.08);
+  transform: translateZ(22px) scale(1.1);
+}
+
+.slot-sym {
+  overflow: visible;
+  animation: aaa-symbol-float 3.4s ease-in-out infinite;
+}
+
+.symbol:nth-child(2) .slot-sym { animation-delay: .35s; }
+.symbol:nth-child(3) .slot-sym { animation-delay: .7s; }
+
+@keyframes aaa-symbol-float {
+  0%, 100% { transform: translateZ(22px) translateY(0) scale(1.08) rotate(-.4deg); }
+  50% { transform: translateZ(22px) translateY(-3px) scale(1.13) rotate(.5deg); }
+}
+
+.slot-sym-wild,
+.slot-sym-scatter {
+  filter:
+    drop-shadow(0 5px 0 rgb(0 0 0 / 42%))
+    drop-shadow(0 12px 14px rgb(0 0 0 / 44%))
+    drop-shadow(0 0 18px color-mix(in srgb, var(--slot-primary, #ffd84d) 80%, transparent))
+    saturate(1.32)
+    contrast(1.12);
+}
+
+.symbol:has(.slot-sym-wild) {
+  border-color: #fff4ad !important;
+  background:
+    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--slot-primary, #ffd84d) 42%, transparent), transparent 38%),
+    linear-gradient(180deg, #7c1aff 0%, #29005f 54%, #090013 100%) !important;
+}
+
+.symbol:has(.slot-sym-scatter) {
+  border-color: #bffcff !important;
+  background:
+    radial-gradient(circle at 50% 44%, rgb(87 255 246 / 44%), transparent 38%),
+    linear-gradient(180deg, #105dff 0%, #3711a8 52%, #090013 100%) !important;
+}
+
+.symbol:has(.slot-sym-wild)::after,
+.symbol:has(.slot-sym-scatter)::after {
+  opacity: .68;
+  animation-duration: 1.8s;
+}
+
+.slot-sym-code-a,
+.slot-sym-code-k,
+.slot-sym-code-q {
+  filter:
+    drop-shadow(0 5px 0 rgb(0 0 0 / 42%))
+    drop-shadow(0 12px 14px rgb(0 0 0 / 42%))
+    drop-shadow(0 0 14px rgb(255 216 77 / 35%))
+    saturate(1.26)
+    contrast(1.12);
+}
+
+.reel-frame:not(.is-spinning) .symbol:hover {
+  transform: translateY(-3px) scale(1.035);
+  box-shadow:
+    inset 0 4px rgb(255 255 255 / 42%),
+    inset 0 -10px rgb(0 0 0 / 30%),
+    0 8px 0 rgb(22 0 35 / 72%),
+    0 18px 24px rgb(0 0 0 / 48%),
+    0 0 28px color-mix(in srgb, var(--slot-primary, #ffd84d) 48%, transparent) !important;
+}
+
+.low-symbol {
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(30px, 4.8vw, 64px) !important;
+  color: #fff4a2 !important;
+  -webkit-text-stroke: 2px #620071;
+  text-shadow:
+    0 4px 0 #2d0038,
+    0 8px 12px rgb(0 0 0 / 58%),
+    0 0 18px rgb(255 216 77 / 70%) !important;
+}
+
+.reel-frame.is-spinning .reel {
+  animation: aaa-reel-turbo .16s linear infinite !important;
+  filter: blur(5px) saturate(1.55) brightness(1.18) !important;
+}
+
+.reel-frame.is-spinning .symbol::before {
+  background:
+    repeating-linear-gradient(180deg, rgb(255 255 255 / 24%) 0 8px, transparent 8px 18px),
+    linear-gradient(90deg, transparent, rgb(255 255 255 / 24%), transparent);
+  opacity: .8;
+}
+
+.reel-frame.is-turbo.is-spinning .reel {
+  animation-duration: .09s !important;
+}
+
+@keyframes aaa-reel-turbo {
+  from { transform: translateY(-22px) scaleY(1.03); }
+  to { transform: translateY(22px) scaleY(.97); }
+}
+
+.reel-frame.has-win {
+  animation: aaa-cabinet-win .75s ease-out 2;
+}
+
+@keyframes aaa-cabinet-win {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px) scale(1.01); }
+  55% { transform: translateY(3px) scale(.995); }
+}
+
+.reel-frame .symbol.winning {
+  border-color: #fff7b6 !important;
+  background:
+    radial-gradient(circle at 50% 45%, rgb(255 255 255 / 66%), transparent 34%),
+    linear-gradient(180deg, #ffdf60, #ff7a00 48%, #7c006e) !important;
+  box-shadow:
+    0 0 0 4px rgb(255 235 120 / 84%),
+    0 0 28px rgb(255 216 77 / 92%),
+    0 0 58px rgb(255 46 238 / 72%),
+    inset 0 5px rgb(255 255 255 / 54%),
+    inset 0 -12px rgb(0 0 0 / 28%) !important;
+  animation: aaa-winning-symbol-pop .72s cubic-bezier(.18, 1.35, .32, 1) infinite alternate;
+}
+
+.reel-frame .symbol.winning::before {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(255 255 255 / 82%), transparent 24%),
+    conic-gradient(from 0deg, transparent, rgb(255 255 255 / 78%), transparent, rgb(255 215 63 / 70%), transparent);
+  opacity: .75;
+  animation: aaa-win-ray-spin 1.1s linear infinite;
+}
+
+.reel-frame .symbol.winning::after {
+  inset: -20%;
+  opacity: .92;
+  filter: blur(3px);
+}
+
+.reel-frame .symbol.winning .slot-sym {
+  animation: aaa-winning-art-dance .6s cubic-bezier(.18, 1.35, .32, 1) infinite alternate;
+}
+
+@keyframes aaa-winning-symbol-pop {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-4px) scale(1.055); }
+}
+
+@keyframes aaa-winning-art-dance {
+  from { transform: translateZ(34px) scale(1.14) rotate(-2deg); }
+  to { transform: translateZ(34px) scale(1.23) rotate(2deg); }
+}
+
+@keyframes aaa-win-ray-spin {
+  to { transform: rotate(1turn); }
+}
+
+.win-panel {
+  width: min(760px, calc(100% - 32px));
+  min-height: 68px !important;
+  margin-top: 14px !important;
+  border: 3px solid #ff65ff;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 216 77 / 20%), transparent 48%),
+    linear-gradient(180deg, #4e0068, #16001f 58%, #36004d);
+  box-shadow:
+    inset 0 3px rgb(255 255 255 / 22%),
+    0 8px 0 #3d0048,
+    0 18px 32px rgb(0 0 0 / 42%),
+    0 0 28px rgb(255 53 239 / 42%);
+}
+
+.win-panel span {
+  color: #fff !important;
+  font-weight: 900;
+  text-shadow: 0 2px 0 #000;
+}
+
+.win-panel strong {
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(24px, 4.4vw, 54px) !important;
+  letter-spacing: .04em;
+  -webkit-text-stroke: 1px #5b003a;
+  background: linear-gradient(180deg, #fff9c4, #ffd84d 45%, #ff7a00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 5px 0 rgb(0 0 0 / 45%)) drop-shadow(0 0 18px rgb(255 216 77 / 80%));
+}
+
+.slot-controls {
+  width: min(820px, calc(100% - 32px));
+  margin-inline: auto;
+  padding: 12px 14px 16px !important;
+  border: 3px solid #ff65ff;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgb(167 0 190 / 96%), rgb(62 0 84 / 98%));
+  box-shadow:
+    inset 0 4px rgb(255 255 255 / 28%),
+    0 9px 0 #3b0046,
+    0 22px 38px rgb(0 0 0 / 46%);
+}
+
+.spin-button {
+  border-color: #fff6b1 !important;
+  background:
+    radial-gradient(circle at 50% 24%, #eaffc4, transparent 30%),
+    linear-gradient(180deg, #8fff4d 0%, #27ca16 42%, #087400 100%) !important;
+  color: #083100 !important;
+  box-shadow:
+    inset 0 6px rgb(255 255 255 / 48%),
+    inset 0 -10px rgb(0 0 0 / 22%),
+    0 8px 0 #034800,
+    0 18px 28px rgb(0 0 0 / 46%),
+    0 0 30px rgb(101 255 55 / 64%) !important;
+  animation: aaa-spin-idle 1.7s ease-in-out infinite;
+}
+
+@keyframes aaa-spin-idle {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.035); }
+}
+
+.spin-button:disabled {
+  animation: none;
+  filter: grayscale(.1) brightness(.88);
+}
+
+.bet-control,
+.turbo-button,
+.auto-button {
+  border-width: 3px !important;
+  border-color: rgb(255 235 122 / 64%) !important;
+  background:
+    linear-gradient(180deg, #41005d, #14001e) !important;
+  box-shadow:
+    inset 0 3px rgb(255 255 255 / 20%),
+    0 5px 0 #24002c,
+    0 12px 20px rgb(0 0 0 / 34%) !important;
+}
+
+.jackpot-strip span {
+  border-width: 3px !important;
+  border-color: #ffdf60 !important;
+  border-radius: 15px !important;
+  box-shadow:
+    inset 0 3px rgb(255 255 255 / 24%),
+    0 5px 0 rgb(75 0 88 / 72%),
+    0 12px 18px rgb(0 0 0 / 36%) !important;
+}
+
+.jackpot-strip strong {
+  font-family: Impact, "Arial Black", sans-serif;
+  letter-spacing: .04em;
+}
+
+@media (max-width: 820px) {
+  .app-shell { padding-inline: 8px !important; }
+  .slot-stage {
+    border-radius: 18px !important;
+    border-width: 2px !important;
+  }
+  .premium-cabinet-top {
+    width: calc(100% - 12px);
+    margin-top: 7px;
+  }
+  .premium-cabinet-top strong {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .reel-frame {
+    width: calc(100% - 12px) !important;
+    border-radius: 18px !important;
+    box-shadow:
+      0 0 0 3px #3a003f,
+      0 0 0 5px #ff55f3,
+      0 9px 0 #4b0055,
+      0 22px 36px rgb(0 0 0 / 58%) !important;
+  }
+  .reel-frame .symbol {
+    border-width: 2px !important;
+    border-radius: 12px !important;
+  }
+  .cabinet-bulbs { display: none; }
+  .win-panel,
+  .slot-controls {
+    width: calc(100% - 12px);
+  }
+  .slot-controls {
+    border-radius: 18px;
+    padding: 8px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-button,
+  .golden-promo-card::after,
+  .quest-king-panel::after,
+  .game-cover::after,
+  .cover-play::before,
+  .claim-button::before,
+  .hero-cta::before,
+  .quest-king-panel a::before,
+  .spin-button,
+  .slot-fx-layer span,
+  .cabinet-bulbs i,
+  .reel-frame.has-win {
+    animation: none !important;
+  }
+}
