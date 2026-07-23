@@ -25,6 +25,14 @@ import { WinCelebration, winTierFor } from "./win-celebration";
 const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
 const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
+type FeaturePresentation = {
+  readonly mode: "wheel" | "pick" | "hold" | "free_spins" | "jackpot" | "bonus";
+  readonly title: string;
+  readonly subtitle: string;
+  readonly amount: number;
+  readonly multiplier?: number;
+  readonly count?: number;
+};
 
 let audioContext: AudioContext | null = null;
 /** Kleine synthetische Spielgeraeusche; laeuft nur nach einer Nutzer-Geste. */
@@ -47,6 +55,54 @@ function playTones(frequencies: readonly number[], step = 0.09, type: Oscillator
   } catch { /* Sound ist optional */ }
 }
 
+function presentationFromSpin(body: SpinResult): FeaturePresentation | null {
+  const bonusRound = body.spin.rounds.find((round) => round.phase === "bonus");
+  const bonusEvent = bonusRound?.events?.find((event) => event.type === "bonus.awarded");
+  if (bonusRound && bonusEvent) {
+    const mode = String(bonusEvent.data?.mode ?? "bonus");
+    const multiplier = Number(bonusEvent.data?.multiplier ?? 0) || undefined;
+    const tier = typeof bonusEvent.data?.tier === "string" ? bonusEvent.data.tier : undefined;
+    const title = mode === "wheel" ? "Riesiger Dreh"
+      : mode === "pick" ? "Pick a Vault"
+      : mode === "hold_and_win" ? "Hold & Spin"
+      : mode === "jackpot" ? `${tier ?? "Mega"} Jackpot`
+      : mode === "coin_collect" ? "Coin Collect"
+      : "Bonus Game";
+    const presentationMode: FeaturePresentation["mode"] = mode === "wheel" ? "wheel"
+      : mode === "pick" ? "pick"
+      : mode === "hold_and_win" || mode === "coin_collect" ? "hold"
+      : mode === "jackpot" ? "jackpot"
+      : "bonus";
+    return {
+      mode: presentationMode,
+      title,
+      subtitle: multiplier ? `${multiplier}× Einsatz gewonnen` : "Feature gewonnen",
+      amount: bonusRound.totalWin,
+      multiplier,
+    };
+  }
+  if (body.spin.freeSpinsPlayed > 0) {
+    return {
+      mode: "free_spins",
+      title: "Free Spins",
+      subtitle: `${body.spin.freeSpinsPlayed} Freispiele gespielt`,
+      amount: body.spin.rounds.filter((round) => round.phase === "free_spin").reduce((sum, round) => sum + round.totalWin, 0),
+      count: body.spin.freeSpinsPlayed,
+    };
+  }
+  const respins = body.spin.rounds.filter((round) => round.phase === "respin");
+  if (respins.length > 0) {
+    return {
+      mode: "hold",
+      title: "Respins",
+      subtitle: `${respins.length} Lock-&-Respin Runden`,
+      amount: respins.reduce((sum, round) => sum + round.totalWin, 0),
+      count: respins.length,
+    };
+  }
+  return null;
+}
+
 /** Server-authoritative Slot-Oberflaeche fuer jedes konfigurierte Theme. */
 export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const { profile, setProfile, error, refresh } = usePlayer();
@@ -63,6 +119,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [presentationOpen, setPresentationOpen] = useState(true);
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
+  const [featurePresentation, setFeaturePresentation] = useState<FeaturePresentation | null>(null);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
@@ -101,7 +158,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setWinCells(new Set()); setWin(0); setCelebration(null); setMessage("Walzen drehen â¦");
+    setSpinning(true); setWinCells(new Set()); setWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -116,6 +173,10 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       setWin(body.spin.totalWin);
       setWinCells(new Set(body.spin.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
       if (body.jackpots) setJackpots(body.jackpots);
+      const feature = presentationFromSpin(body);
+      if (feature) {
+        window.setTimeout(() => setFeaturePresentation(feature), turbo ? 260 : 580);
+      }
       if (body.spin.totalWin > 0) {
         setMessage(`${body.spin.winClass ?? "GEWINN"} Â· ${coinNumber(body.spin.totalWin)} Coins`);
         if (sound) playTones([523, 659, 784, 1047], 0.1, "triangle", 0.05);
@@ -261,6 +322,12 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         secondary={game.secondary}
         onDone={() => setCelebration(null)}
       />}
+      {featurePresentation && <FeatureOverlay
+        presentation={featurePresentation}
+        primary={game.primary}
+        secondary={game.secondary}
+        onDone={() => setFeaturePresentation(null)}
+      />}
       <p className="play-money-notice">Nur zur Unterhaltung Â· Virtuelle Coins haben keinen Geldwert Â· Ergebnisse kommen vom Server</p>
 
       {infoOpen && <div className="paytable-overlay" role="dialog" aria-modal="true" aria-label="Gewinntabelle" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}>
@@ -291,4 +358,48 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </div>}
     </section>
   </AppShell>;
+}
+
+function FeatureOverlay({
+  presentation, primary, secondary, onDone,
+}: Readonly<{
+  presentation: FeaturePresentation;
+  primary: string;
+  secondary: string;
+  onDone: () => void;
+}>) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, presentation.mode === "wheel" ? 4200 : 3600);
+    return () => window.clearTimeout(timer);
+  }, [onDone, presentation.mode]);
+
+  const wheelSegments = [2, 3, 5, 8, 10, 15, 20, presentation.multiplier ?? 25];
+  const picks = Array.from({ length: 9 }, (_, index) => index);
+  return <div
+    className={`feature-overlay feature-${presentation.mode}`}
+    style={{ "--slot-primary": primary, "--slot-secondary": secondary } as React.CSSProperties}
+    role="dialog"
+    aria-modal="true"
+    aria-label={presentation.title}
+    onClick={onDone}
+  >
+    <div className="feature-orbit" aria-hidden="true">{Array.from({ length: 20 }, (_, index) => <i key={index} style={{ "--orbit-index": index } as React.CSSProperties} />)}</div>
+    <div className="feature-stage-card" onClick={(event) => event.stopPropagation()}>
+      <span className="feature-ribbon">BONUS FEATURE</span>
+      <h2>{presentation.title}</h2>
+      <p>{presentation.subtitle}</p>
+      {presentation.mode === "wheel" && <div className="bonus-wheel" aria-hidden="true">
+        {wheelSegments.map((segment, index) => <span key={`${segment}-${index}`} style={{ "--segment-index": index } as React.CSSProperties}>{segment}×</span>)}
+        <strong>{presentation.multiplier ?? 25}×</strong>
+      </div>}
+      {(presentation.mode === "pick" || presentation.mode === "hold" || presentation.mode === "jackpot" || presentation.mode === "bonus") && <div className="bonus-vault-grid" aria-hidden="true">
+        {picks.map((index) => <span key={index} className={index < 3 ? "picked" : ""}><i />{index < 3 ? "WIN" : "?"}</span>)}
+      </div>}
+      {presentation.mode === "free_spins" && <div className="free-spin-stack" aria-hidden="true">
+        {Array.from({ length: Math.min(8, presentation.count ?? 5) }, (_, index) => <span key={index}>FREE<br />SPIN</span>)}
+      </div>}
+      <strong className="feature-amount">{coinNumber(presentation.amount)}</strong>
+      <button type="button" onClick={onDone}>Weiter</button>
+    </div>
+  </div>;
 }
