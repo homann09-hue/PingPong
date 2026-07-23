@@ -723,3 +723,478 @@ body {
     animation: none !important;
   }
 }
+
+/* ---------- Video-reference presentation pass ----------
+   Built from the supplied MP4: full-screen slot reveal, poster-quality cover
+   art, purple/gold frame density, spotlights, confetti and progress drama.
+   ---------- */
+
+.slot-stage {
+  min-height: calc(100svh - 96px) !important;
+}
+
+.slot-stage::before,
+.slot-stage::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.slot-stage::before {
+  z-index: 1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 8%, rgb(255 255 255 / 22%), transparent 18%),
+    linear-gradient(118deg, transparent 0 17%, rgb(255 255 255 / 18%) 20%, transparent 30% 100%),
+    linear-gradient(242deg, transparent 0 15%, rgb(150 231 255 / 16%) 19%, transparent 31% 100%);
+  mix-blend-mode: screen;
+  animation: aaa-stage-breath 5.2s ease-in-out infinite;
+}
+
+.slot-stage::after {
+  z-index: 1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 28%;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgb(58 255 106 / 35%), transparent 65%),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 11%) 0 1px, transparent 1px 42px);
+  opacity: .75;
+  transform: perspective(500px) rotateX(58deg);
+  transform-origin: bottom;
+}
+
+@keyframes aaa-stage-breath {
+  0%, 100% { opacity: .62; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.025); }
+}
+
+.slot-backdrop {
+  opacity: .74 !important;
+  filter: blur(3px) saturate(1.42) contrast(1.06) brightness(.82) !important;
+  transform: scale(1.06) !important;
+  animation: aaa-backdrop-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes aaa-backdrop-drift {
+  from { transform: scale(1.06) translate3d(-1.2%, -.8%, 0); }
+  to { transform: scale(1.12) translate3d(1.2%, .8%, 0); }
+}
+
+.slot-overlay {
+  background:
+    radial-gradient(ellipse at 50% 12%, rgb(255 255 255 / 12%), transparent 28%),
+    radial-gradient(ellipse at 50% 72%, rgb(255 41 235 / 20%), transparent 38%),
+    linear-gradient(180deg, rgb(12 0 22 / 22%), rgb(5 0 10 / 58%) 58%, rgb(10 0 18 / 82%)) !important;
+}
+
+.slot-cinematic-rig {
+  position: absolute !important;
+  z-index: 2 !important;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.slot-cinematic-rig i {
+  position: absolute;
+  top: -18%;
+  width: 18%;
+  height: 78%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 48%), rgb(75 214 255 / 13%) 42%, transparent);
+  filter: blur(14px);
+  opacity: .62;
+  mix-blend-mode: screen;
+  transform-origin: top;
+  animation: aaa-searchlight 4.8s ease-in-out infinite alternate;
+}
+
+.slot-cinematic-rig i:nth-child(1) { left: 4%; transform: rotate(25deg); }
+.slot-cinematic-rig i:nth-child(2) { left: 27%; transform: rotate(9deg); animation-delay: .8s; }
+.slot-cinematic-rig i:nth-child(3) { right: 27%; transform: rotate(-9deg); animation-delay: 1.4s; }
+.slot-cinematic-rig i:nth-child(4) { right: 4%; transform: rotate(-25deg); animation-delay: .35s; }
+
+@keyframes aaa-searchlight {
+  from { opacity: .32; transform: rotate(-22deg) scaleX(.78); }
+  to { opacity: .86; transform: rotate(22deg) scaleX(1.08); }
+}
+
+.slot-presentation {
+  position: fixed !important;
+  z-index: 1000 !important;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #07000d;
+  pointer-events: none;
+  animation: aaa-presentation-out 2.6s ease forwards;
+}
+
+.slot-presentation-art {
+  object-fit: cover;
+  filter: saturate(1.35) contrast(1.08) brightness(.92);
+  transform: scale(1.08);
+  animation: aaa-presentation-art 2.6s cubic-bezier(.16, 1, .3, 1) forwards;
+}
+
+.slot-presentation::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 38%, transparent 0 28%, rgb(0 0 0 / 32%) 62%),
+    linear-gradient(180deg, rgb(5 0 10 / 8%), rgb(5 0 10 / 42%) 62%, rgb(5 0 10 / 84%));
+}
+
+.presentation-card {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  width: min(680px, calc(100% - 36px));
+  padding: clamp(22px, 4vw, 46px);
+  border: 5px solid #ff58ff;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 237 137 / 38%), transparent 36%),
+    linear-gradient(180deg, rgb(116 0 168 / 84%), rgb(33 0 51 / 94%));
+  box-shadow:
+    inset 0 5px rgb(255 255 255 / 34%),
+    inset 0 -12px rgb(0 0 0 / 28%),
+    0 0 0 4px rgb(255 216 77 / 82%),
+    0 28px 80px rgb(0 0 0 / 72%),
+    0 0 70px rgb(255 53 239 / 72%);
+  text-align: center;
+  transform: rotate(-1.5deg);
+  animation: aaa-presentation-card 2.35s cubic-bezier(.18, 1.4, .3, 1) forwards;
+}
+
+.presentation-kicker {
+  padding: 8px 14px;
+  border: 3px solid #fff2a9;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff2b2b, #a60022);
+  color: #fff;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(17px, 2.7vw, 34px);
+  letter-spacing: .06em;
+  text-shadow: 0 3px 0 #52000d;
+}
+
+.presentation-card strong {
+  margin-top: 10px;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(44px, 9vw, 104px);
+  line-height: .86;
+  text-transform: uppercase;
+  -webkit-text-stroke: 2px #2a0039;
+  background: linear-gradient(180deg, #fff9c8 0%, #ffdb4d 28%, #ff7b00 54%, #ff35ef 88%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter:
+    drop-shadow(0 6px 0 #50005f)
+    drop-shadow(0 12px 16px rgb(0 0 0 / 62%))
+    drop-shadow(0 0 24px rgb(255 216 77 / 82%));
+}
+
+.presentation-card small {
+  max-width: 520px;
+  margin-top: 12px;
+  color: #fff;
+  font-weight: 950;
+  text-shadow: 0 3px 0 #24002f, 0 0 18px rgb(0 0 0 / 70%);
+}
+
+.presentation-progress {
+  position: relative;
+  width: min(430px, 86%);
+  height: 24px;
+  margin-top: 22px;
+  overflow: hidden;
+  border: 4px solid #260029;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #16001f, #060008);
+  box-shadow:
+    inset 0 3px 7px rgb(0 0 0 / 70%),
+    0 0 0 3px #ff58ff,
+    0 0 25px rgb(255 53 239 / 62%);
+}
+
+.presentation-progress i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, #3eff2f, #b8ff2c 46%, #fff7a8 52%, #37ff4f),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgb(255 255 255 / 34%) 18px 23px);
+  box-shadow: inset 0 3px rgb(255 255 255 / 45%), 0 0 22px rgb(80 255 80 / 84%);
+  transform-origin: left;
+  animation: aaa-progress-fill 2.15s cubic-bezier(.16, 1, .3, 1) forwards;
+}
+
+.presentation-spotlights {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+}
+
+.presentation-spotlights i {
+  position: absolute;
+  bottom: -10%;
+  width: 30%;
+  height: 86%;
+  border-radius: 999px;
+  background: linear-gradient(0deg, rgb(255 255 255 / 48%), transparent 68%);
+  filter: blur(18px);
+  mix-blend-mode: screen;
+  transform-origin: bottom;
+  animation: aaa-presentation-light 1.2s ease-in-out infinite alternate;
+}
+
+.presentation-spotlights i:nth-child(1) { left: 1%; transform: rotate(-22deg); }
+.presentation-spotlights i:nth-child(2) { left: 35%; animation-delay: .25s; }
+.presentation-spotlights i:nth-child(3) { right: 1%; transform: rotate(22deg); animation-delay: .5s; }
+
+.presentation-confetti {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  overflow: hidden;
+}
+
+.presentation-confetti i {
+  --x: calc((var(--confetti-index) * 41) % 100);
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: -24px;
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  background: hsl(calc(var(--confetti-index) * 39deg) 95% 58%);
+  box-shadow: 0 0 12px rgb(255 255 255 / 45%);
+  animation: aaa-confetti-drop calc(1.5s + var(--confetti-index) * .035s) linear infinite;
+  animation-delay: calc(var(--confetti-index) * -0.09s);
+}
+
+@keyframes aaa-presentation-out {
+  0%, 78% { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+@keyframes aaa-presentation-art {
+  0% { transform: scale(1.22); filter: blur(6px) saturate(1.55) brightness(.7); }
+  36% { transform: scale(1.08); filter: blur(0) saturate(1.38) brightness(.96); }
+  100% { transform: scale(1.02); }
+}
+
+@keyframes aaa-presentation-card {
+  0% { opacity: 0; transform: translateY(80px) scale(.72) rotate(-7deg); }
+  24% { opacity: 1; transform: translateY(-8px) scale(1.06) rotate(2deg); }
+  72% { opacity: 1; transform: translateY(0) scale(1) rotate(-1.5deg); }
+  100% { opacity: 0; transform: translateY(-36px) scale(1.08) rotate(1deg); }
+}
+
+@keyframes aaa-progress-fill {
+  from { transform: scaleX(.02); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes aaa-presentation-light {
+  from { opacity: .36; transform: rotate(-18deg) scaleX(.8); }
+  to { opacity: .84; transform: rotate(18deg) scaleX(1.15); }
+}
+
+@keyframes aaa-confetti-drop {
+  from { transform: translate3d(0, -20px, 0) rotate(0); opacity: 1; }
+  to { transform: translate3d(calc((50 - var(--x)) * .8px), 105vh, 0) rotate(720deg); opacity: 0; }
+}
+
+.slot-showcase-rail {
+  position: absolute !important;
+  z-index: 4 !important;
+  right: clamp(12px, 3vw, 42px);
+  top: 50%;
+  display: grid;
+  justify-items: center;
+  width: clamp(96px, 12vw, 160px);
+  padding: 8px;
+  border: 4px solid #ff58ff;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 216 77 / 35%), transparent 42%),
+    linear-gradient(180deg, rgb(103 0 142 / 92%), rgb(31 0 48 / 96%));
+  box-shadow:
+    inset 0 3px rgb(255 255 255 / 28%),
+    0 8px 0 #4c005d,
+    0 18px 34px rgb(0 0 0 / 52%),
+    0 0 34px rgb(255 53 239 / 62%);
+  transform: translateY(-50%) rotate(2deg);
+  animation: aaa-showcase-bob 3.3s ease-in-out infinite;
+}
+
+.slot-showcase-rail span {
+  position: relative;
+  width: 100%;
+  aspect-ratio: .86 / 1;
+  overflow: hidden;
+  border: 3px solid #fff0a1;
+  border-radius: 18px;
+  background: #120018;
+  box-shadow: inset 0 0 18px rgb(255 255 255 / 18%), 0 10px 22px rgb(0 0 0 / 46%);
+}
+
+.slot-showcase-rail img {
+  object-fit: cover;
+  filter: saturate(1.28) contrast(1.08);
+}
+
+.slot-showcase-rail em,
+.slot-showcase-rail strong {
+  width: 100%;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 #30003d, 0 0 14px rgb(255 216 77 / 74%);
+}
+
+.slot-showcase-rail em {
+  margin-top: 8px;
+  color: #fff;
+  font-size: clamp(9px, 1vw, 13px);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.slot-showcase-rail strong {
+  color: #ffeb63;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(15px, 1.7vw, 25px);
+  line-height: .95;
+}
+
+@keyframes aaa-showcase-bob {
+  0%, 100% { transform: translateY(-50%) rotate(2deg) scale(1); }
+  50% { transform: translateY(calc(-50% - 8px)) rotate(-1deg) scale(1.035); }
+}
+
+.reel-frame {
+  width: min(760px, calc(100% - 220px)) !important;
+  min-height: clamp(280px, 42vw, 500px);
+}
+
+.jackpot-strip,
+.premium-cabinet-top,
+.win-panel,
+.slot-controls {
+  transform: translateX(clamp(-42px, -4vw, -12px));
+}
+
+.reel-frame.is-spinning {
+  animation:
+    aaa-cabinet-spin-rumble .18s linear infinite,
+    aaa-spin-flash .74s ease-in-out infinite !important;
+}
+
+@keyframes aaa-cabinet-spin-rumble {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(-1px) translateY(1px); }
+  50% { transform: translateX(1px) translateY(-1px); }
+  75% { transform: translateX(-1px) translateY(-1px); }
+}
+
+@keyframes aaa-spin-flash {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px rgb(54 0 70 / 92%),
+      0 18px 0 rgb(60 0 70 / 88%),
+      0 34px 70px rgb(0 0 0 / 68%),
+      0 0 54px rgb(255 53 239 / 72%),
+      inset 0 5px rgb(255 255 255 / 28%),
+      inset 0 0 28px rgb(255 216 77 / 24%) !important;
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgb(255 235 120 / 92%),
+      0 18px 0 rgb(60 0 70 / 88%),
+      0 34px 70px rgb(0 0 0 / 68%),
+      0 0 84px rgb(255 216 77 / 86%),
+      inset 0 5px rgb(255 255 255 / 42%),
+      inset 0 0 44px rgb(255 216 77 / 42%) !important;
+  }
+}
+
+.spin-button {
+  animation: aaa-spin-button-heartbeat 1.15s ease-in-out infinite !important;
+}
+
+@keyframes aaa-spin-button-heartbeat {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  42% { transform: scale(1.08); filter: brightness(1.22); }
+  55% { transform: scale(1.02); filter: brightness(1.08); }
+}
+
+@media (max-width: 920px) {
+  .slot-showcase-rail {
+    position: relative !important;
+    inset: auto;
+    grid-template-columns: 78px 1fr;
+    column-gap: 10px;
+    width: calc(100% - 24px);
+    margin: 10px auto;
+    transform: none;
+  }
+
+  .slot-showcase-rail span {
+    grid-row: span 2;
+    width: 78px;
+  }
+
+  .slot-showcase-rail em,
+  .slot-showcase-rail strong {
+    align-self: end;
+    text-align: left;
+  }
+
+  .slot-showcase-rail strong {
+    align-self: start;
+  }
+
+  .reel-frame {
+    width: calc(100% - 18px) !important;
+    min-height: auto;
+  }
+
+  .jackpot-strip,
+  .premium-cabinet-top,
+  .win-panel,
+  .slot-controls {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-presentation,
+  .slot-presentation-art,
+  .presentation-card,
+  .presentation-progress i,
+  .presentation-spotlights i,
+  .presentation-confetti i,
+  .slot-cinematic-rig i,
+  .slot-backdrop,
+  .slot-showcase-rail,
+  .reel-frame.is-spinning,
+  .spin-button {
+    animation: none !important;
+  }
+
+  .slot-presentation {
+    display: none;
+  }
+}

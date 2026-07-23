@@ -60,6 +60,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [turbo, setTurbo] = useState(false);
   const [sound, setSound] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [presentationOpen, setPresentationOpen] = useState(true);
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
@@ -69,6 +70,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   useEffect(() => {
     let cancelled = false;
+    setPresentationOpen(true);
+    const introTimer = window.setTimeout(() => setPresentationOpen(false), 2600);
     void fetch("/api/player/jackpots", { cache: "no-store" })
       .then(async (response) => response.ok ? await response.json() as { jackpots: JackpotTier[] } : null)
       .then((body) => { if (body && !cancelled) setJackpots(body.jackpots); })
@@ -77,7 +80,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       .then(async (response) => response.ok ? await response.json() as Paytable : null)
       .then((body) => { if (body && !cancelled) setPaytable(body); })
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => { cancelled = true; window.clearTimeout(introTimer); };
   }, [game.id]);
 
   // Autoplay: dreht bis zu N Runden automatisch. Der "latest ref"-Zeiger haelt
@@ -139,6 +142,24 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
+      <div className="slot-cinematic-rig" aria-hidden="true">
+        <i /><i /><i /><i />
+      </div>
+      {presentationOpen && (
+        <div className="slot-presentation" aria-hidden="true">
+          <Image className="slot-presentation-art" src={game.cover} alt="" fill priority sizes="100vw" quality={82} />
+          <div className="presentation-spotlights"><i /><i /><i /></div>
+          <div className="presentation-confetti">
+            {Array.from({ length: 24 }, (_, index) => <i key={index} style={{ "--confetti-index": index } as React.CSSProperties} />)}
+          </div>
+          <div className="presentation-card">
+            <span className="presentation-kicker">NEW MEGA SLOT</span>
+            <strong>{game.name}</strong>
+            <small>{game.features}</small>
+            <span className="presentation-progress"><i /></span>
+          </div>
+        </div>
+      )}
       {!paytable && (
         <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}>
           <span className="slot-intro-emblem" aria-hidden="true" />
@@ -166,6 +187,11 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </div>
       <div className="premium-cabinet-top" aria-hidden="true">
         <i /><strong>{game.name}</strong><i />
+      </div>
+      <div className="slot-showcase-rail" aria-hidden="true">
+        <span><Image src={game.cover} alt="" fill sizes="150px" quality={72} /></span>
+        <em>SUPER FEATURE</em>
+        <strong>FREE SPINS</strong>
       </div>
       <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${win > 0 ? "has-win" : ""} ${turbo ? "is-turbo" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
         <div className="cabinet-bulbs" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</div>
