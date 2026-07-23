@@ -45,6 +45,7 @@ const migrationFiles = [
   "029_mission_tracks.sql",
   "030_high_roller_club.sql",
   "031_store_high_roller_points.sql",
+  "034_spin_wager_integrity.sql",
 ];
 
 databaseSuite("PostgresSpinStore integration", () => {
@@ -95,7 +96,8 @@ databaseSuite("PostgresSpinStore integration", () => {
   it("atomically settles and persistently replays a spin", async () => {
     const idempotencyKey = randomUUID();
     const spin = winningSpin(slotId);
-    const command = { playerId, idempotencyKey, slotId, configVersion: 1, bet: 10, seed: 42n };
+    const command = { playerId, idempotencyKey, slotId, configVersion: 1,
+      baseBet: 10, effectiveWager: 10, bonusBuy: false, seed: 42n };
     const first = await store.settle(command, () => spin);
     const replay = await store.settle(command, () => { throw new Error("must not recalculate"); });
 
@@ -105,6 +107,8 @@ databaseSuite("PostgresSpinStore integration", () => {
       progression: { level: 1, xp: 10, spins: 1, totalWon: 5, freeSpins: 0, vipPoints: 1 },
     });
     expect(replay).toEqual(first);
+    await expect(store.settle({ ...command, effectiveWager: 20 }, () => spin))
+      .rejects.toThrow("Idempotency key was already used");
     const wallet = await pool.query<{ balance: string }>("SELECT balance FROM wallets WHERE player_id=$1 AND currency='coin'", [playerId]);
     const ledger = await pool.query<{
       amount: string;
@@ -276,7 +280,7 @@ databaseSuite("PostgresSpinStore integration", () => {
     expect(activation).toMatchObject({ boosterBalance: 0, activeSpins: 20 });
     expect(await store.getHighRollerClub(boostPlayerId, new Date())).toMatchObject({ points: 500 });
     await store.settle({ playerId: boostPlayerId, idempotencyKey: randomUUID(), slotId,
-      configVersion: 1, bet: 10, seed: 42n }, () => winningSpin(slotId));
+      configVersion: 1, baseBet: 10, effectiveWager: 10, bonusBuy: false, seed: 42n }, () => winningSpin(slotId));
     expect((await store.getProfile(boostPlayerId)).progression.xp).toBe(20);
     expect(await store.getBoosterStatus(boostPlayerId)).toMatchObject({ activeSpins: 19, xpMultiplier: 2 });
     const ledger = await pool.query<{ count: string }>(

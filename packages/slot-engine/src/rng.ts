@@ -1,6 +1,7 @@
 import type { RngSeed } from "./types.js";
 
 const MASK_64 = (1n << 64n) - 1n;
+const UINT64_RANGE = 1n << 64n;
 
 /** Deterministic SplitMix64 generator. Never use client-provided seeds in production. */
 export class DeterministicRng {
@@ -22,6 +23,12 @@ export class DeterministicRng {
     if (!Number.isSafeInteger(exclusiveMax) || exclusiveMax <= 0) {
       throw new RangeError("exclusiveMax must be a positive safe integer");
     }
-    return Number(this.nextUint64() % BigInt(exclusiveMax));
+    const bound = BigInt(exclusiveMax);
+    const unbiasedLimit = UINT64_RANGE - (UINT64_RANGE % bound);
+    let value: bigint;
+    do {
+      value = this.nextUint64();
+    } while (value >= unbiasedLimit);
+    return Number(value % bound);
   }
 }

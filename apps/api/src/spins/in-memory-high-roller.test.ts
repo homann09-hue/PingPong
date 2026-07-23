@@ -6,9 +6,9 @@ import { HighRollerAlreadyActiveError } from "./spin-store.js";
 import { activeShopOffers } from "../shop/shop-catalog.js";
 import { storeProducts } from "../monetization/store-products.js";
 
-function result(totalWin: number): SpinResult {
+function result(totalWin: number, seed: bigint): SpinResult {
   return {
-    configId: "high-roller-test", configVersion: 1, mathModelVersion: "test", seed: "1",
+    configId: "high-roller-test", configVersion: 1, mathModelVersion: "test", seed: seed.toString(),
     baseBet: 10_000, wager: 10_000, bonusBuy: false, stops: [0, 0, 0], grid: [["A"], ["A"], ["A"]],
     wins: [], rounds: [{ phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin, events: [] }],
     freeSpinsPlayed: 0, totalWin, maxWinReached: false, maxWinMultiplier: 1_000,
@@ -67,8 +67,9 @@ describe("InMemorySpinStore High Roller Club", () => {
     const store = new InMemorySpinStore(500_000);
     const playerId = randomUUID();
     for (let index = 0; index < 19; index += 1) {
+      const seed = BigInt(index);
       await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "high-roller-test",
-        configVersion: 1, bet: 10_000, seed: BigInt(index) }, () => result(10_000));
+        configVersion: 1, baseBet: 10_000, effectiveWager: 10_000, bonusBuy: false, seed }, () => result(10_000, seed));
     }
     const now = new Date("2026-07-17T12:00:00.000Z");
     expect(await store.getHighRollerClub(playerId, now)).toMatchObject({ points: 20_900, eligible: true, active: false });
@@ -82,8 +83,9 @@ describe("InMemorySpinStore High Roller Club", () => {
     const beforeProfile = await store.getProfile(playerId);
     const before = beforeProfile.coinBalance;
     const leagueBefore = beforeProfile.balances.find((entry) => entry.currency === "league_point")!.balance;
+    const seed = 100n;
     await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "high-roller-test",
-      configVersion: 1, bet: 10_000, seed: 100n }, () => result(0));
+      configVersion: 1, baseBet: 10_000, effectiveWager: 10_000, bonusBuy: false, seed }, () => result(0, seed));
     const profile = await store.getProfile(playerId);
     expect(profile.coinBalance).toBe(before - 9_800);
     expect(profile.balances.find((entry) => entry.currency === "league_point")?.balance).toBe(leagueBefore + 100);
