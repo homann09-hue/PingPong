@@ -1932,3 +1932,258 @@ body {
     animation: none !important;
   }
 }
+
+/* ---------- Slot machine motion pass: reels, paylines, symbol aura ---------- */
+
+.reel-frame {
+  perspective: 980px;
+}
+
+.reel-frame .reel {
+  position: relative;
+  overflow: hidden;
+  transform-origin: 50% 50%;
+  will-change: transform, filter;
+}
+
+.reel-frame .reel::before,
+.reel-frame .reel::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  left: 0;
+  height: 23%;
+  pointer-events: none;
+}
+
+.reel-frame .reel::before {
+  top: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 64%), transparent);
+}
+
+.reel-frame .reel::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgb(0 0 0 / 66%), transparent);
+}
+
+.reel-strip {
+  position: absolute;
+  z-index: 6;
+  inset: -130% 4px;
+  display: grid;
+  gap: clamp(5px, .7vw, 10px);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-12%);
+}
+
+.strip-symbol {
+  min-height: clamp(68px, 10vw, 124px);
+  opacity: .92;
+}
+
+.reel-frame.is-spinning .reel {
+  animation:
+    aaa-reel-stage-rumble .14s linear infinite,
+    aaa-reel-depth-sway .42s ease-in-out infinite alternate !important;
+}
+
+.reel-frame.is-spinning .reel-strip {
+  opacity: 1;
+  animation: aaa-reel-strip-roll .42s linear infinite;
+  animation-delay: var(--reel-delay);
+}
+
+.reel-frame.is-spinning .reel > .symbol:not(.strip-symbol) {
+  opacity: .2;
+  transform: translateY(12px) scale(.92);
+  filter: blur(3px) brightness(.88);
+}
+
+.reel-frame.is-spinning .reel:nth-of-type(2) { animation-delay: .06s, .04s !important; }
+.reel-frame.is-spinning .reel:nth-of-type(3) { animation-delay: .12s, .08s !important; }
+.reel-frame.is-spinning .reel:nth-of-type(4) { animation-delay: .18s, .12s !important; }
+.reel-frame.is-spinning .reel:nth-of-type(5) { animation-delay: .24s, .16s !important; }
+
+.reel-frame:not(.is-spinning) .reel {
+  animation: aaa-reel-stop-slam .52s cubic-bezier(.16, 1.45, .25, 1) both;
+  animation-delay: var(--reel-delay);
+}
+
+@keyframes aaa-reel-strip-roll {
+  from { transform: translateY(-26%); }
+  to { transform: translateY(9%); }
+}
+
+@keyframes aaa-reel-stage-rumble {
+  0%, 100% { transform: translate3d(0, 0, 0) rotateX(0); }
+  25% { transform: translate3d(0, -2px, 0) rotateX(1.2deg); }
+  50% { transform: translate3d(0, 2px, 0) rotateX(-1.2deg); }
+  75% { transform: translate3d(0, -1px, 0) rotateX(.8deg); }
+}
+
+@keyframes aaa-reel-depth-sway {
+  from { filter: brightness(1.08) saturate(1.34); }
+  to { filter: brightness(1.28) saturate(1.65); }
+}
+
+@keyframes aaa-reel-stop-slam {
+  0% { transform: translateY(-34px) scaleY(1.08); filter: blur(2px) brightness(1.3); }
+  58% { transform: translateY(9px) scaleY(.96); filter: blur(.4px) brightness(1.08); }
+  100% { transform: translateY(0) scaleY(1); filter: none; }
+}
+
+.payline-fx {
+  position: absolute;
+  z-index: 12;
+  inset: clamp(10px, 1.4vw, 18px);
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.payline-fx span {
+  position: absolute;
+  left: -8%;
+  top: var(--line-y);
+  width: 116%;
+  height: clamp(5px, .8vw, 10px);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent, #fff8c9 12%, #ffd84d 28%, #ff35ef 50%, #65f7ff 72%, transparent);
+  box-shadow:
+    0 0 14px #fff8c9,
+    0 0 28px #ffd84d,
+    0 0 52px #ff35ef;
+  opacity: 0;
+  transform: rotate(calc((var(--line-index) - 3) * 3.5deg)) scaleX(.4);
+  animation: aaa-payline-scan 1.2s cubic-bezier(.16, 1, .3, 1) infinite;
+  animation-delay: calc(var(--line-index) * .12s);
+}
+
+@keyframes aaa-payline-scan {
+  0% { opacity: 0; transform: translateX(-16%) rotate(calc((var(--line-index) - 3) * 3.5deg)) scaleX(.35); }
+  22% { opacity: 1; }
+  55% { opacity: .92; transform: translateX(0) rotate(calc((var(--line-index) - 3) * 3.5deg)) scaleX(1); }
+  100% { opacity: 0; transform: translateX(16%) rotate(calc((var(--line-index) - 3) * 3.5deg)) scaleX(.65); }
+}
+
+.symbol-code-w,
+.symbol-code-s,
+.symbol-code-b {
+  border-color: #fff8b9 !important;
+}
+
+.symbol-code-w::after,
+.symbol-code-s::after,
+.symbol-code-b::after {
+  opacity: .82 !important;
+  filter: blur(1px) saturate(1.45);
+}
+
+.symbol-code-w {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(255 245 169 / 58%), transparent 34%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--slot-primary, #ffd84d) 72%, transparent), transparent 58%),
+    linear-gradient(180deg, #851aff 0%, #33006d 58%, #070013 100%) !important;
+  box-shadow:
+    inset 0 5px rgb(255 255 255 / 42%),
+    inset 0 -10px rgb(0 0 0 / 32%),
+    0 0 0 2px rgb(255 245 169 / 68%),
+    0 0 26px color-mix(in srgb, var(--slot-primary, #ffd84d) 78%, transparent),
+    0 12px 20px rgb(0 0 0 / 50%) !important;
+}
+
+.symbol-code-s {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(101 247 255 / 62%), transparent 35%),
+    linear-gradient(180deg, #1878ff 0%, #3b08a4 58%, #070013 100%) !important;
+  box-shadow:
+    inset 0 5px rgb(255 255 255 / 42%),
+    inset 0 -10px rgb(0 0 0 / 32%),
+    0 0 0 2px rgb(177 252 255 / 74%),
+    0 0 28px rgb(101 247 255 / 82%),
+    0 12px 20px rgb(0 0 0 / 50%) !important;
+}
+
+.symbol-code-b {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(255 77 77 / 55%), transparent 35%),
+    linear-gradient(180deg, #ffb22f 0%, #bb1700 58%, #160008 100%) !important;
+  box-shadow:
+    inset 0 5px rgb(255 255 255 / 42%),
+    inset 0 -10px rgb(0 0 0 / 32%),
+    0 0 0 2px rgb(255 224 120 / 74%),
+    0 0 30px rgb(255 67 67 / 82%),
+    0 12px 20px rgb(0 0 0 / 50%) !important;
+}
+
+.symbol-code-a,
+.symbol-code-k,
+.symbol-code-q,
+.symbol-code-j {
+  background:
+    radial-gradient(circle at 50% 18%, rgb(255 255 255 / 38%), transparent 32%),
+    radial-gradient(circle at 50% 110%, rgb(255 216 77 / 18%), transparent 48%),
+    linear-gradient(180deg, #6d18d8 0%, #27005d 56%, #060012 100%) !important;
+}
+
+.slot-has-win .stage-coin-burst i {
+  background:
+    radial-gradient(circle at 35% 28%, #fff 0 15%, #fff08d 17% 46%, #ff9b00 48% 100%);
+  box-shadow:
+    inset 0 0 0 2px rgb(99 45 0 / 42%),
+    0 0 18px rgb(255 216 77 / 90%),
+    0 0 36px rgb(255 53 239 / 56%);
+}
+
+.slot-has-win .slot-cinematic-rig i {
+  animation-duration: 1.65s;
+  opacity: .95;
+  filter: blur(10px) brightness(1.45);
+}
+
+.slot-has-win .win-panel {
+  animation: aaa-win-panel-slam .52s cubic-bezier(.18, 1.5, .3, 1) 2;
+}
+
+@keyframes aaa-win-panel-slam {
+  0%, 100% { transform: translateX(clamp(-42px, -4vw, -12px)) scale(1); }
+  42% { transform: translateX(clamp(-42px, -4vw, -12px)) scale(1.045) rotate(-.6deg); }
+  72% { transform: translateX(clamp(-42px, -4vw, -12px)) scale(.99) rotate(.3deg); }
+}
+
+@media (max-width: 920px) {
+  .payline-fx { inset: 7px; }
+
+  .strip-symbol {
+    min-height: clamp(56px, 17vw, 98px);
+  }
+
+  .slot-has-win .win-panel {
+    animation-name: aaa-win-panel-slam-mobile;
+  }
+}
+
+@keyframes aaa-win-panel-slam-mobile {
+  0%, 100% { transform: scale(1); }
+  42% { transform: scale(1.045) rotate(-.6deg); }
+  72% { transform: scale(.99) rotate(.3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-frame .reel,
+  .reel-frame.is-spinning .reel,
+  .reel-frame.is-spinning .reel-strip,
+  .reel-frame:not(.is-spinning) .reel,
+  .payline-fx span,
+  .slot-has-win .win-panel {
+    animation: none !important;
+  }
+
+  .reel-strip,
+  .payline-fx {
+    display: none !important;
+  }
+}

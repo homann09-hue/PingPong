@@ -14,7 +14,7 @@ import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
-import { initialGrid, type JackpotTier, type SpinResult } from "@/lib/contracts";
+import { initialGrid, type JackpotTier, type SpinResult, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
 import { hasSymbolArt, SlotSymbol } from "@/lib/slot-symbols";
@@ -110,6 +110,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [betIndex, setBetIndex] = useState(0);
   const [grid, setGrid] = useState(initialGrid);
   const [winCells, setWinCells] = useState<Set<string>>(new Set());
+  const [winPaths, setWinPaths] = useState<readonly SpinWin[]>([]);
   const [win, setWin] = useState(0);
   const [message, setMessage] = useState("Setz deinen Einsatz und dreh los");
   const [spinning, setSpinning] = useState(false);
@@ -158,7 +159,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setWinCells(new Set()); setWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
+    setSpinning(true); setWinCells(new Set()); setWinPaths([]); setWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -171,6 +172,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       await new Promise((resolve) => window.setTimeout(resolve, turbo ? 160 : 720));
       setGrid(body.spin.grid);
       setWin(body.spin.totalWin);
+      setWinPaths(body.spin.wins);
       setWinCells(new Set(body.spin.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
       if (body.jackpots) setJackpots(body.jackpots);
       const feature = presentationFromSpin(body);
@@ -278,13 +280,19 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </aside>
       <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${win > 0 ? "has-win" : ""} ${turbo ? "is-turbo" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
         <div className="cabinet-bulbs" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</div>
+        {winPaths.length > 0 && <div className="payline-fx" aria-hidden="true">
+          {winPaths.slice(0, 8).map((path, index) => <span
+            key={`${index}-${path.amount}-${path.cells.map(([reel, row]) => `${reel}:${row}`).join("-")}`}
+            style={{ "--line-index": index, "--line-y": `${18 + (index % 5) * 16}%` } as React.CSSProperties}
+          />)}
+        </div>}
         {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
               fest, bevor sich hier etwas bewegt â die Drehung erzaehlt es nur nach. */}
           <div className="reel-strip" aria-hidden="true">
             {[...column, ...column, ...column].map((symbol, index) => {
               const stripAsset = symbolAsset(game.symbolSet, symbol);
-              return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>
+              return <div className={`symbol strip-symbol symbol-code-${symbol.toLowerCase()}`} key={`strip-${reel}-${index}`}>
                 {stripAsset
                   ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} />
                   : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}
@@ -293,7 +301,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
           </div>
           {column.map((symbol, row) => {
           const asset = symbolAsset(game.symbolSet, symbol);
-          return <div className={`symbol ${winCells.has(`${reel}:${row}`) ? "winning" : ""}`} key={`${reel}-${row}`}>{hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winCells.has(`${reel}:${row}`)} /> : asset
+          return <div className={`symbol symbol-code-${symbol.toLowerCase()} ${winCells.has(`${reel}:${row}`) ? "winning" : ""}`} style={{ "--symbol-row": row } as React.CSSProperties} key={`${reel}-${row}`}>{hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winCells.has(`${reel}:${row}`)} /> : asset
               ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} />
               : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}</div>;
         })}</div>)}
