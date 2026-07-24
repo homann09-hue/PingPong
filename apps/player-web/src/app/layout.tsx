@@ -43,6 +43,7 @@ import "./slot-feature-status.css";
 import "./slot-session-stats.css";
 import "./slot-immersive-controls.css";
 import "./mobile-polish-v2.css";
+import "./slot-mobile-session.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 import { SlotPerformanceHud } from "@/components/slot-performance-hud";
