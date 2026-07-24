@@ -4,9 +4,11 @@ import { achievementById, achievementCatalog, achievementViews, canClaimAchievem
 const progression = { level: 10, xp: 0, spins: 100, totalWon: 5_000_000, freeSpins: 25, vipPoints: 1_000 };
 
 describe("achievement system", () => {
-  it("publishes three durable tiers for every category", () => {
+  it("publishes three durable versioned tiers for every category", () => {
     expect(achievementCatalog).toHaveLength(15);
     expect(new Set(achievementCatalog.map((item) => item.id)).size).toBe(15);
+    expect(new Set(achievementCatalog.map((item) => `${item.id}:${item.version}`)).size).toBe(15);
+    expect(achievementCatalog.every((item) => item.version === 1)).toBe(true);
     for (const category of ["journey", "spins", "wins", "free_spins", "vip"]) {
       expect(achievementCatalog.filter((item) => item.category === category).map((item) => item.tier))
         .toEqual(["bronze", "silver", "gold"]);
