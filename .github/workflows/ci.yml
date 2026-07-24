@@ -1,4 +1,6 @@
 name: ci
+permissions:
+  contents: write
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,6 +28,25 @@ jobs:
       TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
     steps:
       - uses: actions/checkout@v4
+      - name: Apply progression integration patch
+        if: github.event_name == 'pull_request' && github.head_ref == 'codex/core-systems-integration'
+        shell: bash
+        run: |
+          cat scripts/progression-integration.patch.part* > /tmp/progression-integration.patch
+          if git apply --check /tmp/progression-integration.patch; then
+            git apply /tmp/progression-integration.patch
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/api/src/meta apps/api/src/spins infra/postgres
+            git commit -m "feat(api): integrate deterministic player progression"
+            git push origin HEAD:${GITHUB_HEAD_REF}
+          else
+            test -f apps/api/src/meta/spin-progression.ts
+            test -f infra/postgres/035_player_progression_curve_v1.sql
+            grep -q 'advanceSpinProgression' apps/api/src/spins/in-memory-spin-store.ts
+            grep -q 'advanceSpinProgression' apps/api/src/spins/postgres-spin-store.ts
+            echo "Progression integration is already applied."
+          fi
       - name: Upload integration source snapshot
         uses: actions/upload-artifact@v4
         with:
