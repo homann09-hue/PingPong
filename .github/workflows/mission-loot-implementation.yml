@@ -1,0 +1,31 @@
+name: mission loot implementation
+on:
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.head_ref == 'codex/mission-loot-rewards'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/mission-loot-rewards
+          fetch-depth: 0
+          show-progress: false
+      - name: Apply guarded patches
+        run: |
+          python3 .github/scripts/patch_mission_claim_contract.py
+          python3 .github/scripts/patch_mission_postgres_store.py
+          git diff --check
+      - name: Commit product changes
+        run: |
+          if git diff --quiet; then
+            echo "Product files already patched"
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/api/src apps/mobile/lib/services/casino_api.dart
+          git commit -m "Integrate idempotent mission loot claims"
+          git push origin HEAD:codex/mission-loot-rewards
