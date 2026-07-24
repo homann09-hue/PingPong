@@ -299,10 +299,10 @@ databaseSuite("PostgresLootStore entitlement integration", () => {
       expect(JSON.stringify(opening.result)).not.toContain("serverSeed");
     }
     expect(eventTypes.rows).toEqual([
-      { event_type: "inventory.granted", count: "8" },
+      { event_type: "inventory.granted", count: "7" },
       { event_type: "loot.entitlement.consumed", count: "4" },
       { event_type: "loot.entitlement.expired", count: "1" },
-      { event_type: "loot.entitlement.issued", count: "9" },
+      { event_type: "loot.entitlement.issued", count: "8" },
       { event_type: "loot.opened", count: "4" },
     ]);
   });
