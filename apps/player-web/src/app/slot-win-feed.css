@@ -1,0 +1,191 @@
+.slot-win-feed {
+  position: fixed;
+  z-index: 24;
+  right: clamp(14px, 2vw, 30px);
+  top: clamp(168px, 22vh, 250px);
+  width: min(330px, calc(100vw - 28px));
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--slot-primary, #8b5cf6) 48%, rgba(255, 255, 255, 0.18));
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(24, 16, 43, 0.94), rgba(8, 6, 19, 0.96));
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+}
+
+.slot-win-feed > header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.slot-win-feed-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 13px;
+  color: #fff4b0;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--slot-primary, #8b5cf6) 68%, #fff 8%), rgba(255, 255, 255, 0.08));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--slot-primary, #8b5cf6) 30%, transparent);
+}
+
+.slot-win-feed-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.slot-win-feed header small,
+.slot-win-feed header strong {
+  display: block;
+}
+
+.slot-win-feed header small {
+  color: color-mix(in srgb, var(--slot-primary, #a78bfa) 74%, #fff);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.slot-win-feed header strong {
+  margin-top: 2px;
+  font-size: 0.9rem;
+}
+
+.slot-win-feed header button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.8);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.slot-win-feed ol {
+  display: grid;
+  gap: 8px;
+  max-height: min(390px, 48vh);
+  margin: 13px 0 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.slot-win-feed li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+}
+
+.slot-win-feed li.is-latest {
+  border-color: color-mix(in srgb, var(--slot-primary, #8b5cf6) 50%, rgba(255, 255, 255, 0.12));
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--slot-primary, #8b5cf6) 10%, transparent);
+  animation: slot-win-feed-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.slot-win-feed li > svg {
+  width: 17px;
+  height: 17px;
+  color: #ffd86b;
+}
+
+.slot-win-feed li span small,
+.slot-win-feed li span strong {
+  display: block;
+}
+
+.slot-win-feed li span small {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.slot-win-feed li span strong {
+  margin-top: 2px;
+  font-size: 0.83rem;
+}
+
+.slot-win-feed time {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.slot-win-feed-empty {
+  margin: 13px 0 0;
+  padding: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 15px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@keyframes slot-win-feed-enter {
+  from { opacity: 0; transform: translateX(16px) scale(0.96); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@media (max-width: 1180px) {
+  .slot-win-feed {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: min(760px, calc(100% - 28px));
+    margin: 12px auto 0;
+  }
+
+  .slot-win-feed ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: none;
+  }
+
+  .slot-win-feed li {
+    grid-template-columns: auto 1fr;
+  }
+
+  .slot-win-feed time {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .slot-win-feed {
+    width: calc(100% - 20px);
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .slot-win-feed ol {
+    grid-template-columns: 1fr;
+  }
+
+  .slot-win-feed li {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .slot-win-feed time {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-win-feed li.is-latest {
+    animation: none;
+  }
+}
