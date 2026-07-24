@@ -1,0 +1,532 @@
+.fl-slot-screen {
+  isolation: isolate;
+  width: min(100%, 760px) !important;
+  max-width: 760px !important;
+  margin: 0 auto !important;
+  overflow: visible !important;
+  padding: 12px 10px 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.fl-slot-screen::before {
+  content: "";
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(111, 29, 132, .32), transparent 30%),
+    radial-gradient(circle at 50% 52%, rgba(219, 103, 25, .11), transparent 30%),
+    linear-gradient(180deg, rgba(5, 2, 9, .38), rgba(4, 2, 7, .94));
+}
+
+.fl-slot-screen .slot-backdrop {
+  position: fixed !important;
+  opacity: .18 !important;
+  filter: saturate(1.18) contrast(1.2) blur(3px) !important;
+  transform: scale(1.05);
+}
+
+.fl-slot-screen .fl-slot-overlay {
+  position: fixed !important;
+  background:
+    radial-gradient(circle at center, transparent 0 24%, rgba(5, 2, 8, .58) 56%, rgba(4, 2, 7, .94) 100%),
+    linear-gradient(180deg, rgba(6, 2, 10, .12), rgba(4, 2, 7, .86)) !important;
+}
+
+.fl-slot-topline {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto;
+  align-items: center !important;
+  min-height: 104px !important;
+  padding: 0 4px 10px !important;
+}
+
+.fl-slot-title-lockup {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-width: 0;
+  color: var(--fl-gold);
+  text-align: center;
+  text-shadow: 0 3px #5c2b0a, 0 0 20px rgba(246, 212, 111, .32);
+}
+
+.fl-slot-title-lockup > svg {
+  width: 38px;
+  height: 38px;
+  margin-bottom: -11px;
+  filter: drop-shadow(0 4px 4px #000);
+}
+
+.fl-slot-title-lockup > span {
+  color: #f4ce68 !important;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .19em !important;
+}
+
+.fl-slot-title-lockup h1 {
+  max-width: 430px;
+  margin: 3px 0 0 !important;
+  overflow: hidden;
+  color: #ffe197 !important;
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-size: clamp(25px, 5vw, 48px) !important;
+  font-weight: 1000;
+  line-height: .92;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fl-slot-title-lockup small {
+  margin-top: 5px;
+  color: #bda869;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.fl-slot-cabinet {
+  position: relative;
+  z-index: 2;
+  padding: 18px 20px 22px;
+  border: 2px solid #8e601d;
+  border-radius: 36px 36px 28px 28px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(151, 45, 154, .24), transparent 30%),
+    radial-gradient(circle at 50% 62%, rgba(224, 92, 18, .13), transparent 38%),
+    linear-gradient(180deg, rgba(27, 11, 31, .98), rgba(10, 5, 14, .99));
+  box-shadow:
+    0 38px 100px rgba(0, 0, 0, .74),
+    0 0 0 4px rgba(22, 11, 28, .92),
+    0 0 0 5px rgba(219, 173, 66, .22),
+    inset 0 1px rgba(255, 255, 255, .1),
+    inset 0 0 70px rgba(119, 30, 138, .11);
+}
+
+.fl-slot-cabinet::before,
+.fl-slot-cabinet::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 24%;
+  width: 54px;
+  height: 52%;
+  border: 1px solid rgba(218, 173, 67, .28);
+  background: linear-gradient(180deg, rgba(62, 28, 56, .94), rgba(17, 8, 22, .98));
+  box-shadow: inset 0 0 22px rgba(246, 212, 111, .05);
+}
+
+.fl-slot-cabinet::before {
+  right: 100%;
+  border-radius: 22px 0 0 22px;
+}
+
+.fl-slot-cabinet::after {
+  left: 100%;
+  border-radius: 0 22px 22px 0;
+}
+
+.fl-slot-screen .fl-slot-jackpots {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+.fl-slot-screen .fl-slot-jackpots > span {
+  position: relative;
+  display: grid;
+  min-height: 58px !important;
+  place-items: center;
+  overflow: hidden;
+  padding: 6px 8px !important;
+  border: 1px solid currentColor !important;
+  border-radius: 8px !important;
+  background: linear-gradient(180deg, rgba(12, 6, 16, .92), rgba(5, 3, 8, .96)) !important;
+  box-shadow: inset 0 0 18px color-mix(in srgb, currentColor 22%, transparent), 0 0 12px rgba(0, 0, 0, .42) !important;
+}
+
+.fl-slot-screen .fl-slot-jackpots > span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.08), transparent 68%);
+  transform: translateX(-110%);
+  animation: fl-jackpot-glint 5.5s ease-in-out infinite;
+}
+
+@keyframes fl-jackpot-glint {
+  0%, 72% { transform: translateX(-110%); }
+  100% { transform: translateX(110%); }
+}
+
+.fl-slot-screen .fl-jackpot-grand { color: #ff6a2f !important; }
+.fl-slot-screen .fl-jackpot-major { color: #dd4cff !important; }
+.fl-slot-screen .fl-jackpot-minor { color: #4ca8ff !important; }
+.fl-slot-screen .fl-jackpot-mini { color: #9fe84b !important; }
+.fl-slot-screen .fl-slot-jackpots small { color: currentColor !important; font-size: 9px !important; font-weight: 1000 !important; letter-spacing: .12em; text-transform: uppercase; }
+.fl-slot-screen .fl-slot-jackpots strong { color: #fff0c2 !important; font-size: clamp(14px, 3vw, 21px) !important; letter-spacing: .035em; text-shadow: 0 0 14px currentColor; }
+
+.fl-slot-logo {
+  display: grid;
+  justify-items: center;
+  margin: 15px 0 10px;
+  color: #f5ca5d;
+  text-align: center;
+  text-shadow: 0 3px #6b2e0c, 0 0 20px rgba(246, 212, 111, .34);
+}
+
+.fl-slot-logo svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: -12px;
+  filter: drop-shadow(0 4px 4px #000);
+}
+
+.fl-slot-logo span {
+  max-width: 90%;
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(23px, 5vw, 40px);
+  font-weight: 1000;
+  line-height: .95;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fl-slot-logo small {
+  max-width: 90%;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #b7a57f;
+  font-size: 8px;
+  letter-spacing: .09em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fl-slot-machine-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 42px minmax(0, 1fr) 42px 30px;
+  gap: 7px;
+  align-items: center;
+}
+
+.fl-payline-column {
+  display: grid;
+  gap: 27px;
+  align-content: center;
+}
+
+.fl-payline-column span {
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid #9d751c;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #4a3309, #171004);
+  color: #f5d466;
+  font-size: 9px;
+  font-weight: 1000;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 4px 12px rgba(0,0,0,.4);
+}
+
+.fl-payline-column span small {
+  margin-top: -5px;
+  font-size: 4px;
+  letter-spacing: .05em;
+}
+
+.fl-round-control {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #a67a25;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 32%, #35221a, #0b070c 72%);
+  color: #e5b947;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 16px rgba(0,0,0,.48);
+  cursor: pointer;
+}
+
+.fl-round-control svg { width: 21px; height: 21px; }
+.fl-round-control.lightning { color: #ffd24e; }
+.fl-round-control.lightning.active { border-color: #c955ff; color: #e58aff; box-shadow: 0 0 18px rgba(194, 71, 255, .38), inset 0 1px rgba(255,255,255,.2); }
+
+.fl-slot-screen .reel-frame {
+  min-width: 0;
+  gap: 4px !important;
+  padding: 10px !important;
+  border: 5px solid #6b4214 !important;
+  border-radius: 11px !important;
+  background: #050308 !important;
+  box-shadow:
+    inset 0 0 0 2px #e6bc58,
+    inset 0 0 0 5px #2e1908,
+    inset 0 0 38px #000,
+    0 18px 40px rgba(0,0,0,.62) !important;
+}
+
+.fl-slot-screen .reel {
+  gap: 4px !important;
+  padding: 3px !important;
+  border: 1px solid rgba(246, 212, 111, .21) !important;
+  background: linear-gradient(180deg, #27152c, #0c0710) !important;
+}
+
+.fl-slot-screen .symbol {
+  border: 1px solid rgba(246, 212, 111, .18) !important;
+  border-radius: 6px !important;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(145, 70, 50, .17), transparent 43%),
+    linear-gradient(180deg, #241428, #100914) !important;
+}
+
+.fl-slot-screen .low-symbol {
+  color: #f5c759 !important;
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-size: clamp(22px, 5.8vw, 62px) !important;
+  font-weight: 1000 !important;
+  text-shadow: 0 3px #692617, 0 0 10px rgba(245,199,89,.2) !important;
+}
+
+.fl-slot-screen .symbol.winning {
+  border-color: #ffe16e !important;
+  box-shadow: 0 0 21px rgba(255, 225, 110, .72), inset 0 0 20px rgba(255, 225, 110, .18) !important;
+}
+
+.fl-slot-screen .fl-slot-message {
+  display: flex !important;
+  min-height: 42px !important;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 11px 73px 0 !important;
+  border: 1px solid rgba(246, 212, 111, .2) !important;
+  border-radius: 8px !important;
+  background: rgba(7, 4, 10, .88) !important;
+  color: #a99caf !important;
+  font-size: 10px;
+  text-align: center;
+}
+
+.fl-slot-screen .fl-slot-message strong {
+  color: #f6d267 !important;
+  font-size: 14px !important;
+}
+
+.fl-slot-screen .fl-slot-readout-row {
+  display: grid !important;
+  grid-template-columns: 1.12fr 1.15fr auto !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+  margin-top: 9px !important;
+}
+
+.fl-slot-screen .fl-slot-readout-row .bet-control {
+  min-height: 58px !important;
+  border: 1px solid rgba(246, 212, 111, .25) !important;
+  border-radius: 10px !important;
+  background: linear-gradient(180deg, #191020, #09060d) !important;
+}
+
+.fl-slot-screen .fl-slot-readout-row .bet-control button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50% !important;
+  background: #2a1a30 !important;
+  color: #f0c75d !important;
+}
+
+.fl-slot-screen .fl-slot-readout-row small,
+.fl-win-box small {
+  color: #8e8295;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.fl-slot-screen .fl-slot-readout-row strong,
+.fl-win-box strong {
+  color: #f4d06d;
+  font-size: clamp(13px, 3vw, 19px);
+}
+
+.fl-win-box {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(246, 212, 111, .25);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #191020, #09060d);
+}
+
+.fl-max-bet {
+  min-width: 70px;
+  border: 1px solid #a99325;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #626412, #242605);
+  color: #fff188;
+  font-size: 11px;
+  font-weight: 1000;
+  line-height: .9;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px rgba(255,255,255,.25);
+  cursor: pointer;
+}
+
+.fl-slot-action-row {
+  display: grid;
+  grid-template-columns: 74px minmax(210px, 300px) 74px;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.fl-slot-action-row .spin-button {
+  display: grid !important;
+  grid-template-columns: auto auto;
+  column-gap: 9px;
+  min-height: 76px !important;
+  place-content: center;
+  border: 2px solid #67ff53 !important;
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, #4ef13c, #0e8618) !important;
+  color: white !important;
+  box-shadow: inset 0 2px rgba(255,255,255,.48), 0 0 30px rgba(67,227,56,.34) !important;
+}
+
+.fl-slot-action-row .spin-button > svg {
+  grid-row: span 2;
+  width: 30px;
+  height: 30px;
+}
+
+.fl-slot-action-row .spin-button span {
+  font-size: 25px !important;
+  font-weight: 1000 !important;
+  line-height: .88;
+  text-transform: uppercase;
+}
+
+.fl-slot-action-row .spin-button small {
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.fl-slot-action-row .auto-button,
+.fl-slot-action-row .turbo-button {
+  display: flex;
+  min-height: 62px !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid rgba(246, 212, 111, .28) !important;
+  border-radius: 15px !important;
+  background: linear-gradient(180deg, #1c1224, #0b0710) !important;
+  color: #e5bd58 !important;
+}
+
+.fl-slot-action-row .auto-button svg,
+.fl-slot-action-row .turbo-button svg { width: 22px; height: 22px; }
+.fl-slot-action-row .auto-button span,
+.fl-slot-action-row .turbo-button span { display: grid; justify-items: center; font-size: 8px; font-weight: 900; text-transform: uppercase; }
+.fl-slot-action-row .auto-button em { color: #9d90a4; font-size: 7px; font-style: normal; }
+.fl-slot-action-row .auto-button.running,
+.fl-slot-action-row .turbo-button.selected { border-color: #ce54ff !important; background: linear-gradient(180deg, #7e2fb6, #32104e) !important; color: white !important; box-shadow: 0 0 18px rgba(194,71,255,.26); }
+
+.fl-slot-screen .play-money-notice {
+  margin-top: 14px;
+  color: #736978;
+  font-size: 8px;
+  letter-spacing: .04em;
+  text-align: center;
+}
+
+.fl-slot-screen .paytable-panel {
+  border: 1px solid rgba(246, 212, 111, .34) !important;
+  background: linear-gradient(180deg, #181020, #08050c) !important;
+  box-shadow: 0 30px 100px #000 !important;
+}
+
+.fl-slot-screen .paytable-panel > header {
+  border-bottom-color: rgba(246, 212, 111, .15) !important;
+}
+
+.fl-slot-screen .paytable-panel h2,
+.fl-slot-screen .paytable-facts dd { color: #f5d274 !important; font-family: Georgia, "Times New Roman", serif; }
+.fl-slot-screen .paytable-facts > div,
+.fl-slot-screen .paytable-table th,
+.fl-slot-screen .paytable-table td { border-color: rgba(246, 212, 111, .13) !important; background: #100a16 !important; }
+
+@media (max-width: 900px) {
+  .fl-slot-screen { width: min(100%, 690px) !important; padding-inline: 5px !important; }
+  .fl-slot-cabinet { padding: 14px 13px 18px; border-radius: 27px 27px 22px 22px; }
+  .fl-slot-cabinet::before,
+  .fl-slot-cabinet::after { display: none; }
+  .fl-slot-machine-row { grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 5px; }
+  .fl-payline-column { display: none; }
+  .fl-round-control { width: 36px; height: 36px; }
+  .fl-slot-screen .fl-slot-message { margin-inline: 41px !important; }
+}
+
+@media (max-width: 580px) {
+  .fl-slot-screen { padding-top: 2px !important; }
+  .fl-slot-topline { min-height: 82px !important; grid-template-columns: 38px 1fr 76px; gap: 5px; }
+  .fl-slot-title-lockup > svg { width: 31px; height: 31px; }
+  .fl-slot-title-lockup h1 { max-width: 58vw; font-size: clamp(19px, 6vw, 29px) !important; }
+  .fl-slot-title-lockup small { display: none; }
+  .fl-slot-topline .back-link { width: 38px; min-width: 38px; height: 38px; overflow: hidden; padding: 0 !important; font-size: 0; }
+  .fl-slot-topline .back-link svg { width: 19px; height: 19px; }
+  .fl-slot-topline .slot-actions { gap: 4px; }
+  .fl-slot-topline .icon-button { width: 36px; min-width: 36px; height: 36px; }
+  .fl-slot-cabinet { padding: 10px 8px 14px; border-radius: 22px 22px 17px 17px; }
+  .fl-slot-screen .fl-slot-jackpots { gap: 5px !important; }
+  .fl-slot-screen .fl-slot-jackpots > span { min-height: 48px !important; padding: 4px !important; }
+  .fl-slot-screen .fl-slot-jackpots small { font-size: 7px !important; }
+  .fl-slot-screen .fl-slot-jackpots strong { font-size: 12px !important; }
+  .fl-slot-logo { margin: 9px 0 7px; }
+  .fl-slot-logo svg { width: 37px; height: 37px; }
+  .fl-slot-logo span { font-size: 22px; }
+  .fl-slot-logo small { font-size: 6px; }
+  .fl-slot-machine-row { grid-template-columns: 30px minmax(0, 1fr) 30px; gap: 3px; }
+  .fl-round-control { width: 30px; height: 30px; }
+  .fl-round-control svg { width: 16px; height: 16px; }
+  .fl-slot-screen .reel-frame { gap: 2px !important; padding: 6px !important; border-width: 4px !important; }
+  .fl-slot-screen .reel { gap: 2px !important; padding: 2px !important; }
+  .fl-slot-screen .symbol { border-radius: 4px !important; }
+  .fl-slot-screen .low-symbol { font-size: clamp(18px, 9vw, 40px) !important; }
+  .fl-slot-screen .fl-slot-message { min-height: 35px !important; margin: 7px 33px 0 !important; padding: 5px !important; font-size: 8px; }
+  .fl-slot-screen .fl-slot-message strong { font-size: 10px !important; }
+  .fl-slot-screen .fl-slot-readout-row { grid-template-columns: 1.15fr 1fr 55px !important; gap: 5px !important; }
+  .fl-slot-screen .fl-slot-readout-row .bet-control { min-height: 49px !important; }
+  .fl-slot-screen .fl-slot-readout-row .bet-control button { width: 27px; height: 27px; }
+  .fl-slot-screen .fl-slot-readout-row strong,
+  .fl-win-box strong { font-size: 11px; }
+  .fl-max-bet { min-width: 55px; font-size: 9px; }
+  .fl-slot-action-row { grid-template-columns: 52px minmax(150px, 230px) 52px; gap: 7px; margin-top: 9px; }
+  .fl-slot-action-row .spin-button { min-height: 62px !important; border-radius: 17px !important; }
+  .fl-slot-action-row .spin-button > svg { width: 24px; height: 24px; }
+  .fl-slot-action-row .spin-button span { font-size: 20px !important; }
+  .fl-slot-action-row .auto-button,
+  .fl-slot-action-row .turbo-button { min-height: 50px !important; border-radius: 12px !important; }
+  .fl-slot-action-row .auto-button svg,
+  .fl-slot-action-row .turbo-button svg { width: 18px; height: 18px; }
+}
