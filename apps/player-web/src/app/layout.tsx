@@ -25,6 +25,7 @@ import "./premium-shell.css";
 import "./premium-welcome.css";
 import "./premium-liveops.css";
 import "./premium-pass.css";
+import "./premium-social-promo.css";
 import "./premium-placement.css";
 import "./slot-premium-polish.css";
 import "./slot-spin-states.css";
