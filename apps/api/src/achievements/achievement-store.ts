@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { LootEntitlementResult } from "../loot/loot-entitlement.js";
 import type { AchievementView } from "./achievement-system.js";
 
 export interface ClaimAchievementCommand {
@@ -13,6 +14,7 @@ export interface AchievementClaimResult {
   readonly achievementVersion: number;
   readonly coins: number;
   readonly coinBalance: number;
+  readonly lootEntitlement: LootEntitlementResult | null;
   readonly progress: number;
   readonly completionEvidence: Readonly<Record<string, unknown>>;
   readonly replayed: boolean;
