@@ -20,6 +20,7 @@ import "./vegas.css";
 import "./premium-casino.css";
 import "./lotsa-app.css";
 import "./lotsa-menus.css";
+import "./lotsa-slots.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
