@@ -19,6 +19,7 @@ import "./mobile.css";
 import "./vegas.css";
 import "./premium-live.css";
 import "./premium-placement.css";
+import "./slot-premium-polish.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
