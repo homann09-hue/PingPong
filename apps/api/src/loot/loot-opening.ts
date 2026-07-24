@@ -1,13 +1,11 @@
 import { createHash } from "node:crypto";
 import type { LootDrawEvidence } from "./loot-engine.js";
+import { assertLootUuid, canonicalLootJson } from "./loot-entitlement.js";
 
 export interface OpenLootCommand {
   readonly playerId: string;
   readonly idempotencyKey: string;
-  readonly tableId: string;
-  readonly source: string;
-  readonly referenceId: string;
-  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly entitlementId: string;
 }
 
 export interface LootOpeningReward {
@@ -20,8 +18,11 @@ export interface LootOpeningReward {
 
 export interface LootOpeningResult {
   readonly openingId: string;
+  readonly entitlementId: string;
   readonly tableId: string;
   readonly tableVersion: number;
+  readonly source: string;
+  readonly referenceId: string;
   readonly pityGroup: string;
   readonly pityBefore: number;
   readonly pityAfter: number;
@@ -37,7 +38,7 @@ export interface LootOpeningResult {
 
 export class LootTableNotFoundError extends Error {
   public constructor() {
-    super("Active loot table was not found");
+    super("Entitlement-bound loot table version was not found");
     this.name = "LootTableNotFoundError";
   }
 }
@@ -56,23 +57,38 @@ export class LootPlayerNotFoundError extends Error {
   }
 }
 
+export class LootEntitlementNotFoundError extends Error {
+  public constructor() {
+    super("Loot entitlement was not found for this player");
+    this.name = "LootEntitlementNotFoundError";
+  }
+}
+
+export class LootEntitlementNotAvailableError extends Error {
+  public constructor() {
+    super("Loot entitlement is not available");
+    this.name = "LootEntitlementNotAvailableError";
+  }
+}
+
+export class LootEntitlementExpiredError extends Error {
+  public constructor() {
+    super("Loot entitlement has expired");
+    this.name = "LootEntitlementExpiredError";
+  }
+}
+
 export function validateOpenLootCommand(command: OpenLootCommand): void {
-  assertBoundedText(command.playerId, "playerId", 128);
+  assertLootUuid(command.playerId, "playerId");
   assertBoundedText(command.idempotencyKey, "idempotencyKey", 200);
-  assertBoundedText(command.tableId, "tableId", 128);
-  assertBoundedText(command.source, "source", 100);
-  assertBoundedText(command.referenceId, "referenceId", 200);
-  canonicalJson(command.metadata ?? {});
+  assertLootUuid(command.entitlementId, "entitlementId");
 }
 
 export function lootOpeningRequestHash(command: OpenLootCommand): Buffer {
   validateOpenLootCommand(command);
-  return createHash("sha256").update(canonicalJson({
+  return createHash("sha256").update(canonicalLootJson({
     playerId: command.playerId,
-    tableId: command.tableId,
-    source: command.source,
-    referenceId: command.referenceId,
-    metadata: command.metadata ?? {},
+    entitlementId: command.entitlementId,
   })).digest();
 }
 
@@ -80,27 +96,4 @@ function assertBoundedText(value: string, name: string, maximumLength: number): 
   if (value.length < 1 || value.length > maximumLength) {
     throw new RangeError(`${name} must contain between 1 and ${maximumLength} characters`);
   }
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === null) return "null";
-  if (typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new RangeError("Loot metadata numbers must be finite");
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
-  if (typeof value === "object") {
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) {
-      throw new TypeError("Loot metadata must contain only JSON-compatible values");
-    }
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map((key) => {
-      const entry = record[key];
-      if (entry === undefined) throw new TypeError("Loot metadata cannot contain undefined values");
-      return `${JSON.stringify(key)}:${canonicalJson(entry)}`;
-    }).join(",")}}`;
-  }
-  throw new TypeError("Loot metadata must contain only JSON-compatible values");
 }
