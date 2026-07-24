@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import type { ClaimMissionCommand, EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionIdempotencyConflictError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -29,6 +29,8 @@ export class InMemorySpinStore implements SpinStore {
   private readonly gemBalances = new Map<string, number>();
   private readonly economy = new Map<string, Partial<Record<SpinEconomyCurrency, number>>>();
   private readonly missionProgress = new Map<string, { progress: number; claimed: boolean }>();
+  private readonly missionClaimRetries = new Map<string, { semanticKey: string; claim: MissionClaim }>();
+  private readonly missionClaims = new Map<string, MissionClaim>();
   private readonly eventProgress = new Map<string, number>();
   private readonly eventClaims = new Set<string>();
   private readonly tournamentScores = new Map<string, number>();
@@ -361,16 +363,34 @@ export class InMemorySpinStore implements SpinStore {
     });
   }
 
-  public async claimMission(playerId: string, missionId: string, now: Date): Promise<MissionClaim> {
-    const mission = (await this.getMissions(playerId, now)).find((item) => item.id === missionId);
-    if (!mission || !mission.completed || mission.claimed) throw new MissionNotClaimableError();
-    const key = `${playerId}:${missionId}:${mission.periodKey}`;
-    this.missionProgress.set(key, { progress: mission.progress, claimed: true });
-    const coinBefore = this.balances.get(playerId) ?? this.defaultBalance;
+  public async claimMission(command: ClaimMissionCommand, now: Date): Promise<MissionClaim> {
+    const mission = (await this.getMissions(command.playerId, now)).find((item) => item.id === command.missionId);
+    if (!mission) throw new MissionNotClaimableError();
+    const semanticKey = `${command.playerId}:${mission.id}:v${mission.version}:${mission.periodKey}`;
+    const retryKey = `${command.playerId}:${command.idempotencyKey}`;
+    const retry = this.missionClaimRetries.get(retryKey);
+    if (retry) {
+      if (retry.semanticKey !== semanticKey) throw new MissionIdempotencyConflictError();
+      return { ...retry.claim, replayed: true };
+    }
+    const semanticReplay = this.missionClaims.get(semanticKey);
+    if (semanticReplay) {
+      this.missionClaimRetries.set(retryKey, { semanticKey, claim: semanticReplay });
+      return { ...semanticReplay, replayed: true };
+    }
+    if (!mission.completed || mission.claimed) throw new MissionNotClaimableError();
+    const progressKey = `${command.playerId}:${mission.id}:${mission.periodKey}`;
+    this.missionProgress.set(progressKey, { progress: mission.progress, claimed: true });
+    const coinBefore = this.balances.get(command.playerId) ?? this.defaultBalance;
     const coinBalance = coinBefore + mission.rewards.coins;
-    this.balances.set(playerId, coinBalance);
-    if (mission.rewards.coins > 0) this.record(playerId, mission.rewards.coins, "mission_claim", "mission", `${key}:coin`, coinBefore, coinBalance);
-    const wallet = { ...this.economy.get(playerId) };
+    if (!Number.isSafeInteger(coinBalance) || coinBalance < 0) throw new RangeError("Mission coin balance is unsafe");
+    this.balances.set(command.playerId, coinBalance);
+    const claimId = randomUUID();
+    if (mission.rewards.coins > 0) {
+      this.record(command.playerId, mission.rewards.coins, "mission_claim", "mission", claimId,
+        coinBefore, coinBalance);
+    }
+    const wallet = { ...this.economy.get(command.playerId) };
     const rewardCurrencies: readonly [SpinEconomyCurrency, number][] = [
       ["mission_point", mission.rewards.missionPoints], ["loyalty_point", mission.rewards.loyaltyPoints],
       ["stamp", mission.rewards.stamps], ["toolbox", mission.rewards.toolboxes], ["booster", mission.rewards.boosters],
@@ -379,14 +399,32 @@ export class InMemorySpinStore implements SpinStore {
     for (const [currency, amount] of rewardCurrencies) {
       const before = wallet[currency] ?? 0;
       const after = before + amount;
+      if (!Number.isSafeInteger(after) || after < 0) throw new RangeError(`Mission ${currency} balance is unsafe`);
       wallet[currency] = after;
       balances[currency] = after;
-      if (amount > 0) this.record(playerId, amount, "mission_claim", "mission", `${key}:${currency}`, before, after, currency);
+      if (amount > 0) this.record(command.playerId, amount, "mission_claim", "mission", claimId,
+        before, after, currency);
     }
-    this.economy.set(playerId, wallet);
-    const definition = missionCatalog.definitions.find((item) => item.id === missionId)!;
-    if (definition.cadence === "daily" && definition.tier === "standard") this.advanceWeeklyMissionBar(playerId, now);
-    return { missionId, coins: mission.rewards.coins, coinBalance, rewards: mission.rewards, balances };
+    this.economy.set(command.playerId, wallet);
+    const definition = missionCatalog.definitions.find((item) => item.id === command.missionId)!;
+    if (definition.cadence === "daily" && definition.tier === "standard") {
+      this.advanceWeeklyMissionBar(command.playerId, now);
+    }
+    const claim: MissionClaim = {
+      claimId,
+      missionId: mission.id,
+      missionVersion: mission.version,
+      periodKey: mission.periodKey,
+      coins: mission.rewards.coins,
+      coinBalance,
+      rewards: mission.rewards,
+      balances,
+      lootEntitlement: null,
+      replayed: false,
+    };
+    this.missionClaims.set(semanticKey, claim);
+    this.missionClaimRetries.set(retryKey, { semanticKey, claim });
+    return claim;
   }
 
   public async getLiveEvents(playerId: string, now: Date): Promise<readonly LiveEventView[]> {

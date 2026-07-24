@@ -20,6 +20,17 @@ describe("mission catalogue v3", () => {
     expect(missionById("weekly-bar-7").rewards.coins).toBe(200_000);
   });
 
+  it("binds every definition to its exact versioned tier reward", () => {
+    for (const mission of missionCatalog.definitions) {
+      expect(mission.version).toBe(3);
+      expect(mission.lootReward).toEqual({
+        tableId: `mission-${mission.tier}-reward`,
+        tableVersion: 1,
+        expiresInSeconds: 604_800,
+      });
+    }
+  });
+
   it("keeps every reward component non-negative and safely representable", () => {
     for (const mission of missionCatalog.definitions) {
       for (const value of Object.values(mission.rewards)) {

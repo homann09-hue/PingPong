@@ -10,7 +10,7 @@ import type { Authenticator } from "./auth.js";
 import type { IdentityService } from "./identity/identity-service.js";
 import { ExternalIdentityInvalidError, ExternalIdentityUnavailableError } from "./identity/identity-service.js";
 import type { SpinStore } from "./spins/spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionIdempotencyConflictError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spins/spin-store.js";
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
 import type { SlotAvailabilityStore, SlotStatus } from "./liveops/slot-availability-store.js";
@@ -1143,9 +1143,17 @@ export function buildApp(
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     const missionId = (request.params as { missionId: string }).missionId;
     if (!/^[a-z0-9-]{3,64}$/.test(missionId)) return reply.code(400).send({ code: "INVALID_REQUEST" });
-    try { return await dependencies.spinStore.claimMission(playerId, missionId, new Date()); }
-    catch (error) {
+    const keyResult = idempotencyKey.safeParse(request.headers["idempotency-key"]);
+    if (!keyResult.success) return reply.code(400).send({ code: "INVALID_IDEMPOTENCY_KEY" });
+    const rate = authRateLimiter.consume(`mission-claim:${playerId}`, 20, 60_000);
+    if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+    try {
+      return await dependencies.spinStore.claimMission({
+        playerId, missionId, idempotencyKey: keyResult.data,
+      }, new Date());
+    } catch (error) {
       if (error instanceof MissionNotClaimableError) return reply.code(409).send({ code: "MISSION_NOT_CLAIMABLE" });
+      if (error instanceof MissionIdempotencyConflictError) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT" });
       throw error;
     }
   });

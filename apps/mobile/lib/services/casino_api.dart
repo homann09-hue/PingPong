@@ -1969,6 +1969,7 @@ class CasinoApi {
   Future<MissionClaimView> claimMission(String missionId) async {
     final response = await _client.post(
       Uri.parse('$base/v1/missions/$missionId/claim'),
+      headers: {'idempotency-key': _uuid()},
     );
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
