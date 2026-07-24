@@ -30,6 +30,7 @@ import "./premium-jackpot-recent.css";
 import "./premium-achievements.css";
 import "./premium-placement.css";
 import "./premium-sections.css";
+import "./premium-account.css";
 import "./slot-premium-polish.css";
 import "./slot-spin-states.css";
 import { AgeGate } from "@/components/age-gate";
