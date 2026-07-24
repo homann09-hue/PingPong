@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft";
 import { ArrowsClockwise } from "@phosphor-icons/react/dist/csr/ArrowsClockwise";
+import { Crown } from "@phosphor-icons/react/dist/csr/Crown";
 import { Info } from "@phosphor-icons/react/dist/csr/Info";
 import { Lightning } from "@phosphor-icons/react/dist/csr/Lightning";
 import { Minus } from "@phosphor-icons/react/dist/csr/Minus";
@@ -22,12 +23,14 @@ import { coinNumber } from "@/lib/format";
 import { usePlayer } from "@/hooks/use-player";
 import { WinCelebration, winTierFor } from "./win-celebration";
 
-const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
+const jackpotOrder = ["GRAND", "MAJOR", "MINOR", "MINI"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
 const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
+const leftPaylines = [50, 40, 30];
+const rightPaylines = [30, 40, 50];
 
 let audioContext: AudioContext | null = null;
-/** Kleine synthetische Spielgeraeusche; laeuft nur nach einer Nutzer-Geste. */
+
 function playTones(frequencies: readonly number[], step = 0.09, type: OscillatorType = "triangle", volume = 0.05) {
   try {
     audioContext ??= new AudioContext();
@@ -44,10 +47,11 @@ function playTones(frequencies: readonly number[], step = 0.09, type: Oscillator
       oscillator.start(now + index * step);
       oscillator.stop(now + (index + 1) * step + 0.02);
     });
-  } catch { /* Sound ist optional */ }
+  } catch {
+    // Sound is optional and only starts after a user gesture.
+  }
 }
 
-/** Server-authoritative Slot-Oberflaeche fuer jedes konfigurierte Theme. */
 export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const { profile, setProfile, error, refresh } = usePlayer();
   const [paytable, setPaytable] = useState<Paytable | null>(null);
@@ -62,6 +66,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
+  const [autoRemaining, setAutoRemaining] = useState(0);
+
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
@@ -80,25 +86,24 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     return () => { cancelled = true; };
   }, [game.id]);
 
-  // Autoplay: dreht bis zu N Runden automatisch. Der "latest ref"-Zeiger haelt
-  // stets die aktuelle spin-Funktion, damit kein veralteter Closure-Stand
-  // (Einsatz, Kontostand) verwendet wird. Der Effekt startet die naechste Runde
-  // erst, wenn die vorige fertig ist — keine Timer-Kollision, terminiert nach N.
-  const [autoRemaining, setAutoRemaining] = useState(0);
   const spinRef = useRef(spin);
   useEffect(() => { spinRef.current = spin; });
   useEffect(() => {
     if (autoRemaining <= 0 || spinning) return undefined;
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       void spinRef.current();
       setAutoRemaining((remaining) => remaining - 1);
     }, turbo ? 320 : 780);
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [autoRemaining, spinning, turbo]);
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setWinCells(new Set()); setWin(0); setCelebration(null); setMessage("Walzen drehen …");
+    setSpinning(true);
+    setWinCells(new Set());
+    setWin(0);
+    setCelebration(null);
+    setMessage("Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -119,97 +124,142 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         const tier = winTierFor(body.spin.winClass, body.spin.totalWin / bet);
         if (tier) setCelebration({ tier, amount: body.spin.totalWin });
       } else {
-        setMessage("Versuch den naechsten Spin");
+        setMessage("Versuch den nächsten Spin");
       }
       if (profile) setProfile({ ...profile, coinBalance: body.coinBalance });
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
-      if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins fuer diesen Einsatz – hol dir Gratis-Boni im Shop.");
+      if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
       else if (code === "HIGH_ROLLER_MEMBERSHIP_REQUIRED") setMessage("Dieser Slot ist dem High Roller Club vorbehalten.");
       else if (code === "RATE_LIMITED") setMessage("Zu viele Spins in kurzer Zeit. Kurz durchatmen und weiter geht es.");
       else setMessage("Der Spin konnte nicht abgeschlossen werden. Dein Guthaben ist sicher.");
-    } finally { setSpinning(false); }
+    } finally {
+      setSpinning(false);
+    }
   }
 
-  const themeStyle = { "--slot-primary": game.primary, "--slot-secondary": game.secondary,
-    // Die Cover-Kunst des Slots dient als Blickfang am Bildrand — eigene
-    // Grafik, kein zusaetzliches Asset noetig.
-    "--slot-cover": `url("${game.cover}")` } as React.CSSProperties;
+  const themeStyle = {
+    "--slot-primary": game.primary,
+    "--slot-secondary": game.secondary,
+    "--slot-cover": `url("${game.cover}")`,
+  } as React.CSSProperties;
+
   return <AppShell profile={profile}>
-    <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
-      <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
-      <div className="slot-overlay" />
-      {!paytable && (
-        <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}>
-          <span className="slot-intro-emblem" aria-hidden="true" />
-          <p className="slot-intro-name">{game.name}</p>
-          <span className="slot-intro-bar" aria-hidden="true"><i /></span>
+    <section className="slot-stage fl-slot-screen" aria-labelledby="slot-title" style={themeStyle}>
+      <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={58} />
+      <div className="slot-overlay fl-slot-overlay" />
+
+      {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}>
+        <span className="slot-intro-emblem" aria-hidden="true" />
+        <p className="slot-intro-name">{game.name}</p>
+        <span className="slot-intro-bar" aria-hidden="true"><i /></span>
+      </div>}
+
+      <header className="slot-header fl-slot-topline">
+        <Link href="/" className="back-link" aria-label="Zurück zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
+        <div className="fl-slot-title-lockup">
+          <Crown weight="fill" />
+          <span>Fortune Legends</span>
+          <h1 id="slot-title">{game.name}</h1>
+          <small>Grand {grand ? coinNumber(grand.amount) : "—"}</small>
         </div>
-      )}
-      <header className="slot-header">
-        <Link href="/" className="back-link" aria-label="Zurueck zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
-        <div><span>{game.name}</span><h1 id="slot-title">Grand {grand ? coinNumber(grand.amount) : "—"}</h1></div>
         <div className="slot-actions">
           <button className="icon-button" onClick={() => setInfoOpen(true)} aria-label="Gewinntabelle und Regeln"><Info weight="fill" /></button>
           <button className="icon-button" onClick={() => setSound((value) => !value)} aria-pressed={sound} aria-label={sound ? "Ton aus" : "Ton an"}>{sound ? <SpeakerHigh weight="fill" /> : <SpeakerSlash weight="fill" />}</button>
         </div>
       </header>
+
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
-      <div className="jackpot-strip" aria-label="Progressive Jackpots">
-        {jackpotOrder.map((tier) => {
-          const entry = jackpots.find((jackpot) => jackpot.tier === tier);
-          return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>;
-        })}
-      </div>
-      <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
-        {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
-          {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
-              fest, bevor sich hier etwas bewegt — die Drehung erzaehlt es nur nach. */}
-          <div className="reel-strip" aria-hidden="true">
-            {[...column, ...column, ...column].map((symbol, index) => {
-              const stripAsset = symbolAsset(game.symbolSet, symbol);
-              return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>
-                {stripAsset
-                  ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} />
-                  : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}
-              </div>;
-            })}
+
+      <div className="fl-slot-cabinet">
+        <div className="jackpot-strip fl-slot-jackpots" aria-label="Progressive Jackpots">
+          {jackpotOrder.map((tier) => {
+            const entry = jackpots.find((jackpot) => jackpot.tier === tier);
+            return <span key={tier} className={`fl-jackpot-${tier.toLowerCase()}`}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>;
+          })}
+        </div>
+
+        <div className="fl-slot-logo">
+          <Crown weight="fill" />
+          <span>{game.name}</span>
+          <small>{game.features}</small>
+        </div>
+
+        <div className="fl-slot-machine-row">
+          <div className="fl-payline-column left" aria-hidden="true">{leftPaylines.map((line) => <span key={line}>{line}<small>LINES</small></span>)}</div>
+          <button className="fl-round-control info" onClick={() => setInfoOpen(true)} aria-label="Gewinntabelle öffnen"><Info weight="fill" /></button>
+
+          <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
+            {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
+              <div className="reel-strip" aria-hidden="true">
+                {[...column, ...column, ...column].map((symbol, index) => {
+                  const stripAsset = symbolAsset(game.symbolSet, symbol);
+                  return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>
+                    {stripAsset
+                      ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} />
+                      : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}
+                  </div>;
+                })}
+              </div>
+              {column.map((symbol, row) => {
+                const asset = symbolAsset(game.symbolSet, symbol);
+                const winning = winCells.has(`${reel}:${row}`);
+                return <div className={`symbol ${winning ? "winning" : ""}`} key={`${reel}-${row}`}>
+                  {hasSymbolArt(game.symbolSet, symbol)
+                    ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winning} />
+                    : asset
+                      ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} />
+                      : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}
+                </div>;
+              })}
+            </div>)}
           </div>
-          {column.map((symbol, row) => {
-            const asset = symbolAsset(game.symbolSet, symbol);
-            return <div className={`symbol ${winCells.has(`${reel}:${row}`) ? "winning" : ""}`} key={`${reel}-${row}`}>{hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winCells.has(`${reel}:${row}`)} /> : asset
-              ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} />
-              : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}</div>;
-          })}</div>)}
+
+          <button className={`fl-round-control lightning ${turbo ? "active" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo} aria-label="Turbo umschalten"><Lightning weight="fill" /></button>
+          <div className="fl-payline-column right" aria-hidden="true">{rightPaylines.map((line) => <span key={line}>{line}<small>LINES</small></span>)}</div>
+        </div>
+
+        <div className="win-panel fl-slot-message" aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(win)}</strong>}</div>
+
+        <div className="slot-controls fl-slot-readout-row">
+          <div className="bet-control">
+            <button disabled={spinning || betIndex === 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button>
+            <span><small>Total Bet</small><strong>{coinNumber(bet)}</strong></span>
+            <button disabled={spinning || betIndex >= bets.length - 1} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhöhen"><Plus weight="bold" /></button>
+          </div>
+
+          <div className="fl-win-box"><small>Win</small><strong>{coinNumber(win)}</strong></div>
+
+          <button className="fl-max-bet" disabled={spinning} onClick={() => setBetIndex(Math.max(0, bets.length - 1))}>Max<br />Bet</button>
+        </div>
+
+        <div className="fl-slot-action-row">
+          <button className={`auto-button ${autoRemaining > 0 ? "running" : ""}`} onClick={() => (autoRemaining > 0 ? setAutoRemaining(0) : setAutoRemaining(10))} disabled={!profile} aria-label={autoRemaining > 0 ? "Autoplay stoppen" : "10 Runden automatisch drehen"}>
+            <ArrowsClockwise weight="bold" /><span>Auto<em>{autoRemaining > 0 ? autoRemaining : "10x"}</em></span>
+          </button>
+
+          <button className="spin-button" onClick={spin} disabled={spinning || !profile} aria-label={spinning ? "Walzen drehen" : `Für ${coinNumber(bet)} Coins drehen`}>
+            {spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}
+            <span>{spinning ? "Dreht" : "Spin"}</span>
+            <small>Hold for Auto</small>
+          </button>
+
+          <button className={`turbo-button ${turbo ? "selected" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo}>
+            <Lightning weight="fill" /><span>Turbo</span>
+          </button>
+        </div>
       </div>
-      <div className="win-panel" aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(win)}</strong>}</div>
-      <div className="slot-controls">
-        <div className="bet-control"><button disabled={spinning || betIndex === 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhoehen"><Plus weight="bold" /></button></div>
-        <button className={`turbo-button ${turbo ? "selected" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo}><Lightning weight="fill" /><span>Turbo</span></button>
-        <button className="spin-button" onClick={spin} disabled={spinning || !profile} aria-label={spinning ? "Walzen drehen" : `Fuer ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? "Dreht" : "Spin"}</span></button>
-        <button
-          className={autoRemaining > 0 ? "auto-button running" : "auto-button"}
-          onClick={() => (autoRemaining > 0 ? setAutoRemaining(0) : setAutoRemaining(10))}
-          disabled={!profile}
-          aria-label={autoRemaining > 0 ? "Autoplay stoppen" : "10 Runden automatisch drehen"}
-        ><ArrowsClockwise weight="bold" /><span>Auto<em>{autoRemaining > 0 ? autoRemaining : "10x"}</em></span></button>
-      </div>
-      {celebration?.tier && <WinCelebration
-        tier={celebration.tier}
-        amount={celebration.amount}
-        primary={game.primary}
-        secondary={game.secondary}
-        onDone={() => setCelebration(null)}
-      />}
+
+      {celebration?.tier && <WinCelebration tier={celebration.tier} amount={celebration.amount} primary={game.primary} secondary={game.secondary} onDone={() => setCelebration(null)} />}
       <p className="play-money-notice">Nur zur Unterhaltung · Virtuelle Coins haben keinen Geldwert · Ergebnisse kommen vom Server</p>
 
       {infoOpen && <div className="paytable-overlay" role="dialog" aria-modal="true" aria-label="Gewinntabelle" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}>
         <div className="paytable-panel">
-          <header><h2>{game.name}</h2><button onClick={() => setInfoOpen(false)} aria-label="Schliessen"><X weight="bold" /></button></header>
+          <header><h2>{game.name}</h2><button onClick={() => setInfoOpen(false)} aria-label="Schließen"><X weight="bold" /></button></header>
           {paytable ? <>
             <dl className="paytable-facts">
               <div><dt>RTP (Ziel)</dt><dd>{(paytable.targetRtp * 100).toFixed(2)} %</dd></div>
-              <div><dt>Volatilitaet</dt><dd>{paytable.volatility ?? "—"}</dd></div>
+              <div><dt>Volatilität</dt><dd>{paytable.volatility ?? "—"}</dd></div>
               <div><dt>Gewinnlinien</dt><dd>{paytable.paylines ?? "—"}</dd></div>
               <div><dt>Max. Gewinn</dt><dd>{paytable.maxWinMultiplier ? `${coinNumber(paytable.maxWinMultiplier)}×` : "—"}</dd></div>
             </dl>
@@ -226,7 +276,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
               })}</tbody>
             </table>
           </> : <p className="section-empty">Gewinntabelle wird geladen …</p>}
-          <p className="paytable-note">Alle Ergebnisse werden serverseitig ermittelt. Die veroeffentlichten RTP-Werte werden regelmaessig durch deterministische Simulationen geprueft.</p>
+          <p className="paytable-note">Alle Ergebnisse werden serverseitig ermittelt. Die veröffentlichten RTP-Werte werden regelmäßig durch deterministische Simulationen geprüft.</p>
         </div>
       </div>}
     </section>
