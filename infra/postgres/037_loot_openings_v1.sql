@@ -70,7 +70,8 @@ CREATE TABLE loot_openings (
   created_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (table_id, table_version)
     REFERENCES loot_table_versions(table_id, version),
-  UNIQUE (player_id, idempotency_key)
+  UNIQUE (player_id, idempotency_key),
+  UNIQUE (id, table_id, table_version)
 );
 
 CREATE INDEX loot_openings_player_created_idx
@@ -80,7 +81,9 @@ CREATE INDEX loot_openings_table_created_idx
   ON loot_openings (table_id, table_version, created_at DESC);
 
 CREATE TABLE loot_opening_rewards (
-  opening_id uuid NOT NULL REFERENCES loot_openings(id) ON DELETE CASCADE,
+  opening_id uuid NOT NULL,
+  table_id text NOT NULL,
+  table_version integer NOT NULL,
   sequence integer NOT NULL CHECK (sequence >= 0),
   entry_id text NOT NULL,
   item_id text NOT NULL,
@@ -88,6 +91,10 @@ CREATE TABLE loot_opening_rewards (
   quantity bigint NOT NULL CHECK (quantity > 0),
   inventory_operation_id uuid NOT NULL UNIQUE REFERENCES inventory_operations(id),
   PRIMARY KEY (opening_id, sequence),
+  FOREIGN KEY (opening_id, table_id, table_version)
+    REFERENCES loot_openings(id, table_id, table_version) ON DELETE CASCADE,
+  FOREIGN KEY (table_id, table_version, entry_id)
+    REFERENCES loot_table_entries(table_id, table_version, entry_id),
   FOREIGN KEY (item_id, item_version)
     REFERENCES inventory_item_definitions(item_id, version)
 );
