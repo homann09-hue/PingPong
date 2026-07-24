@@ -148,14 +148,26 @@ databaseSuite("PostgresInventoryStore integration", () => {
               count(*) AS entries
          FROM inventory_ledger`,
     );
-    expect(audit.rows[0]).toMatchObject({ invalid: "0", entries: "9" });
+    expect(audit.rows[0]).toMatchObject({ invalid: "0", entries: "10" });
 
     const operationCount = await pool.query<{ count: string }>("SELECT count(*) FROM inventory_operations");
     const outboxCount = await pool.query<{ count: string }>(
       "SELECT count(*) FROM outbox_events WHERE aggregate_type='inventory'",
     );
+    const eventTypes = await pool.query<{ event_type: string; count: string }>(
+      `SELECT event_type,count(*)::text AS count
+         FROM outbox_events
+        WHERE aggregate_type='inventory'
+        GROUP BY event_type
+        ORDER BY event_type`,
+    );
     expect(operationCount.rows[0]?.count).toBe("5");
     expect(outboxCount.rows[0]?.count).toBe(operationCount.rows[0]?.count);
+    expect(eventTypes.rows).toEqual([
+      { event_type: "inventory.consumed", count: "1" },
+      { event_type: "inventory.expired", count: "1" },
+      { event_type: "inventory.granted", count: "3" },
+    ]);
   });
 
   function grantCommand(overrides: {
