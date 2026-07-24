@@ -2,12 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Fire, Gift, Lightning, Play, Sparkle, Trophy } from "@phosphor-icons/react";
+import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree } from "@phosphor-icons/react";
 
 const liveWins = [
   { player: "Luna77", game: "Neon Nights", amount: "8.4 M" },
   { player: "MikaX", game: "Pharaoh Oasis", amount: "12.7 M" },
   { player: "LuckyLeo", game: "Candy Carnival", amount: "4.2 M" },
+];
+
+const categories = [
+  { href: "/#all-games", label: "Alle Spiele", icon: SquaresFour, badge: "128" },
+  { href: "/#featured", label: "Top Slots", icon: Crown, badge: "HOT" },
+  { href: "/#new", label: "Neu", icon: Star, badge: "12" },
+  { href: "/#jackpots", label: "Jackpots", icon: Trophy, badge: "LIVE" },
+  { href: "/#recent", label: "Zuletzt gespielt", icon: ClockCounterClockwise },
+  { href: "/#social", label: "Mit Freunden", icon: UsersThree },
 ];
 
 const worlds = [
@@ -18,6 +27,7 @@ const worlds = [
 
 export function PremiumLiveRail() {
   const [activeWin, setActiveWin] = useState(0);
+  const [activeCategory, setActiveCategory] = useState("Alle Spiele");
 
   useEffect(() => {
     const timer = window.setInterval(() => setActiveWin((current) => (current + 1) % liveWins.length), 3200);
@@ -29,6 +39,25 @@ export function PremiumLiveRail() {
   return (
     <section className="premium-live-layer" aria-label="Live-Casino-Highlights">
       <div className="premium-ambient" aria-hidden="true"><i /><i /><i /></div>
+
+      <nav className="premium-category-nav" aria-label="Spielkategorien">
+        {categories.map((category) => {
+          const Icon = category.icon;
+          const active = activeCategory === category.label;
+          return (
+            <Link
+              href={category.href}
+              key={category.label}
+              className={active ? "active" : ""}
+              onClick={() => setActiveCategory(category.label)}
+            >
+              <span><Icon weight={active ? "fill" : "bold"} /></span>
+              <strong>{category.label}</strong>
+              {category.badge ? <small>{category.badge}</small> : null}
+            </Link>
+          );
+        })}
+      </nav>
 
       <div className="premium-live-strip">
         <span className="premium-live-label"><i /> LIVE</span>
