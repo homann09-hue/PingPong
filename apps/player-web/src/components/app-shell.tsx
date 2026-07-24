@@ -15,11 +15,12 @@ import { MagnifyingGlass } from "@phosphor-icons/react/dist/csr/MagnifyingGlass"
 import { Medal } from "@phosphor-icons/react/dist/csr/Medal";
 import { ShoppingBag } from "@phosphor-icons/react/dist/csr/ShoppingBag";
 import { Target } from "@phosphor-icons/react/dist/csr/Target";
+import { Trophy } from "@phosphor-icons/react/dist/csr/Trophy";
 import { UsersThree } from "@phosphor-icons/react/dist/csr/UsersThree";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useRef, useState } from "react";
+import { AnimatedCounter } from "./motion-effects";
 import { games } from "@/lib/catalog";
-import { coinNumber } from "@/lib/format";
 import type { Profile } from "@/lib/contracts";
 
 const bottomNav = [
@@ -46,6 +47,7 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchInput = useRef<HTMLInputElement>(null);
+  const claimableRewards = profile?.achievements?.filter((entry) => entry.completed && !entry.claimed && entry.unlocked).length ?? 0;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -75,14 +77,15 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
 
   return <div className="ls-app-shell">
     <header className="ls-topbar">
+      <div className="ls-topbar-shine" aria-hidden="true" />
       <Link className="ls-buy-button" href="/shop"><ShoppingBag weight="fill" /><span>BUY</span></Link>
       <div className="ls-brand"><Crown weight="fill" /><span>AURORA</span><strong>SLOTS</strong></div>
       <div className="ls-top-actions">
-        <div className="ls-balance coin"><Coins weight="fill" /><strong>{profile ? coinNumber(profile.coinBalance) : "—"}</strong></div>
-        <div className="ls-balance gem"><Diamond weight="fill" /><strong>{profile ? coinNumber(profile.gemBalance ?? 0) : "—"}</strong></div>
+        <div className="ls-balance coin"><Coins weight="fill" /><strong>{profile ? <AnimatedCounter value={profile.coinBalance} durationMs={650} /> : "—"}</strong></div>
+        <div className="ls-balance gem"><Diamond weight="fill" /><strong>{profile ? <AnimatedCounter value={profile.gemBalance ?? 0} durationMs={650} /> : "—"}</strong></div>
         <Link className="ls-scratch-button" href="/boost"><Gift weight="fill" /><span>SCRATCH</span></Link>
         <button className="ls-icon-button" onClick={() => setSearchOpen(true)} aria-label="Slots suchen"><MagnifyingGlass weight="bold" /></button>
-        <button className="ls-menu-button" onClick={() => setDrawerOpen(true)} aria-label="Menü öffnen"><List weight="bold" /></button>
+        <button className="ls-menu-button" onClick={() => setDrawerOpen(true)} aria-label="Menü öffnen"><List weight="bold" />{claimableRewards > 0 && <i>{claimableRewards}</i>}</button>
       </div>
     </header>
 
@@ -106,10 +109,17 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
           <span><strong>PlayerOne</strong><small>Level {profile?.progression.level ?? 1} · VIP {profile?.vip?.tier ?? "Bronze"}</small></span>
           <button onClick={() => setDrawerOpen(false)} aria-label="Menü schließen"><X weight="bold" /></button>
         </header>
-        <nav>{drawerLinks.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={() => setDrawerOpen(false)}><Icon weight="fill" /><span>{item.label}</span><b>›</b></Link>; })}</nav>
+        <nav>{drawerLinks.map((item, index) => { const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={() => setDrawerOpen(false)} style={{ "--drawer-index": index } as React.CSSProperties}><Icon weight="fill" /><span>{item.label}</span><b>›</b></Link>; })}</nav>
         <footer><Crown weight="fill" /><span>Social Casino · Nur virtuelles Spielgeld</span></footer>
       </aside>
     </div>}
+
+    <aside className="ls-quick-rail" aria-label="Schnellzugriffe">
+      <Link href="/events" className="live"><Trophy weight="fill" /><span>EVENT</span><small>LIVE</small></Link>
+      <Link href="/missions" className={claimableRewards > 0 ? "attention" : ""}><Target weight="fill" /><span>REWARDS</span>{claimableRewards > 0 ? <b>{claimableRewards}</b> : <small>DAILY</small>}</Link>
+      <Link href="/boost"><Lightning weight="fill" /><span>BOOST</span><small>FREE</small></Link>
+      <Link href="/shop"><ShoppingBag weight="fill" /><span>SHOP</span><small>COINS</small></Link>
+    </aside>
 
     <main className="ls-page-content">{children}</main>
 
@@ -117,7 +127,7 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
       {bottomNav.map((item) => {
         const Icon = item.icon;
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-        return <Link key={item.href} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold"} /><span>{item.label}</span></Link>;
+        return <Link key={item.href} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold" /><span>{item.label}</span>{item.href === "/inbox" && claimableRewards > 0 && <i>{claimableRewards}</i>}</Link>;
       })}
     </nav>
   </div>;
