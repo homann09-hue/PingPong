@@ -24,6 +24,7 @@ import "./premium-game-tiles.css";
 import "./premium-shell.css";
 import "./premium-welcome.css";
 import "./premium-liveops.css";
+import "./premium-pass.css";
 import "./premium-placement.css";
 import "./slot-premium-polish.css";
 import "./slot-spin-states.css";
@@ -37,24 +38,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://aurora-player-web.vercel.app"),
   alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: "/assets/ui/player-avatar.png",
-    apple: "/assets/ui/player-avatar.png",
-  },
-  openGraph: {
-    title: "Aurora Casino",
-    description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events und Jackpots.",
-    images: ["/assets/slots/pharaoh_oasis.png"],
-  },
+  icons: { icon: "/assets/ui/player-avatar.png", apple: "/assets/ui/player-avatar.png" },
+  openGraph: { title: "Aurora Casino", description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events und Jackpots.", images: ["/assets/slots/pharaoh_oasis.png"] },
 };
 
-export const viewport: Viewport = {
-  viewportFit: "cover",
-  width: "device-width",
-  initialScale: 1,
-  themeColor: "#120b2b",
-  colorScheme: "dark",
-};
+export const viewport: Viewport = { viewportFit: "cover", width: "device-width", initialScale: 1, themeColor: "#120b2b", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate />{children}<LegalFooter /></body></html>;
