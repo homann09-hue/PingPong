@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Bell } from "@phosphor-icons/react/dist/csr/Bell";
 import { Coins } from "@phosphor-icons/react/dist/csr/Coins";
 import { Fire } from "@phosphor-icons/react/dist/csr/Fire";
 import { Gift } from "@phosphor-icons/react/dist/csr/Gift";
@@ -9,18 +10,33 @@ import { Lightning } from "@phosphor-icons/react/dist/csr/Lightning";
 import { LockKey } from "@phosphor-icons/react/dist/csr/LockKey";
 import { Play } from "@phosphor-icons/react/dist/csr/Play";
 import { Star } from "@phosphor-icons/react/dist/csr/Star";
+import { Target } from "@phosphor-icons/react/dist/csr/Target";
 import { Trophy } from "@phosphor-icons/react/dist/csr/Trophy";
 import { Wrench } from "@phosphor-icons/react/dist/csr/Wrench";
+import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./app-shell";
 import { games, type GameCard } from "@/lib/catalog";
-import { coinNumber, timeLeft } from "@/lib/format";
+import { coinNumber } from "@/lib/format";
 import { useLobbyData } from "@/hooks/use-lobby-data";
 import { usePlayer } from "@/hooks/use-player";
 import { useSlotAvailability } from "@/hooks/use-slot-availability";
 
 const filters = ["Alle", "Neu", "Jackpot", "Freispiele", "Bonus", "VIP"] as const;
 type Filter = (typeof filters)[number];
+
+const coinParticles = Array.from({ length: 24 }, (_, index) => ({
+  left: `${4 + ((index * 37) % 92)}%`,
+  x: `${-80 + ((index * 67) % 160)}px`,
+  delay: `${(index % 8) * -0.42}s`,
+  time: `${2.8 + (index % 5) * 0.35}s`,
+}));
+const confettiParticles = Array.from({ length: 34 }, (_, index) => ({
+  x: `${-210 + ((index * 83) % 420)}px`,
+  y: `${-180 + ((index * 61) % 390)}px`,
+  delay: `${(index % 9) * 0.045}s`,
+  color: ["#ffd83e", "#ff3e8e", "#52e8ff", "#8cff3e", "#a95cff"][index % 5]!,
+}));
 
 function matchesFilter(game: GameCard, filter: Filter): boolean {
   const features = game.features.toLowerCase();
@@ -58,10 +74,18 @@ export function LotsaLobby() {
   const availability = useSlotAvailability();
   const [filter, setFilter] = useState<Filter>("Alle");
   const [bonusSeconds, setBonusSeconds] = useState(59 * 60 + 57);
+  const [rewardOpen, setRewardOpen] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setBonusSeconds((value) => value > 0 ? value - 1 : 60 * 60), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (window.sessionStorage.getItem("aurora-daily-reward-seen") === "1") return;
+    const timer = window.setTimeout(() => setRewardOpen(true), 900);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const level = profile?.progression.level ?? 1;
@@ -73,8 +97,24 @@ export function LotsaLobby() {
   const minutes = Math.floor(bonusSeconds / 60).toString().padStart(2, "0");
   const seconds = (bonusSeconds % 60).toString().padStart(2, "0");
 
+  function closeReward() {
+    window.sessionStorage.setItem("aurora-daily-reward-seen", "1");
+    setRewardOpen(false);
+  }
+
+  function claimPreviewReward() {
+    setRewardClaimed(true);
+    window.setTimeout(closeReward, 1450);
+  }
+
   return <AppShell profile={profile}>
     {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => { void refresh(); void refreshLobby(); }}>Erneut versuchen</button></div>}
+
+    <nav className="ls-side-events" aria-label="Schnellzugriff">
+      <Link href="/events" aria-label="Live Event"><Trophy weight="fill" /><i>{events.length || 1}</i></Link>
+      <Link href="/missions" aria-label="Missionen"><Target weight="fill" />{missions.length > completedMissions && <i>{missions.length - completedMissions}</i>}</Link>
+      <Link href="/inbox" aria-label="Inbox"><Bell weight="fill" /><i>3</i></Link>
+    </nav>
 
     <section className="ls-event-carousel" aria-label="Aktuelle Events">
       <article className="ls-event-hero">
@@ -109,8 +149,22 @@ export function LotsaLobby() {
     <section className="ls-lobby-bonus" aria-label="Lobby Bonus">
       <div><Lightning weight="fill" /><span><small>GET BOOSTED!</small><strong>LOBBY BONUS IN {minutes}:{seconds}</strong></span></div>
       <div className="ls-bonus-progress"><i style={{ width: `${Math.max(4, 100 - (bonusSeconds / 3600) * 100)}%` }} /></div>
-      <Link href="/boost"><Gift weight="fill" /> BONUS</Link>
+      <button onClick={() => { setRewardClaimed(false); setRewardOpen(true); }}><Gift weight="fill" /> BONUS</button>
     </section>
+
+    {rewardOpen && <div className="ls-reward-overlay" role="dialog" aria-modal="true" aria-label="Tägliche Belohnung">
+      <div className="ls-reward-card">
+        <button className="close" onClick={closeReward} aria-label="Schließen"><X weight="bold" /></button>
+        <div className="ls-coin-rain" aria-hidden="true">{coinParticles.map((coin, index) => <i key={index} className="ls-coin" style={{ left: coin.left, "--coin-x": coin.x, "--coin-delay": coin.delay, "--coin-time": coin.time } as React.CSSProperties} />)}</div>
+        {rewardClaimed && <div className="ls-confetti-burst" aria-hidden="true">{confettiParticles.map((piece, index) => <i key={index} className="ls-confetti" style={{ "--conf-x": piece.x, "--conf-y": piece.y, "--conf-delay": piece.delay, "--conf-color": piece.color } as React.CSSProperties} />)}</div>}
+        <Gift size={70} weight="fill" />
+        <p>{rewardClaimed ? "BELohnung eingesammelt!" : "TÄGLICHER BONUS"}</p>
+        <h2>{rewardClaimed ? "GEWONNEN!" : "WELCOME BACK"}</h2>
+        <div className="ls-reward-amount"><Coins weight="fill" /> {coinNumber(2_000_000)}</div>
+        <p>Tag 7 wartet eine besondere Truhe auf dich.</p>
+        <button onClick={claimPreviewReward} disabled={rewardClaimed}>{rewardClaimed ? "GUTGESCHRIEBEN" : "JETZT ABHOLEN"}</button>
+      </div>
+    </div>}
   </AppShell>;
 }
 
