@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { SpinResult } from "@aurora/slot-engine";
 import type { JackpotPoolView } from "../jackpots/progressive-jackpots.js";
 import type { ShopOffer } from "../shop/shop-catalog.js";
@@ -7,8 +8,9 @@ import type { EconomyBalance, WalletCurrency } from "../economy/currencies.js";
 import type { CheckWinClaim, CheckWinStatus } from "../economy/check-win.js";
 import type { BoosterActivation, BoosterCraft, BoosterStatus } from "../economy/xp-booster.js";
 import type { LoyaltyRedemption, LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
-import type { MissionCadence, MissionRewards, MissionTier } from "../missions/mission-system.js";
+import type { MissionCadence, MissionLootReward, MissionRewards, MissionTier } from "../missions/mission-system.js";
 import type { HighRollerActivation, HighRollerClubStatus } from "../economy/high-roller-club.js";
+import type { LootEntitlementResult } from "../loot/loot-entitlement.js";
 
 export interface SettleSpinCommand {
   readonly playerId: string;
@@ -118,17 +120,31 @@ export interface WheelSpinResult {
   readonly availableSpins: number;
 }
 export interface MissionView {
-  readonly id: string; readonly cadence: MissionCadence;
+  readonly id: string; readonly version: number; readonly cadence: MissionCadence;
   readonly tier: MissionTier; readonly translationKey: string;
   readonly metric: string; readonly target: number;
   readonly progress: number; readonly rewards: MissionRewards; readonly rewardCoins: number;
+  readonly lootReward: MissionLootReward;
   readonly completed: boolean; readonly claimed: boolean; readonly periodKey: string;
   readonly startsAt: string; readonly endsAt: string; readonly unlocked: boolean;
   readonly unlockProgress: number; readonly unlockTarget: number;
 }
+export interface ClaimMissionCommand {
+  readonly playerId: string;
+  readonly missionId: string;
+  readonly idempotencyKey: string;
+}
 export interface MissionClaim {
-  readonly missionId: string; readonly coins: number; readonly coinBalance: number;
-  readonly rewards: MissionRewards; readonly balances: Readonly<Record<string, number>>;
+  readonly claimId: string;
+  readonly missionId: string;
+  readonly missionVersion: number;
+  readonly periodKey: string;
+  readonly coins: number;
+  readonly coinBalance: number;
+  readonly rewards: MissionRewards;
+  readonly balances: Readonly<Record<string, number>>;
+  readonly lootEntitlement: LootEntitlementResult | null;
+  readonly replayed: boolean;
 }
 export interface EventMilestoneView {
   readonly id: string; readonly target: number; readonly rewardCoins: number;
@@ -170,7 +186,7 @@ export interface SpinStore {
   getWheelStatus(playerId: string, now: Date): Promise<WheelStatus>;
   spinWheel(playerId: string, idempotencyKey: string, randomUnit: number, now: Date): Promise<WheelSpinResult>;
   getMissions(playerId: string, now: Date): Promise<readonly MissionView[]>;
-  claimMission(playerId: string, missionId: string, now: Date): Promise<MissionClaim>;
+  claimMission(command: ClaimMissionCommand, now: Date): Promise<MissionClaim>;
   getLiveEvents(playerId: string, now: Date): Promise<readonly LiveEventView[]>;
   claimEventMilestone(playerId: string, eventId: string, milestoneId: string, now: Date): Promise<EventMilestoneClaim>;
   getActiveTournament(playerId: string, now: Date): Promise<TournamentView>;
@@ -181,6 +197,13 @@ export interface SpinStore {
   close(): Promise<void>;
 }
 
+export function missionClaimRequestHash(command: ClaimMissionCommand): Buffer {
+  return createHash("sha256").update(JSON.stringify({
+    playerId: command.playerId,
+    missionId: command.missionId,
+  })).digest();
+}
+
 export class InsufficientFundsError extends Error {}
 export class RewardAlreadyClaimedError extends Error {}
 export class RewardNotAvailableError extends Error {
@@ -188,6 +211,7 @@ export class RewardNotAvailableError extends Error {
 }
 export class WheelNotAvailableError extends Error {}
 export class MissionNotClaimableError extends Error {}
+export class MissionIdempotencyConflictError extends Error {}
 export class EventMilestoneNotClaimableError extends Error {}
 export class InsufficientGemsError extends Error {}
 export class CheckWinNotClaimableError extends Error {}
