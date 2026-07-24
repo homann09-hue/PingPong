@@ -34,6 +34,7 @@ import "./premium-account.css";
 import "./slot-premium-polish.css";
 import "./slot-spin-states.css";
 import "./slot-cabinet-v2.css";
+import "./slot-auto-spin.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
