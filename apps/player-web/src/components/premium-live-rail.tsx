@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree, Coins, UserPlus, ChatsCircle } from "@phosphor-icons/react";
+import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree, Heart } from "@phosphor-icons/react";
 
 const liveWins = [
   { player: "Luna77", game: "Neon Nights", amount: "8.4 M" },
@@ -19,27 +20,24 @@ const categories = [
   { href: "/#social", label: "Mit Freunden", icon: UsersThree },
 ];
 
+const featuredGames = [
+  { href: "/slots/candy-carnival", title: "Candy Carnival", image: "/assets/slots/candy_carnival.png", players: "12.450", badge: "HOT", tone: "pink" },
+  { href: "/slots/pharaoh-oasis", title: "Pharaoh Oasis", image: "/assets/slots/pharaoh_oasis.png", players: "8.932", badge: "TOP", tone: "gold" },
+  { href: "/slots/neon-nights", title: "Neon Nights", image: "/assets/slots/neon_nights.png", players: "6.521", badge: "NEU", tone: "violet" },
+  { href: "/slots/verdant-afterfall", title: "Verdant Afterfall", image: "/assets/slots/verdant_afterfall.png", players: "5.362", badge: "LIVE", tone: "green" },
+  { href: "/slots/vegas-gold", title: "Vegas Gold", image: "/assets/slots/vegas_gold.png", players: "9.817", badge: "JACKPOT", tone: "orange" },
+];
+
 const worlds = [
   { href: "/slots/pharaoh-oasis", eyebrow: "MEGAWAYS", title: "Pharaoh Oasis", copy: "Goldene Kammern, Mystery Wilds und bis zu 117.649 Gewinnwege.", className: "pharaoh" },
   { href: "/slots/neon-nights", eyebrow: "HOLD & WIN", title: "Neon Nights", copy: "Jackpot-Orbs, pulsierende Reels und ein wachsender Bonus-Tresor.", className: "neon" },
   { href: "/slots/candy-carnival", eyebrow: "CLUSTER PAYS", title: "Candy Carnival", copy: "Kettenreaktionen, Multiplikatoren und riesige Symbol-Explosionen.", className: "candy" },
 ];
 
-const jackpots = [
-  { tier: "GRAND", game: "Pharaoh Oasis", amount: "24.850.987", className: "grand", href: "/slots/pharaoh-oasis" },
-  { tier: "MAJOR", game: "Neon Nights", amount: "5.210.456", className: "major", href: "/slots/neon-nights" },
-  { tier: "SUPER", game: "Candy Carnival", amount: "2.500.000", className: "super", href: "/slots/candy-carnival" },
-];
-
-const friends = [
-  { name: "Julia", level: 42, status: "In Neon Nights", initials: "JU" },
-  { name: "Tommy", level: 36, status: "Online", initials: "TO" },
-  { name: "Lisa", level: 28, status: "In der Lobby", initials: "LI" },
-];
-
 export function PremiumLiveRail() {
   const [activeWin, setActiveWin] = useState(0);
   const [activeCategory, setActiveCategory] = useState("Alle Spiele");
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setActiveWin((current) => (current + 1) % liveWins.length), 3200);
@@ -47,6 +45,7 @@ export function PremiumLiveRail() {
   }, []);
 
   const win = liveWins[activeWin];
+  const toggleFavorite = (title: string) => setFavorites((current) => current.includes(title) ? current.filter((item) => item !== title) : [...current, title]);
 
   return (
     <section className="premium-live-layer" aria-label="Live-Casino-Highlights">
@@ -86,26 +85,23 @@ export function PremiumLiveRail() {
         </aside>
       </div>
 
+      <section className="premium-featured" id="featured" aria-labelledby="premium-featured-title">
+        <div className="premium-world-header"><div><span>Für dich ausgewählt</span><h2 id="premium-featured-title">Empfohlene Slots</h2></div><Link href="/#all-games">Alle anzeigen</Link></div>
+        <div className="premium-featured-rail">
+          {featuredGames.map((game) => {
+            const favorite = favorites.includes(game.title);
+            return <article className={`premium-game-tile ${game.tone}`} key={game.title}>
+              <Link href={game.href} className="premium-game-cover"><Image src={game.image} alt={`${game.title} Slot Cover`} fill sizes="(max-width: 680px) 44vw, 220px" quality={84} /><span className="premium-game-vignette" /><b className="premium-game-badge">{game.badge}</b><span className="premium-game-play"><Play weight="fill" /></span></Link>
+              <button type="button" className={favorite ? "premium-favorite active" : "premium-favorite"} onClick={() => toggleFavorite(game.title)} aria-label={`${game.title} ${favorite ? "aus Favoriten entfernen" : "favorisieren"}`}><Heart weight={favorite ? "fill" : "bold"} /></button>
+              <div className="premium-game-meta"><strong>{game.title}</strong><small><i /> {game.players} spielen</small></div>
+            </article>;
+          })}
+        </div>
+      </section>
+
       <div className="premium-world-header"><div><span>Ausgewählte Welten</span><h2>Jeder Slot fühlt sich anders an</h2></div><Link href="/#all-games">Alle Slots</Link></div>
       <div className="premium-world-rail">
         {worlds.map((world, index) => <Link href={world.href} className={`premium-world-card ${world.className}`} key={world.title}><span className="premium-card-index">0{index + 1}</span><div className="premium-card-energy" aria-hidden="true" /><div className="premium-card-copy"><small>{world.eyebrow}</small><h3>{world.title}</h3><p>{world.copy}</p><b><Play weight="fill" /> Spielen</b></div></Link>)}
-      </div>
-
-      <div className="premium-community-grid">
-        <section className="premium-jackpot-board" id="jackpots" aria-labelledby="premium-jackpot-title">
-          <header><div><span>Live-Pools</span><h2 id="premium-jackpot-title">Top Jackpots</h2></div><Link href="/#all-games">Alle anzeigen</Link></header>
-          <div className="premium-jackpot-list">
-            {jackpots.map((jackpot) => <Link href={jackpot.href} className={`premium-jackpot-row ${jackpot.className}`} key={jackpot.tier}><span className="premium-jackpot-medal"><Crown weight="fill" /></span><div><small>{jackpot.tier}</small><strong>{jackpot.game}</strong></div><b><Coins weight="fill" /> {jackpot.amount}</b><i>SPIELEN</i></Link>)}
-          </div>
-        </section>
-
-        <section className="premium-friends-panel" id="social" aria-labelledby="premium-friends-title">
-          <header><div><span>Social Lobby</span><h2 id="premium-friends-title">Freunde online</h2></div><button type="button" aria-label="Freund einladen"><UserPlus weight="bold" /></button></header>
-          <div className="premium-friend-list">
-            {friends.map((friend, index) => <article key={friend.name}><span className={`premium-friend-avatar avatar-${index + 1}`}>{friend.initials}<i /></span><div><strong>{friend.name}<small>LVL {friend.level}</small></strong><p>{friend.status}</p></div><button type="button"><ChatsCircle weight="fill" /><span>Einladen</span></button></article>)}
-          </div>
-          <div className="premium-party-card"><div className="premium-party-avatars"><span>JU</span><span>TO</span><span>LI</span><b>+2</b></div><div><small>Deine Gruppe</small><strong>3 von 5 online</strong></div><Link href="/#clans">Lobby öffnen</Link></div>
-        </section>
       </div>
     </section>
   );
