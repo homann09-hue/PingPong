@@ -28,6 +28,8 @@ import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store
 import { PostgresEconomyAdminStore } from "./admin/postgres-economy-admin-store.js";
 import { InMemoryOperationsStore } from "./operations/in-memory-operations-store.js";
 import { PostgresOperationsStore } from "./operations/postgres-operations-store.js";
+import { InMemoryAchievementStore } from "./achievements/in-memory-achievement-store.js";
+import { PostgresAchievementStore } from "./achievements/postgres-achievement-store.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -71,6 +73,9 @@ const messagingStore = demoMode
   : PostgresMessagingStore.connect(databaseUrl!, new AesGcmPushTokenCipher(pushTokenEncryptionKey!));
 const metrics = new PrometheusOperationalMetrics();
 const spinStore = demoMode ? new InMemorySpinStore(8_400_000) : PostgresSpinStore.connect(databaseUrl!);
+const achievementStore = demoMode
+  ? new InMemoryAchievementStore(spinStore as InMemorySpinStore)
+  : PostgresAchievementStore.connect(databaseUrl!);
 const economyAdminStore = demoMode
   ? new InMemoryEconomyAdminStore(spinStore as InMemorySpinStore, demoPlayerId)
   : PostgresEconomyAdminStore.connect(databaseUrl!);
@@ -91,6 +96,7 @@ const pushWorker = new PushDeliveryWorker(
 const app = buildApp({
   authenticator: identityService,
   spinStore,
+  achievementStore,
   socialStore,
   liveOpsStore: demoMode ? new InMemoryLiveOpsStore() : PostgresLiveOpsStore.connect(databaseUrl!),
   slotAvailabilityStore: demoMode ? new InMemorySlotAvailabilityStore() : PostgresSlotAvailabilityStore.connect(databaseUrl!),

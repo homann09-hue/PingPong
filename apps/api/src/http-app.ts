@@ -36,6 +36,8 @@ import type { EconomyAdminStore } from "./admin/economy-admin-store.js";
 import { EconomyFourEyesViolationError, EconomyGrantNotFoundError, EconomyGrantStateError, EconomyPlayerNotFoundError } from "./admin/economy-admin-store.js";
 import type { OperationsStore } from "./operations/operations-store.js";
 import { achievementById, achievementViews, canClaimAchievement } from "./achievements/achievement-system.js";
+import type { AchievementStore } from "./achievements/achievement-store.js";
+import { AchievementAlreadyClaimedError, AchievementIdempotencyConflictError, AchievementNotClaimableError, AchievementNotFoundError, AchievementPlayerNotFoundError } from "./achievements/achievement-store.js";
 
 export function createHttpLoggerOptions() {
   return { redact: ["req.headers.authorization", "req.headers.cookie"] };
@@ -154,6 +156,7 @@ const rewardRequirements = new Map<string, (progression: Awaited<ReturnType<Spin
 export interface AppDependencies {
   readonly authenticator: Authenticator;
   readonly spinStore: SpinStore;
+  readonly achievementStore?: AchievementStore;
   readonly identityService?: IdentityService;
   readonly socialStore?: SocialStore;
   readonly adminAuthenticator?: AdminAuthenticator;
@@ -393,11 +396,14 @@ export function buildApp(
     const { progression } = profile;
     const vip = vipStatus(progression.vipPoints);
     const claimed = new Set(profile.claimedRewards);
+    const achievements = dependencies.achievementStore
+      ? await dependencies.achievementStore.list(playerId, new Date())
+      : achievementViews(progression, claimed);
     return {
       playerId,
       ...profile,
       vip,
-      achievements: achievementViews(progression, claimed),
+      achievements,
       tournament,
     };
   });
@@ -1082,6 +1088,24 @@ export function buildApp(
     if (!playerId) return reply.code(401).send({ code: "UNAUTHORIZED" });
     const { rewardId: requestedReward } = request.params as { rewardId: string };
     const achievement = achievementById(requestedReward);
+    if (achievement && dependencies.achievementStore) {
+      const keyResult = idempotencyKey.safeParse(request.headers["idempotency-key"]);
+      if (!keyResult.success) return reply.code(400).send({ code: "INVALID_IDEMPOTENCY_KEY" });
+      const rate = authRateLimiter.consume(`achievement-claim:${playerId}`, 20, 60_000);
+      if (!rate.allowed) return reply.header("retry-after", rate.retryAfterSeconds).code(429).send({ code: "RATE_LIMITED" });
+      try {
+        return await dependencies.achievementStore.claim({
+          playerId, achievementId: achievement.id, idempotencyKey: keyResult.data,
+        }, new Date());
+      } catch (error) {
+        if (error instanceof AchievementNotFoundError) return reply.code(404).send({ code: "REWARD_NOT_FOUND" });
+        if (error instanceof AchievementNotClaimableError) return reply.code(409).send({ code: "REWARD_REQUIREMENT_NOT_MET" });
+        if (error instanceof AchievementAlreadyClaimedError) return reply.code(409).send({ code: "REWARD_ALREADY_CLAIMED" });
+        if (error instanceof AchievementIdempotencyConflictError) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT" });
+        if (error instanceof AchievementPlayerNotFoundError) return reply.code(404).send({ code: "PLAYER_NOT_FOUND" });
+        throw error;
+      }
+    }
     const coins = achievement?.coins ?? rewardAmounts.get(requestedReward);
     if (!coins) return reply.code(404).send({ code: "REWARD_NOT_FOUND" });
     if (achievement) {
@@ -1217,6 +1241,7 @@ export function buildApp(
     }
   });
   app.addHook("onClose", async () => {
+    await dependencies.achievementStore?.close();
     await dependencies.spinStore.close();
     await dependencies.identityService?.close();
     await dependencies.socialStore?.close();

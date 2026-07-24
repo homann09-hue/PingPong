@@ -6,6 +6,7 @@ export type AchievementMetric = "level" | "spins" | "total_won" | "free_spins" |
 
 export interface AchievementDefinition {
   readonly id: string;
+  readonly version: number;
   readonly category: AchievementCategory;
   readonly tier: AchievementTier;
   readonly name: string;
@@ -29,7 +30,7 @@ const chain = (
   metric: AchievementMetric,
   values: readonly [AchievementTier, string, string, number, number][],
 ): readonly AchievementDefinition[] => values.map(([tier, id, name, target, coins], index) => ({
-  id, category, tier, name, metric, target, coins,
+  id, version: 1, category, tier, name, metric, target, coins,
   description: descriptionFor(metric, target),
   ...(index > 0 ? { prerequisiteId: values[index - 1]![1] } : {}),
 }));
