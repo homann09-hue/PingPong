@@ -240,11 +240,19 @@ function rowToEntry(row: LootEntryRow): LootEntry {
     itemId: row.item_id,
     itemVersion: row.item_version,
     kind: row.entry_kind,
-    weight: toPositiveSafeInteger(row.weight, "loot weight"),
+    weight: toSafeNonNegativeInteger(row.weight, "loot weight"),
     minQuantity: toPositiveSafeInteger(row.min_quantity, "minimum loot quantity"),
     maxQuantity: toPositiveSafeInteger(row.max_quantity, "maximum loot quantity"),
     pityEligible: row.pity_eligible,
   };
+}
+
+function toSafeNonNegativeInteger(value: string | number, name: string): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new RangeError(`${name} must be a non-negative safe integer`);
+  }
+  return parsed;
 }
 
 function toPositiveSafeInteger(value: string | number, name: string): number {
