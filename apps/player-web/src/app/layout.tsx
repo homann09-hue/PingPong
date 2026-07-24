@@ -21,6 +21,7 @@ import "./premium-live.css";
 import "./premium-category-nav.css";
 import "./premium-community.css";
 import "./premium-game-tiles.css";
+import "./premium-shell.css";
 import "./premium-placement.css";
 import "./slot-premium-polish.css";
 import "./slot-spin-states.css";
