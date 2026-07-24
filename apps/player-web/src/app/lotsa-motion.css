@@ -17,11 +17,12 @@
 @keyframes ls-number-pulse { 0%,100%{text-shadow:0 0 8px rgba(255,210,64,.5)} 50%{text-shadow:0 0 20px #fff,0 0 42px #ffbf00;transform:scale(1.04)} }
 @keyframes ls-rail-breathe { 0%,100%{transform:translateX(0)} 50%{transform:translateX(-8px)} }
 @keyframes ls-slot-hit { 0%{filter:brightness(1)} 35%{filter:brightness(1.8) saturate(1.5)} 100%{filter:brightness(1)} }
+@keyframes ls-spin { to{transform:rotate(360deg)} }
 
 .ls-event-hero > img { animation:ls-drift 13s ease-in-out infinite; }
 .ls-event-hero::after { content:"";position:absolute;inset:-30% auto -30% -35%;width:22%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent);transform:skewX(-22deg);animation:ls-shine 6.5s ease-in-out infinite;pointer-events:none; }
 .ls-event-copy h1 { animation:ls-float 4.5s ease-in-out infinite; }
-.ls-event-copy a,.ls-lobby-bonus>a { animation:ls-glow 2.4s ease-in-out infinite; }
+.ls-event-copy a,.ls-lobby-bonus>button { animation:ls-glow 2.4s ease-in-out infinite; }
 .ls-event-hero aside strong { display:inline-block;animation:ls-number-pulse 2.1s ease-in-out infinite; }
 
 .ls-mini-promos a { transition:transform .22s var(--ls-ease-pop),filter .22s ease; }
@@ -39,7 +40,8 @@
 .ls-theme-action b { animation:ls-pulse 1.8s ease-in-out infinite; }
 .ls-featured-rail,.ls-new-rail { animation:ls-rail-breathe 8s ease-in-out infinite; }
 .ls-lobby-bonus { position:relative;overflow:hidden; }
-.ls-lobby-bonus::before { content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.18) 45%,transparent 65%);transform:translateX(-120%);animation:ls-shine 4.5s linear infinite; }
+.ls-lobby-bonus::before { content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.18) 45%,transparent 65%);transform:translateX(-120%);animation:ls-shine 4.5s linear infinite;pointer-events:none; }
+.ls-lobby-bonus>button{position:relative;z-index:2;display:flex;align-items:center;gap:5px;padding:8px 10px;border:1px solid #ffcf4b;border-radius:9px;background:linear-gradient(180deg,#ca8d22,#76420c);color:#fff;font-size:9px;font-weight:1000;cursor:pointer}
 
 .ls-side-events { position:fixed;right:max(8px,env(safe-area-inset-right));top:30%;z-index:35;display:grid;gap:10px; }
 .ls-side-events a { position:relative;width:58px;min-height:58px;border-radius:18px;border:2px solid rgba(255,220,91,.75);background:linear-gradient(145deg,#7c20d9,#28104f);display:grid;place-items:center;color:#fff;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.42),0 0 20px rgba(178,62,255,.4);animation:ls-float 3.4s ease-in-out infinite; }
@@ -48,8 +50,8 @@
 
 .ls-reward-overlay { position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(10,1,24,.78);animation:ls-overlay-in .35s ease both; }
 .ls-reward-card { position:relative;width:min(92vw,520px);overflow:hidden;border:4px solid #ffd85b;border-radius:30px;padding:30px 24px 24px;text-align:center;background:radial-gradient(circle at 50% 15%,#a92cf0 0,#54109a 35%,#230843 72%,#12031f 100%);box-shadow:0 0 0 5px #8b3be0,0 0 70px rgba(255,205,49,.65);animation:ls-pop-in .65s var(--ls-ease-pop) both; }
-.ls-reward-card::before { content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent,#fff4 8%,transparent 18%);animation:spin 7s linear infinite; }
-.ls-reward-card>*{position:relative;z-index:2}.ls-reward-card h2{margin:4px 0 8px;font-size:clamp(34px,9vw,62px);line-height:.9;color:#fff;text-transform:uppercase;text-shadow:0 4px 0 #7a1e00,0 0 20px #ffdf56}.ls-reward-card p{color:#f7dfff;font-weight:700}.ls-reward-amount{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0;font-size:clamp(34px,10vw,64px);font-weight:1000;color:#ffe468;text-shadow:0 4px 0 #9a5200,0 0 26px #ffcf33;animation:ls-number-pulse 1.5s infinite}.ls-reward-card button{width:100%;border:0;border-radius:18px;padding:16px;background:linear-gradient(#7cff42,#18a900);color:#fff;font-size:22px;font-weight:1000;text-transform:uppercase;text-shadow:0 2px 0 #087000;box-shadow:inset 0 2px #c8ffab,0 7px 0 #086b00,0 0 26px #46ff2f;animation:ls-pulse 1.7s infinite;cursor:pointer}.ls-reward-card .close{position:absolute;right:12px;top:10px;width:38px;height:38px;padding:0;border-radius:50%;background:#281039;box-shadow:none;animation:none;font-size:18px;z-index:5}
+.ls-reward-card::before { content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent,#fff4 8%,transparent 18%);animation:ls-spin 7s linear infinite; }
+.ls-reward-card>*{position:relative;z-index:2}.ls-reward-card h2{margin:4px 0 8px;font-size:clamp(34px,9vw,62px);line-height:.9;color:#fff;text-transform:uppercase;text-shadow:0 4px 0 #7a1e00,0 0 20px #ffdf56}.ls-reward-card p{color:#f7dfff;font-weight:700}.ls-reward-amount{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0;font-size:clamp(34px,10vw,64px);font-weight:1000;color:#ffe468;text-shadow:0 4px 0 #9a5200,0 0 26px #ffcf33;animation:ls-number-pulse 1.5s infinite}.ls-reward-card button{width:100%;border:0;border-radius:18px;padding:16px;background:linear-gradient(#7cff42,#18a900);color:#fff;font-size:22px;font-weight:1000;text-transform:uppercase;text-shadow:0 2px 0 #087000;box-shadow:inset 0 2px #c8ffab,0 7px 0 #086b00,0 0 26px #46ff2f;animation:ls-pulse 1.7s infinite;cursor:pointer}.ls-reward-card button:disabled{opacity:.82}.ls-reward-card .close{position:absolute;right:12px;top:10px;width:38px;height:38px;padding:0;border-radius:50%;background:#281039;box-shadow:none;animation:none;font-size:18px;z-index:5}
 .ls-coin-rain,.ls-confetti-burst{position:absolute;inset:0;pointer-events:none;overflow:hidden}.ls-coin{position:absolute;left:50%;top:-10%;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6a2 0 8%,#ffd739 20%,#c87900 72%);border:2px solid #fff0a0;box-shadow:0 0 8px #ffd52f;animation:ls-coin-fall var(--coin-time) linear var(--coin-delay) infinite}.ls-confetti{position:absolute;left:50%;top:48%;width:10px;height:18px;border-radius:3px;background:var(--conf-color);animation:ls-confetti 1.6s var(--ls-ease-smooth) var(--conf-delay) both}
 
 .reel-frame.is-spinning { animation:ls-slot-hit .45s ease-in-out infinite alternate; }
