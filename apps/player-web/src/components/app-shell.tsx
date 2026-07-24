@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDots } from "@phosphor-icons/react/dist/csr/CalendarDots";
 import { Coins } from "@phosphor-icons/react/dist/csr/Coins";
 import { Compass } from "@phosphor-icons/react/dist/csr/Compass";
 import { Crown } from "@phosphor-icons/react/dist/csr/Crown";
@@ -12,9 +11,10 @@ import { Gift } from "@phosphor-icons/react/dist/csr/Gift";
 import { House } from "@phosphor-icons/react/dist/csr/House";
 import { List } from "@phosphor-icons/react/dist/csr/List";
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/csr/MagnifyingGlass";
-import { Medal } from "@phosphor-icons/react/dist/csr/Medal";
 import { ShoppingBag } from "@phosphor-icons/react/dist/csr/ShoppingBag";
+import { Star } from "@phosphor-icons/react/dist/csr/Star";
 import { Target } from "@phosphor-icons/react/dist/csr/Target";
+import { Trophy } from "@phosphor-icons/react/dist/csr/Trophy";
 import { UsersThree } from "@phosphor-icons/react/dist/csr/UsersThree";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useRef, useState } from "react";
@@ -22,12 +22,21 @@ import { games } from "@/lib/catalog";
 import { coinNumber } from "@/lib/format";
 import type { Profile } from "@/lib/contracts";
 
-const nav = [
+const desktopNav = [
+  { href: "/", label: "Alle Spiele", icon: Compass },
+  { href: "/#all-games", label: "Slots", icon: Crown },
+  { href: "/#events", label: "Jackpots", icon: Trophy },
+  { href: "/#social", label: "Live Casino", icon: UsersThree },
+  { href: "/#bonus-features", label: "Bonus", icon: Gift },
+  { href: "/#all-games", label: "Favoriten", icon: Star },
+] as const;
+
+const bottomNav = [
   { href: "/", label: "Lobby", icon: House },
-  { href: "/#all-games", label: "Welten", icon: Compass },
   { href: "/#missions", label: "Missionen", icon: Target },
-  { href: "/#events", label: "Events", icon: CalendarDots },
-  { href: "/#clans", label: "Clans", icon: UsersThree },
+  { href: "/", label: "Home", icon: Crown },
+  { href: "/#events", label: "Turnier", icon: Trophy },
+  { href: "/#social", label: "Social", icon: UsersThree },
 ] as const;
 
 export function AppShell({ profile, children }: Readonly<{ profile: Profile | null; children: React.ReactNode }>) {
@@ -39,71 +48,73 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen(true); }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
       if (event.key === "Escape") setSearchOpen(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
-  useEffect(() => { if (searchOpen) searchInput.current?.focus(); else setQuery(""); }, [searchOpen]);
 
-  const results = games.filter((game) =>
-    game.name.toLowerCase().includes(query.trim().toLowerCase())
-    || game.category.toLowerCase().includes(query.trim().toLowerCase()));
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+    else setQuery("");
+  }, [searchOpen]);
 
-  return <div className="app-shell">
-    <header className="topbar">
-      <Link href="/" className="mobile-brand" aria-label="Zur Aurora-Arcade-Lobby"><span className="brand-mark"><Crown weight="fill" /></span><strong>AURORA</strong></Link>
-      <button className="search-trigger" aria-label="Spiele durchsuchen" onClick={() => setSearchOpen(true)}><MagnifyingGlass weight="bold" /><span>Welten durchsuchen</span><kbd>⌘ K</kbd></button>
-      <div className="wallet-cluster" aria-label="Spieler-Guthaben">
-        <div className="wallet-pill coin-wallet"><Coins weight="fill" /><span>{profile ? coinNumber(profile.coinBalance) : "—"}</span><Link href="/#shop" aria-label="Coins holen">+</Link></div>
-        <div className="wallet-pill gem-wallet"><Diamond weight="fill" /><span>{profile ? coinNumber(profile.gemBalance ?? 0) : "—"}</span><Link href="/#shop" aria-label="Gems holen">+</Link></div>
-        <Link className="store-button" href="/#shop"><ShoppingBag weight="fill" /><span>Shop</span></Link>
+  const normalized = query.trim().toLowerCase();
+  const results = games.filter((game) => game.name.toLowerCase().includes(normalized) || game.category.toLowerCase().includes(normalized));
+
+  return <div className="fl-app-shell">
+    <header className="fl-topbar">
+      <Link href="/" className="fl-player" aria-label="Spielerprofil öffnen">
+        <Image src="/assets/ui/player-avatar.png" alt="Spielerprofil" width={46} height={46} quality={82} />
+        <span><strong>PlayerOne</strong><small>VIP {profile?.vip?.tier ?? "5"}</small></span>
+      </Link>
+
+      <div className="fl-wallets" aria-label="Spielguthaben">
+        <div className="fl-wallet fl-wallet-coins"><Coins weight="fill" /><strong>{profile ? coinNumber(profile.coinBalance) : "25,680,000"}</strong><Link href="/#shop" aria-label="Coins holen">+</Link></div>
+        <div className="fl-wallet fl-wallet-gems"><Diamond weight="fill" /><strong>{profile ? coinNumber(profile.gemBalance ?? 0) : "2,450"}</strong></div>
       </div>
-      <div className="player-cluster">
-        <div className="level-copy"><strong>Level {profile?.progression.level ?? "…"}</strong><span>{profile?.vip?.tier ?? "…"} VIP</span></div>
-        <Link href="/account" className="profile-link" aria-label="Konto und Cloud-Speicherstand oeffnen"><Image src="/assets/ui/player-avatar.png" alt="Spielerprofil" width={46} height={46} quality={78} /></Link>
-      </div>
+
+      <button className="fl-search-button" onClick={() => setSearchOpen(true)} aria-label="Spiele suchen"><MagnifyingGlass weight="bold" /></button>
+      <Link className="fl-shop-button" href="/#shop"><ShoppingBag weight="fill" /><span>Shop</span></Link>
+      <Link className="fl-menu-button" href="/account" aria-label="Menü öffnen"><List weight="bold" /></Link>
     </header>
 
-    {searchOpen && <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Spielsuche" onClick={(event) => { if (event.target === event.currentTarget) setSearchOpen(false); }}>
-      <div className="search-panel">
-        <div className="search-head">
+    {searchOpen && <div className="fl-search-overlay" role="dialog" aria-modal="true" aria-label="Spielsuche" onClick={(event) => { if (event.target === event.currentTarget) setSearchOpen(false); }}>
+      <div className="fl-search-panel">
+        <div className="fl-search-head">
           <MagnifyingGlass weight="bold" />
-          <input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Slot oder Kategorie suchen …" aria-label="Suchbegriff" />
-          <button onClick={() => setSearchOpen(false)} aria-label="Suche schliessen"><X weight="bold" /></button>
+          <input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search games..." aria-label="Suchbegriff" />
+          <button onClick={() => setSearchOpen(false)} aria-label="Suche schließen"><X weight="bold" /></button>
         </div>
-        <ul className="search-results">
-          {results.map((game) => <li key={game.id}>
-            <Link href={`/slots/${game.id}`} onClick={() => setSearchOpen(false)}>
-              <Image src={game.cover} alt="" width={72} height={44} quality={72} />
-              <span><strong>{game.name}</strong><small>{game.category} · ab Level {game.unlockLevel}</small></span>
-            </Link>
-          </li>)}
-          {results.length === 0 && <li className="search-empty">Keine Welt gefunden.</li>}
+        <ul>
+          {results.map((game) => <li key={game.id}><Link href={`/slots/${game.id}`} onClick={() => setSearchOpen(false)}><Image src={game.cover} alt="" width={84} height={56} quality={76} /><span><strong>{game.name}</strong><small>{game.category} · Level {game.unlockLevel}</small></span></Link></li>)}
+          {results.length === 0 && <li className="fl-search-empty">Kein Spiel gefunden.</li>}
         </ul>
       </div>
     </div>}
 
-    <aside className="side-nav" aria-label="Hauptnavigation">
-      <Link href="/" className="side-brand" aria-label="Aurora Arcade"><span className="brand-mark"><Crown weight="fill" /></span><strong>AURORA</strong><small>ARCADE</small></Link>
-      <nav>{nav.map((item) => {
+    <aside className="fl-side-nav" aria-label="Hauptnavigation">
+      <Link className="fl-compact-logo" href="/" aria-label="Fortune Legends"><Crown weight="fill" /><span>FL</span></Link>
+      <nav>{desktopNav.map((item, index) => {
         const Icon = item.icon;
-        const active = item.href === "/" && pathname === "/";
+        const active = index === 0 && pathname === "/";
         return <Link key={item.label} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold"} /><span>{item.label}</span></Link>;
       })}</nav>
-      <div className="nav-utility">
-        <Link href="/#rewards"><Medal weight="fill" /><span>Rewards</span>{claimableRewards > 0 && <i>{claimableRewards}</i>}</Link>
-        <Link className="shop-link" href="/#shop"><Gift weight="fill" /><span>Shop</span></Link>
-      </div>
+      <Link className="fl-side-reward" href="/#rewards"><Gift weight="fill" />{claimableRewards > 0 && <i>{claimableRewards}</i>}</Link>
     </aside>
 
-    <main className="page-content">{children}</main>
+    <main className="fl-page-content">{children}</main>
 
-    <nav className="bottom-nav" aria-label="Mobile Navigation">
-      {nav.slice(0, 3).map((item) => { const Icon = item.icon; const active = item.href === "/" && pathname === "/"; return <Link key={item.label} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold"} /><span>{item.label}</span></Link>; })}
-      <Link href="/#shop"><ShoppingBag weight="bold" /><span>Shop</span></Link>
-      <Link href="/account" className={pathname === "/account" ? "active" : ""}><List weight="bold" /><span>Konto</span></Link>
+    <nav className="fl-bottom-nav" aria-label="Mobile Navigation">
+      {bottomNav.map((item, index) => {
+        const Icon = item.icon;
+        const active = index === 0 && pathname === "/";
+        return <Link key={item.label} href={item.href} className={`${active ? "active" : ""} ${index === 2 ? "home" : ""}`}><Icon weight={active || index === 2 ? "fill" : "bold"} /><span>{item.label}</span></Link>;
+      })}
     </nav>
   </div>;
 }
