@@ -5,17 +5,18 @@ import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight";
 import { CheckCircle } from "@phosphor-icons/react/dist/csr/CheckCircle";
 import { Coins } from "@phosphor-icons/react/dist/csr/Coins";
+import { Crown } from "@phosphor-icons/react/dist/csr/Crown";
 import { Diamond } from "@phosphor-icons/react/dist/csr/Diamond";
 import { Fire } from "@phosphor-icons/react/dist/csr/Fire";
 import { Gift } from "@phosphor-icons/react/dist/csr/Gift";
 import { LockKey } from "@phosphor-icons/react/dist/csr/LockKey";
-import { Wrench } from "@phosphor-icons/react/dist/csr/Wrench";
 import { Play } from "@phosphor-icons/react/dist/csr/Play";
 import { Sparkle } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { Star } from "@phosphor-icons/react/dist/csr/Star";
 import { Target } from "@phosphor-icons/react/dist/csr/Target";
 import { Trophy } from "@phosphor-icons/react/dist/csr/Trophy";
 import { UsersThree } from "@phosphor-icons/react/dist/csr/UsersThree";
+import { Wrench } from "@phosphor-icons/react/dist/csr/Wrench";
 import { useState } from "react";
 import { AppShell } from "./app-shell";
 import { games } from "@/lib/catalog";
@@ -29,6 +30,15 @@ import { useLobbyData, postClaim } from "@/hooks/use-lobby-data";
 import { usePlayer } from "@/hooks/use-player";
 
 const categories = ["Alle", "Neu", "Freispiele", "Bonus", "VIP"] as const;
+const reelSymbols = ["A", "K", "♛", "K", "10", "♞", "10", "♚", "J", "K", "Q", "J", "♦", "J", "K"];
+const dailyRewards = ["1M", "2M", "3M", "5M", "10M", "15M", "20M"];
+const socialPlayers = [
+  { name: "Emma", state: "Online" },
+  { name: "JackpotKing", state: "Online" },
+  { name: "Lucky777", state: "Im Spiel" },
+  { name: "SlotQueen", state: "Offline" },
+  { name: "KingOfSlots", state: "Offline" },
+] as const;
 
 function claimErrorText(code?: string): string {
   if (code === "ALREADY_CLAIMED" || code === "REWARD_ALREADY_CLAIMED") return "Diese Belohnung wurde bereits abgeholt.";
@@ -49,15 +59,10 @@ export function Lobby() {
   const [notice, setNotice] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
 
   const level = profile?.progression.level ?? 1;
-  const grand = jackpots.find((entry) => entry.tier === "GRAND");
   const tournament = profile?.tournament;
-  const dailyMissions = missions.filter((mission) => mission.cadence === "daily" && mission.tier === "standard");
-  const dailyDone = dailyMissions.filter((mission) => mission.completed).length;
   const achievements = profile?.achievements ?? [];
   const claimableAchievements = achievements.filter((entry) => entry.completed && !entry.claimed && entry.unlocked);
-  const unlockedGames = games.filter((game) => level >= game.unlockLevel).length;
-  const recentlyPlayed = games.slice(0, 4);
-
+  const featuredGames = games.slice(0, 6);
   const visibleGames = games.filter((game) => {
     if (category === "Neu") return game.isNew === true;
     if (category === "Freispiele") return game.features.toLowerCase().includes("free spin") || game.category === "Free spins";
@@ -66,9 +71,12 @@ export function Lobby() {
     return true;
   });
 
+  const jackpot = (tier: string, fallback: number) => jackpots.find((entry) => entry.tier === tier)?.amount ?? fallback;
+
   async function claim(kind: string, path: string) {
     if (busy) return;
-    setBusy(kind); setNotice(null);
+    setBusy(kind);
+    setNotice(null);
     const result = await postClaim(path);
     if (result.ok) {
       setNotice({ tone: "good", text: "Belohnung gutgeschrieben!" });
@@ -83,210 +91,158 @@ export function Lobby() {
     {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => { void refresh(); void refreshLobby(); }}>Erneut versuchen</button></div>}
     {notice && <div className={`account-notice ${notice.tone}`} role="status">{notice.text}</div>}
 
-    <section className="jackpot-ticker casino-ticker" aria-label="Live-Jackpot">
-      <span><Sparkle weight="fill" /> Grand-Jackpot</span>
-      <strong>{grand ? coinNumber(grand.amount) : "—"}</strong>
-      <span className="ticker-status"><i /> {tournament && timeLeft(tournament.endsAt) ? `Turnier endet in ${timeLeft(tournament.endsAt)}` : "Live"}</span>
-    </section>
+    <section className="fl-reference-stage" aria-label="Fortune Legends Lobby">
+      <aside className="fl-brand-panel">
+        <div className="fl-crown-logo"><Crown weight="fill" /><span>FORTUNE</span><strong>LEGENDS</strong><small>SOCIAL CASINO</small></div>
+        <p>THE ULTIMATE<br />SOCIAL CASINO EXPERIENCE</p>
+        <ul>
+          <li><Crown weight="fill" /><span><strong>REAL SLOTS</strong><small>Exciting casino games</small></span></li>
+          <li><Gift weight="fill" /><span><strong>DAILY REWARDS</strong><small>Collect free coins & bonuses</small></span></li>
+          <li><UsersThree weight="fill" /><span><strong>SOCIAL FEATURES</strong><small>Play with friends & compete</small></span></li>
+          <li><Star weight="fill" /><span><strong>VIP CLUB</strong><small>Unlock exclusive rewards</small></span></li>
+          <li><Trophy weight="fill" /><span><strong>TOURNAMENTS</strong><small>Compete & win big</small></span></li>
+          <li><CheckCircle weight="fill" /><span><strong>SAFE & FAIR</strong><small>100% play-money entertainment</small></span></li>
+        </ul>
+      </aside>
 
-    <section className="casino-lobby-stage" aria-label="Empfohlene Welten">
-      <article className="live-events-panel">
-        <div className="marquee-title">
-          <span>Live</span>
-          <strong>Events</strong>
-          <i>{events.length || "•"}</i>
+      <article className="fl-machine-card">
+        <div className="fl-jackpot-grid">
+          <span className="grand"><small>GRAND</small><strong>{coinNumber(jackpot("GRAND", 125_000_000))}</strong></span>
+          <span className="major"><small>MAJOR</small><strong>{coinNumber(jackpot("MAJOR", 25_000_000))}</strong></span>
+          <span className="minor"><small>MINOR</small><strong>{coinNumber(jackpot("MINOR", 5_000_000))}</strong></span>
+          <span className="mini"><small>MINI</small><strong>{coinNumber(jackpot("MINI", 2_000_000))}</strong></span>
         </div>
-        <div className="golden-promo-card">
-          <Image src="/assets/slots/vegas_gold.png" alt="Goldene Slot-Promo mit Muenzen und hellen Lichtern" fill priority sizes="(max-width: 760px) 94vw, 26vw" quality={88} />
-          <div className="promo-shine" />
-          <div className="promo-copy">
-            <small>{events[0] ? "Live-Event" : "Event"}</small>
-            <h1>{events[0]?.title ?? "Golden Day"}</h1>
-            <p>{events[0]?.subtitle ?? "Sammle Gewinne und steig in den Event-Stufen auf."}</p>
-          </div>
-        </div>
-        <Link className="panel-more-link" href="/#events">Alle Events ansehen <ArrowRight /></Link>
+        <div className="fl-machine-title"><Crown weight="fill" /><span>LEGEND</span><strong>OF GOLD</strong></div>
+        <div className="fl-reel-window">{reelSymbols.map((symbol, index) => <span key={`${symbol}-${index}`} className={symbol === "♛" || symbol === "♚" || symbol === "♞" || symbol === "♦" ? "special" : ""}>{symbol}</span>)}</div>
+        <div className="fl-win-readout"><span><small>TOTAL BET</small><strong>500,000</strong></span><span><small>WIN</small><strong>2,450,000</strong></span><button>MAX BET</button></div>
+        <Link className="fl-spin-cta" href={`/slots/${games[0]?.id ?? "pharaoh-oasis"}`}><Play weight="fill" /><span>SPIN</span><small>HOLD FOR AUTO</small></Link>
       </article>
 
-      <div className="center-promo-stack">
-        <article className="quest-king-panel">
-          <Image src="/assets/slots/neon_nights.png" alt="Neon-Casino-Slot-Cover" fill sizes="(max-width: 760px) 94vw, 34vw" quality={88} />
-          <div className="panel-vignette" />
-          <span className="pool-chip">{tournament ? `Preispool ${coinNumber(tournament.prizePool)}` : "Turnier"}{tournament && timeLeft(tournament.endsAt) ? ` · ${timeLeft(tournament.endsAt)}` : ""}</span>
-          <h2><small>{tournament?.name ?? "Turnier"}</small>Spiel dich hoch</h2>
-          <Link href="/slots/pharaoh-oasis"><Play weight="fill" /> Jetzt spielen</Link>
-        </article>
-        <article className="quest-king-panel compact">
-          <Image src="/assets/slots/candy_carnival.png" alt="Buntes Bonus-Slot-Cover" fill sizes="(max-width: 760px) 94vw, 34vw" quality={84} />
-          <div className="panel-vignette" />
-          <span className="pool-chip new">{events[1] ? "Tages-Event" : "Neu"}</span>
-          <h2><small>{events[1]?.title ?? "Bonus Rush"}</small>{events[1] ? "Mach mit" : "Top Treats"}</h2>
-          <Link href="/#events" aria-label="Zum Event-Bereich"><Trophy weight="fill" /> Zum Event</Link>
-        </article>
-      </div>
-
-      <aside className="recently-played-panel" aria-label="Kuerzlich gespielte Spiele">
-        <div className="miner-card">
-          <Image src="/assets/slots/verdant_afterfall.png" alt="Abenteuer-Slot-Welt" fill sizes="(max-width: 760px) 94vw, 24vw" quality={82} />
-          <div className="miner-card-copy"><span>Kürzlich</span><strong>gespielt</strong></div>
-        </div>
-        <div className="recent-slot-list">
-          {recentlyPlayed.map((game) => {
-            const locked = level < game.unlockLevel;
-            return <Link href={`/slots/${game.id}`} key={game.id} className={locked ? "locked-mini" : ""}>
-              <span className="jackpot-number">{locked ? `AB LEVEL ${game.unlockLevel}` : game.name.toUpperCase()}</span>
-              <Image src={game.cover} alt={`${game.name} Cover`} width={156} height={92} quality={76} />
-              {locked && <i><LockKey weight="fill" /></i>}
-            </Link>;
-          })}
-        </div>
-      </aside>
+      <article className="fl-featured-panel">
+        <header><div><small>LOBBY</small><h1>Featured Games</h1></div><button onClick={() => scrollToSection("all-games")}>SEE ALL <ArrowRight /></button></header>
+        <button className="fl-inline-search" onClick={() => scrollToSection("all-games")}><span>Search games...</span><Sparkle /></button>
+        <div className="fl-featured-grid">{featuredGames.map((game, index) => <Link href={`/slots/${game.id}`} key={game.id}>
+          <div><Image src={game.cover} alt={`${game.name} Cover`} fill sizes="160px" quality={82} /><i>{index < 2 ? "NEW" : index === 4 ? "HOT" : ""}</i></div>
+          <strong>{game.name}</strong>
+        </Link>)}</div>
+        <div className="fl-jackpot-banner"><Crown weight="fill" /><span><small>GRAND JACKPOT</small><strong>{coinNumber(jackpot("GRAND", 125_000_000))}</strong></span></div>
+      </article>
     </section>
 
-    <section className="activity-dock casino-activity-dock" aria-label="Taegliche Aktivitaeten">
-      <button onClick={() => scrollToSection("shop")}><span className="activity-icon gold"><Gift weight="fill" /></span><span><small>Gratis-Boni</small><strong>Tagesbonus</strong></span><i>Abholen</i></button>
-      <button onClick={() => scrollToSection("missions")}><span className="activity-icon coral"><Target weight="fill" /></span><span><small>{dailyMissions.length > 0 ? `${dailyDone} von ${dailyMissions.length} erledigt` : "Heute aktiv"}</small><strong>Tagesmissionen</strong></span><b>{dailyMissions.length > 0 ? `+${coinNumber(dailyMissions.reduce((sum, mission) => sum + mission.rewardCoins, 0))}` : "→"}</b></button>
-      <button onClick={() => scrollToSection("events")}><span className="activity-icon teal"><Trophy weight="fill" /></span><span><small>{tournament ? `Platz ${tournament.rank} von ${tournament.entrants}` : "Turnier"}</small><strong>{tournament?.name ?? "Turnier"}</strong></span><b>{tournament ? `#${tournament.rank}` : "→"}</b></button>
-      <button onClick={() => scrollToSection("rewards")}><span className="activity-icon violet"><Star weight="fill" /></span><span><small>{profile?.vip ? `${coinNumber(profile.vip.points)} VIP-Punkte` : "VIP-Reise"}</small><strong>VIP {profile?.vip?.tier ?? ""}</strong></span><b>{claimableAchievements.length > 0 ? `${claimableAchievements.length} offen` : "→"}</b></button>
+    <section className="fl-dashboard-grid">
+      <div className="fl-stack-column">
+        <article className="fl-panel fl-daily-panel" id="daily-rewards">
+          <header><span><Gift weight="fill" /> DAILY REWARDS</span><small>Come back every day and win!</small></header>
+          <div className="fl-days">{dailyRewards.map((reward, index) => <div key={reward} className={index === 0 ? "active" : index === dailyRewards.length - 1 ? "final" : ""}><small>DAY {index + 1}</small><Coins weight="fill" /><strong>{reward}</strong>{index === 0 && <i>COLLECT</i>}</div>)}</div>
+          <button className="fl-gold-button" onClick={() => scrollToSection("shop")}>COLLECT</button>
+        </article>
+
+        <article className="fl-panel fl-missions-panel" id="missions">
+          <header><span><Target weight="fill" /> MISSIONS</span><small>Daily objectives</small></header>
+          <div className="fl-mission-rows">
+            {missions.slice(0, 4).map((mission) => {
+              const progress = Math.min(100, Math.round((mission.progress / Math.max(1, mission.target)) * 100));
+              const claimable = mission.completed && !mission.claimed && mission.unlocked;
+              return <div key={mission.id} className={!mission.unlocked ? "locked" : mission.claimed ? "claimed" : ""}>
+                <Target weight="fill" />
+                <span><strong>{describeMission(mission.metric, mission.target)}</strong><i><b style={{ width: `${progress}%` }} /></i><small>{coinNumber(Math.min(mission.progress, mission.target))}/{coinNumber(mission.target)}</small></span>
+                <em><Coins weight="fill" /> {coinNumber(mission.rewardCoins)}</em>
+                {claimable && <button disabled={busy !== null} onClick={() => void claim(mission.id, `/api/player/missions/${mission.id}/claim`)}>{busy === mission.id ? "…" : "CLAIM"}</button>}
+              </div>;
+            })}
+            {missions.length === 0 && <p>Missionen werden geladen …</p>}
+          </div>
+          <button className="fl-dark-button" onClick={() => scrollToSection("mission-details")}>VIEW ALL MISSIONS</button>
+        </article>
+      </div>
+
+      <article className="fl-panel fl-tournament-panel" id="events">
+        <header><span><Trophy weight="fill" /> TOURNAMENTS</span><small>{tournament ? timeLeft(tournament.endsAt) : "Live"}</small></header>
+        <div className="fl-trophy-mark"><Trophy weight="fill" /></div>
+        <div className="fl-tournament-tabs"><span>TOP WIN</span><span>BIGGEST BET</span><span>MOST SPINS</span></div>
+        <ol>
+          {(tournament?.leaders ?? [
+            { name: "JackpotKing", score: 125_000_000 },
+            { name: "Lucky777", score: 98_500_000 },
+            { name: "SlotMaster", score: 76_250_000 },
+            { name: "QueenBee", score: 55_000_000 },
+          ]).slice(0, 4).map((leader, index) => <li key={leader.name}><span>{index + 1}</span><Image src="/assets/ui/player-avatar.png" alt="" width={30} height={30} /><strong>{leader.name}</strong><b>{coinNumber(leader.score)}</b></li>)}
+          <li className="self"><span>{tournament?.rank ?? 5}</span><Image src="/assets/ui/player-avatar.png" alt="" width={30} height={30} /><strong>PlayerOne</strong><b>{coinNumber(tournament?.score ?? 42_300_000)}</b></li>
+        </ol>
+        <footer><span>YOUR RANK <strong>{tournament?.rank ?? 5}</strong></span><b>{coinNumber(tournament?.score ?? 42_300_000)}</b></footer>
+        <Link className="fl-purple-button" href={`/slots/${games[0]?.id ?? "pharaoh-oasis"}`}>PLAY NOW</Link>
+      </article>
+
+      <article className="fl-panel fl-vip-panel" id="rewards">
+        <header><span><Crown weight="fill" /> VIP CLUB</span><small>Premium rewards</small></header>
+        <div className="fl-vip-emblem"><Crown weight="fill" /><span>VIP</span><strong>{profile?.vip?.tier ?? "5"}</strong></div>
+        <div className="fl-vip-progress"><i><b style={{ width: `${Math.min(100, Math.round(((profile?.vip?.points ?? 25_680) / Math.max(1, profile?.vip?.nextTierPoints ?? 50_000)) * 100))}%` }} /></i><small>{coinNumber(profile?.vip?.points ?? 25_680)} / {coinNumber(profile?.vip?.nextTierPoints ?? 50_000)} XP</small></div>
+        <h3>VIP {profile?.vip?.tier ?? "5"} BENEFITS</h3>
+        <ul><li>10% more coins on purchases</li><li>Daily VIP bonus</li><li>Exclusive slot tournaments</li><li>Higher reward limits</li><li>Priority support</li></ul>
+        <button className="fl-gold-button" onClick={() => scrollToSection("achievement-details")}>VIEW ALL VIP LEVELS</button>
+      </article>
+
+      <article className="fl-panel fl-social-panel" id="social">
+        <header><span><UsersThree weight="fill" /> SOCIAL</span><small>Friends & competition</small></header>
+        <div className="fl-social-tabs"><span className="active">FRIENDS</span><span>CHAT</span><span>LEADERBOARD</span></div>
+        <ul>{socialPlayers.map((player, index) => <li key={player.name}><Image src="/assets/ui/player-avatar.png" alt="" width={40} height={40} /><span><strong>{player.name}</strong><small className={player.state === "Offline" ? "offline" : ""}>{player.state}</small></span><button>{index < 3 ? "CHALLENGE" : "INVITE"}</button></li>)}</ul>
+        <button className="fl-gold-button">ADD FRIENDS</button>
+      </article>
     </section>
 
-    <section className="catalog" aria-labelledby="games-title">
-      <div className="section-heading">
-        <div><span className="eyebrow"><Fire weight="fill" /> {unlockedGames} / {games.length} Welten freigeschaltet</span><h2 id="games-title">Slot-Park</h2></div>
-        <Link href="/#all-games" onClick={() => setCategory("Alle")}>Alle Spiele <ArrowRight /></Link>
-      </div>
-      <div className="category-row" role="list" aria-label="Slot-Kategorien">
-        {categories.map((item) => <button key={item} className={item === category ? "selected" : ""} aria-pressed={item === category} onClick={() => setCategory(item)}>{item}</button>)}
-      </div>
-      <div className="game-grid" id="all-games">{visibleGames.map((game) => {
+    <section className="fl-feature-row" id="bonus-features">
+      <article className="fl-panel"><header><span>AMAZING SLOT FEATURES</span></header><div className="fl-feature-icons">
+        <div><Crown weight="fill" /><strong>WILD SYMBOLS</strong><small>Expand and substitute</small></div>
+        <div><Gift weight="fill" /><strong>SCATTER SYMBOLS</strong><small>Trigger free spins</small></div>
+        <div><Diamond weight="fill" /><strong>FREE SPINS</strong><small>Win more with bonus rounds</small></div>
+        <div><Fire weight="fill" /><strong>MULTIPLIERS</strong><small>Increase your wins</small></div>
+        <div><Coins weight="fill" /><strong>MEGA WIN</strong><small>Big wins, big excitement</small></div>
+      </div></article>
+      <article className="fl-panel"><header><span>BONUS FEATURES</span></header><div className="fl-feature-icons">
+        <div><Gift weight="fill" /><strong>DAILY BONUS</strong><small>Free coins every day</small></div>
+        <div><Sparkle weight="fill" /><strong>LUCKY WHEEL</strong><small>Spin and win</small></div>
+        <div><Trophy weight="fill" /><strong>COIN SHOP</strong><small>Great deals & packs</small></div>
+        <div><Crown weight="fill" /><strong>SPECIAL EVENTS</strong><small>Limited time only</small></div>
+        <div><Gift weight="fill" /><strong>GIFT CENTER</strong><small>Free gifts & coins</small></div>
+      </div></article>
+    </section>
+
+    <section className="fl-catalog" id="all-games" aria-labelledby="all-games-title">
+      <div className="fl-section-heading"><div><small><Fire weight="fill" /> PREMIUM SLOT COLLECTION</small><h2 id="all-games-title">ALL GAMES</h2></div><span>{games.filter((game) => level >= game.unlockLevel).length}/{games.length} UNLOCKED</span></div>
+      <div className="fl-category-row">{categories.map((item) => <button key={item} className={item === category ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}</div>
+      <div className="fl-game-grid">{visibleGames.map((game) => {
         const locked = level < game.unlockLevel;
         const availability = slotAvailability.get(game.id);
-        // Der Server erzwingt die Sperre beim Spin; hier geht es nur darum, dass
-        // der Spieler nicht erst nach dem Klick merkt, dass der Slot nicht laeuft.
         const offline = availability !== undefined && availability.status !== "live";
-        return <article className="game-card" key={game.id}>
-          <div className="game-cover">
-            <Image src={game.cover} alt={`${game.name} Slot-Cover`} fill sizes="(max-width: 600px) 66vw, (max-width: 1100px) 33vw, 19vw" quality={78} />
-            <div className="game-cover-vignette" />
-            <div className="card-badges">{game.isNew && <span>Neu</span>}{game.highRoller && <span className="vip-badge"><Star weight="fill" /> VIP</span>}{offline && <span className="offline-badge">{availability?.status === "maintenance" ? "Wartung" : "Pause"}</span>}</div>
-            {locked
-              ? <div className="lock-state"><LockKey weight="fill" /><span>Level {game.unlockLevel}</span></div>
-              : offline
-                ? <div className="lock-state offline-state"><Wrench weight="fill" /><span>{availability?.message ?? (availability?.status === "maintenance" ? "Kurz in Wartung" : "Derzeit pausiert")}</span></div>
-                : <Link className="cover-play" href={`/slots/${game.id}`} aria-label={`${game.name} spielen`}><Play weight="fill" /></Link>}
-            <div className="game-title"><small>{game.category}</small><h3>{game.name}</h3><p>{game.features}</p></div>
-          </div>
+        return <article key={game.id} className="fl-game-card">
+          <div><Image src={game.cover} alt={`${game.name} Slot-Cover`} fill sizes="(max-width: 700px) 44vw, 220px" quality={84} />{game.isNew && <i>NEW</i>}{game.highRoller && <em>VIP</em>}
+            {locked ? <span className="fl-game-lock"><LockKey weight="fill" /> LEVEL {game.unlockLevel}</span> : offline ? <span className="fl-game-lock"><Wrench weight="fill" /> OFFLINE</span> : <Link href={`/slots/${game.id}`}><Play weight="fill" /></Link>}
+          </div><strong>{game.name}</strong><small>{game.category}</small>
         </article>;
       })}</div>
     </section>
 
-    <section className="lobby-section" id="missions" aria-labelledby="missions-title">
-      <div className="section-heading">
-        <div><span className="eyebrow"><Target weight="fill" /> Taeglich neu um 00:00 UTC</span><h2 id="missions-title">Missionen</h2></div>
-      </div>
-      <div className="mission-list">
-        {missions.length === 0 && <p className="section-empty">Missionen werden geladen …</p>}
-        {missions.map((mission) => {
-          const progress = Math.min(100, Math.round((mission.progress / Math.max(1, mission.target)) * 100));
-          const claimable = mission.completed && !mission.claimed && mission.unlocked;
-          return <article className={`mission-item ${mission.claimed ? "is-claimed" : ""} ${!mission.unlocked ? "is-locked" : ""}`} key={mission.id}>
-            <div className="mission-copy">
-              <span className="mission-tier">{missionTierLabel(mission.tier, mission.cadence)}</span>
-              <strong>{describeMission(mission.metric, mission.target)}</strong>
-              <small>{mission.unlocked
-                ? `${coinNumber(Math.min(mission.progress, mission.target))} / ${coinNumber(mission.target)} · endet in ${timeLeft(mission.endsAt) || "Kuerze"}`
-                : `Gesperrt – schliesse zuerst ${mission.unlockTarget ?? ""} Missionen ab`}</small>
-              <span className="progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${progress}%` }} /></span>
-            </div>
-            <div className="mission-reward">
-              <span>+{coinNumber(mission.rewardCoins)}</span>
-              {mission.claimed
-                ? <b className="claimed-chip"><CheckCircle weight="fill" /> Abgeholt</b>
-                : claimable
-                  ? <button className="claim-button" disabled={busy !== null} onClick={() => void claim(mission.id, `/api/player/missions/${mission.id}/claim`)}>{busy === mission.id ? "…" : "Abholen"}</button>
-                  : !mission.unlocked ? <b className="locked-chip"><LockKey weight="fill" /></b> : null}
-            </div>
-          </article>;
-        })}
-      </div>
+    <section className="fl-details-grid" id="mission-details">
+      <article className="fl-panel fl-detail-panel"><header><span><Target weight="fill" /> ALL MISSIONS</span><small>Resets at 00:00 UTC</small></header><div className="fl-detail-list">{missions.map((mission) => {
+        const progress = Math.min(100, Math.round((mission.progress / Math.max(1, mission.target)) * 100));
+        const claimable = mission.completed && !mission.claimed && mission.unlocked;
+        return <div key={mission.id}><span><small>{missionTierLabel(mission.tier, mission.cadence)}</small><strong>{describeMission(mission.metric, mission.target)}</strong><i><b style={{ width: `${progress}%` }} /></i></span><em>{coinNumber(mission.rewardCoins)} COINS</em>{claimable && <button onClick={() => void claim(mission.id, `/api/player/missions/${mission.id}/claim`)}>CLAIM</button>}</div>;
+      })}</div></article>
+
+      <article className="fl-panel fl-detail-panel" id="achievement-details"><header><span><Star weight="fill" /> ACHIEVEMENTS</span><small>{claimableAchievements.length} ready</small></header><div className="fl-detail-list">{achievements.slice(0, 8).map((entry) => {
+        const progress = Math.min(100, Math.round((entry.progress / Math.max(1, entry.target)) * 100));
+        const claimable = entry.completed && !entry.claimed && entry.unlocked;
+        return <div key={entry.id}><span><small>{entry.tier.toUpperCase()}</small><strong>{entry.name}</strong><i><b style={{ width: `${progress}%` }} /></i></span><em>{coinNumber(entry.coins)} COINS</em>{claimable && <button onClick={() => void claim(entry.id, `/api/player/rewards/${entry.rewardId}/claims`)}>CLAIM</button>}</div>;
+      })}</div></article>
     </section>
 
-    <section className="lobby-section" id="events" aria-labelledby="events-title">
-      <div className="section-heading">
-        <div><span className="eyebrow"><Trophy weight="fill" /> Live-Events & Turnier</span><h2 id="events-title">Events</h2></div>
-      </div>
-      <div className="event-grid">
-        {events.map((event) => <article className="event-card" key={event.id}>
-          <header><strong>{event.title}</strong><small>{timeLeft(event.endsAt) ? `endet in ${timeLeft(event.endsAt)}` : "laeuft"}</small></header>
-          <p>{event.subtitle}</p>
-          <ul>{event.milestones.map((milestone) => {
-            // Abholbar heisst: erreicht und noch nicht eingeloest. Der Server
-            // entscheidet endgueltig — hier geht es nur um die Anzeige.
-            const claimable = milestone.completed && !milestone.claimed;
-            return <li key={milestone.id} className={milestone.claimed ? "done claimed" : milestone.completed ? "done" : ""}>
-              <span>{coinNumber(milestone.target)}</span>
-              <b>+{coinNumber(milestone.rewardCoins)}</b>
-              {claimable
-                ? <button
-                    className="claim-button milestone-claim"
-                    disabled={busy !== null}
-                    onClick={() => void claim(milestone.id, `/api/player/events/${event.id}/milestones/${milestone.id}/claim`)}
-                  >{busy === milestone.id ? "…" : "Abholen"}</button>
-                : milestone.claimed
-                  ? <CheckCircle weight="fill" />
-                  : null}
-            </li>;
-          })}</ul>
-        </article>)}
-        {tournament && <article className="event-card tournament-card">
-          <header><strong>{tournament.name}</strong><small>Preispool {coinNumber(tournament.prizePool)}</small></header>
-          <p>{tournament.subtitle ?? "Sammle Turnierpunkte mit jedem Spin."}</p>
-          <ol className="leaderboard">
-            {tournament.leaders.map((leader, index) => <li key={leader.name}><span>#{index + 1}</span><strong>{leader.name}</strong><b>{coinNumber(leader.score)}</b></li>)}
-            <li className="own-rank"><span>#{tournament.rank}</span><strong>Du</strong><b>{coinNumber(tournament.score)}</b></li>
-          </ol>
-        </article>}
-        {events.length === 0 && !tournament && <p className="section-empty">Events werden geladen …</p>}
-      </div>
+    <section className="fl-live-events">
+      {events.map((event) => <article className="fl-panel" key={event.id}><header><span><Trophy weight="fill" /> {event.title}</span><small>{timeLeft(event.endsAt) || "LIVE"}</small></header><p>{event.subtitle}</p><div>{event.milestones.map((milestone) => <span key={milestone.id} className={milestone.claimed ? "claimed" : milestone.completed ? "ready" : ""}><small>{coinNumber(milestone.target)}</small><strong>+{coinNumber(milestone.rewardCoins)}</strong>{milestone.completed && !milestone.claimed && <button onClick={() => void claim(milestone.id, `/api/player/events/${event.id}/milestones/${milestone.id}/claim`)}>CLAIM</button>}</span>)}</div></article>)}
     </section>
 
     <LuckyWheel onRewardGranted={refreshLobby} />
-
-    <section className="lobby-section" id="rewards" aria-labelledby="rewards-title">
-      <div className="section-heading">
-        <div><span className="eyebrow"><Star weight="fill" /> {claimableAchievements.length > 0 ? `${claimableAchievements.length} Belohnung${claimableAchievements.length === 1 ? "" : "en"} abholbereit` : "Erfolge & VIP"}</span><h2 id="rewards-title">Rewards</h2></div>
-      </div>
-      {profile?.vip && <div className="vip-progress">
-        <span><Star weight="fill" /> VIP {profile.vip.tier}</span>
-        <span className="progress-track"><i style={{ width: `${Math.min(100, Math.round((profile.vip.points / Math.max(1, profile.vip.nextTierPoints)) * 100))}%` }} /></span>
-        <small>{coinNumber(profile.vip.points)} / {coinNumber(profile.vip.nextTierPoints)} Punkte bis zur naechsten Stufe</small>
-      </div>}
-      <div className="achievement-grid">
-        {achievements.length === 0 && <p className="section-empty">Erfolge werden geladen …</p>}
-        {achievements.map((entry) => {
-          const claimable = entry.completed && !entry.claimed && entry.unlocked;
-          return <article className={`achievement-card tier-${entry.tier} ${entry.claimed ? "is-claimed" : ""} ${!entry.unlocked && !entry.completed ? "is-locked" : ""}`} key={entry.id}>
-            <span className="achievement-tier">{entry.tier === "bronze" ? "Bronze" : entry.tier === "silver" ? "Silber" : "Gold"}</span>
-            <strong>{entry.name}</strong>
-            <small>{entry.description}</small>
-            <span className="progress-track"><i style={{ width: `${Math.min(100, Math.round((entry.progress / Math.max(1, entry.target)) * 100))}%` }} /></span>
-            <div className="achievement-foot">
-              <span>+{coinNumber(entry.coins)}</span>
-              {entry.claimed
-                ? <b className="claimed-chip"><CheckCircle weight="fill" /> Abgeholt</b>
-                : claimable
-                  ? <button className="claim-button" disabled={busy !== null} onClick={() => void claim(entry.id, `/api/player/rewards/${entry.rewardId}/claims`)}>{busy === entry.id ? "…" : "Abholen"}</button>
-                  : !entry.unlocked ? <b className="locked-chip"><LockKey weight="fill" /></b> : null}
-            </div>
-          </article>;
-        })}
-      </div>
-    </section>
-
     <BoostCenter onWalletChanged={refreshLobby} />
-
     <ShopSection gems={profile?.gemBalance ?? 0} onWalletChanged={refreshLobby} />
-
-    <ClanSection onChanged={refreshLobby} />
+    <div id="social-details"><ClanSection onChanged={refreshLobby} /></div>
   </AppShell>;
 }
