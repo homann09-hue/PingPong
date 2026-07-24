@@ -229,6 +229,7 @@ databaseSuite("mission loot reward producer", () => {
 
     expect(ledger.rows[0]).toEqual({ invalid: "0", count: "3" });
     expect(outbox.rows).toEqual([
+      { event_type: "loot.entitlement.consumed", count: "1" },
       { event_type: "loot.entitlement.issued", count: "1" },
       { event_type: "mission.claimed", count: "1" },
     ]);
