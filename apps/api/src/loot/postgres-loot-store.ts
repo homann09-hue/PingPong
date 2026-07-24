@@ -1,8 +1,23 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import type { Pool, PoolClient } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { PostgresInventoryStore } from "../inventory/postgres-inventory-store.js";
 import { evaluateLootTable, type LootEntry, type LootTable } from "./loot-engine.js";
 import {
+  LootEntitlementIdempotencyConflictError,
+  LootEntitlementPlayerNotFoundError,
+  LootEntitlementSourceConflictError,
+  LootEntitlementTableNotFoundError,
+  assertLootDate,
+  lootEntitlementRequestHash,
+  validateIssueLootEntitlementCommand,
+  type IssueLootEntitlementCommand,
+  type LootEntitlementResult,
+  type LootEntitlementStatus,
+} from "./loot-entitlement.js";
+import {
+  LootEntitlementExpiredError,
+  LootEntitlementNotAvailableError,
+  LootEntitlementNotFoundError,
   LootIdempotencyConflictError,
   LootPlayerNotFoundError,
   LootTableNotFoundError,
@@ -17,6 +32,7 @@ interface LootTableRow {
   readonly version: number;
   readonly pity_group: string;
   readonly pity_after: number | null;
+  readonly published_at: Date;
 }
 
 interface LootEntryRow {
@@ -35,6 +51,24 @@ interface LootOpeningRow {
   readonly result: LootOpeningResult;
 }
 
+interface EntitlementReplayRow {
+  readonly request_hash: Buffer;
+  readonly result: LootEntitlementResult;
+}
+
+interface EntitlementRow {
+  readonly id: string;
+  readonly player_id: string;
+  readonly table_id: string;
+  readonly table_version: number;
+  readonly source: string;
+  readonly reference_id: string;
+  readonly metadata: Readonly<Record<string, unknown>>;
+  readonly status: LootEntitlementStatus;
+  readonly issued_at: Date;
+  readonly expires_at: Date;
+}
+
 interface PityRow {
   readonly misses: number;
 }
@@ -42,8 +76,8 @@ interface PityRow {
 export type LootSeedFactory = () => Buffer;
 
 /**
- * Coordinates loot evidence, pity state, inventory grants, ledgers, and outbox
- * messages in one PostgreSQL transaction.
+ * Issues server-bound loot entitlements and consumes them with loot evidence,
+ * pity state, inventory grants, ledgers, and outbox messages in PostgreSQL transactions.
  */
 export class PostgresLootStore {
   private readonly inventory: PostgresInventoryStore;
@@ -56,9 +90,86 @@ export class PostgresLootStore {
     this.inventory = inventory ?? new PostgresInventoryStore(pool);
   }
 
+  public static connect(connectionString: string): PostgresLootStore {
+    const pool = new Pool({ connectionString, max: 20, idleTimeoutMillis: 30_000 });
+    return new PostgresLootStore(pool);
+  }
+
+  public async issue(command: IssueLootEntitlementCommand, now = new Date()): Promise<LootEntitlementResult> {
+    validateIssueLootEntitlementCommand(command, now);
+    const requestHash = lootEntitlementRequestHash(command);
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const player = await client.query("SELECT id FROM players WHERE id=$1 FOR UPDATE", [command.playerId]);
+      if (player.rowCount !== 1) throw new LootEntitlementPlayerNotFoundError();
+
+      const replay = await readEntitlementReplay(client, command.playerId, command.idempotencyKey, requestHash);
+      if (replay !== null) {
+        await client.query("COMMIT");
+        return replay;
+      }
+
+      const sourceReplay = await readEntitlementSourceReplay(
+        client, command.playerId, command.source, command.referenceId, requestHash,
+      );
+      if (sourceReplay !== null) {
+        await client.query("COMMIT");
+        return sourceReplay;
+      }
+
+      const table = await loadActiveTableRow(client, command.tableId, now);
+      const entitlementId = randomUUID();
+      const result: LootEntitlementResult = {
+        entitlementId,
+        tableId: table.table_id,
+        tableVersion: table.version,
+        source: command.source,
+        referenceId: command.referenceId,
+        metadata: command.metadata ?? {},
+        status: "available",
+        issuedAt: now.toISOString(),
+        expiresAt: command.expiresAt.toISOString(),
+        replayed: false,
+      };
+
+      await client.query(
+        `INSERT INTO loot_entitlements
+           (id,player_id,idempotency_key,request_hash,table_id,table_version,source,reference_id,
+            metadata,status,issued_at,expires_at,result)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'available',$10,$11,$12::jsonb)`,
+        [entitlementId, command.playerId, command.idempotencyKey, requestHash, table.table_id, table.version,
+          command.source, command.referenceId, JSON.stringify(command.metadata ?? {}), now, command.expiresAt,
+          JSON.stringify(result)],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (id,aggregate_type,aggregate_id,event_type,payload)
+         VALUES ($1,'loot_entitlement',$2,'loot.entitlement.issued',$3::jsonb)`,
+        [randomUUID(), entitlementId, JSON.stringify({
+          playerId: command.playerId,
+          tableId: table.table_id,
+          tableVersion: table.version,
+          source: command.source,
+          referenceId: command.referenceId,
+          expiresAt: command.expiresAt.toISOString(),
+        })],
+      );
+
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if ((error as { code?: string }).code === "23505") throw new LootEntitlementSourceConflictError();
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   public async open(command: OpenLootCommand, now = new Date()): Promise<LootOpeningResult> {
     validateOpenLootCommand(command);
-    assertValidDate(now, "now");
+    assertLootDate(now, "now");
     const requestHash = lootOpeningRequestHash(command);
     const client = await this.pool.connect();
 
@@ -67,13 +178,25 @@ export class PostgresLootStore {
       const player = await client.query("SELECT id FROM players WHERE id=$1 FOR UPDATE", [command.playerId]);
       if (player.rowCount !== 1) throw new LootPlayerNotFoundError();
 
-      const replay = await readReplay(client, command, requestHash);
+      const replay = await readOpeningReplay(client, command, requestHash);
       if (replay !== null) {
         await client.query("COMMIT");
         return replay;
       }
 
-      const table = await loadActiveTable(client, command.tableId, now);
+      const entitlementResult = await client.query<EntitlementRow>(
+        `SELECT id,player_id,table_id,table_version,source,reference_id,metadata,status,issued_at,expires_at
+           FROM loot_entitlements
+          WHERE id=$1 AND player_id=$2
+          FOR UPDATE`,
+        [command.entitlementId, command.playerId],
+      );
+      const entitlement = entitlementResult.rows[0];
+      if (!entitlement) throw new LootEntitlementNotFoundError();
+      if (entitlement.expires_at.getTime() <= now.getTime()) throw new LootEntitlementExpiredError();
+      if (entitlement.status !== "available") throw new LootEntitlementNotAvailableError();
+
+      const table = await loadEntitledTable(client, entitlement);
       await client.query(
         `INSERT INTO loot_pity_states (player_id,pity_group,misses)
          VALUES ($1,$2,0)
@@ -110,12 +233,13 @@ export class PostgresLootStore {
           source: "loot",
           referenceId: openingId,
           metadata: {
+            entitlementId: entitlement.id,
             lootTableId: table.tableId,
             lootTableVersion: table.version,
             lootEntryId: reward.entryId,
             seedCommitment: evaluation.proof.seedCommitment,
-            commandSource: command.source,
-            commandReferenceId: command.referenceId,
+            entitlementSource: entitlement.source,
+            entitlementReferenceId: entitlement.reference_id,
           },
         }, now);
         grantedRewards.push({
@@ -129,8 +253,11 @@ export class PostgresLootStore {
 
       const result: LootOpeningResult = {
         openingId,
+        entitlementId: entitlement.id,
         tableId: table.tableId,
         tableVersion: table.version,
+        source: entitlement.source,
+        referenceId: entitlement.reference_id,
         pityGroup: table.pityGroup,
         pityBefore: evaluation.pityBefore,
         pityAfter: evaluation.pityAfter,
@@ -148,10 +275,10 @@ export class PostgresLootStore {
       );
       await client.query(
         `INSERT INTO loot_openings
-           (id,player_id,idempotency_key,request_hash,table_id,table_version,pity_group,
+           (id,player_id,idempotency_key,request_hash,entitlement_id,table_id,table_version,pity_group,
             pity_before,pity_after,forced_pity,proof_version,server_seed,seed_commitment,draws,result,created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16)`,
-        [openingId, command.playerId, command.idempotencyKey, requestHash,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17)`,
+        [openingId, command.playerId, command.idempotencyKey, requestHash, entitlement.id,
           table.tableId, table.version, table.pityGroup, evaluation.pityBefore, evaluation.pityAfter,
           evaluation.forcedPity, evaluation.proof.version, serverSeed,
           Buffer.from(evaluation.proof.seedCommitment, "hex"), JSON.stringify(evaluation.proof.draws),
@@ -167,13 +294,25 @@ export class PostgresLootStore {
         );
       }
       await client.query(
+        `UPDATE loot_entitlements
+            SET status='consumed',consumed_at=$2,consumed_opening_id=$3
+          WHERE id=$1 AND status='available'`,
+        [entitlement.id, now, openingId],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (id,aggregate_type,aggregate_id,event_type,payload)
+         VALUES ($1,'loot_entitlement',$2,'loot.entitlement.consumed',$3::jsonb)`,
+        [randomUUID(), entitlement.id, JSON.stringify({ playerId: command.playerId, openingId, consumedAt: now.toISOString() })],
+      );
+      await client.query(
         `INSERT INTO outbox_events (id,aggregate_type,aggregate_id,event_type,payload)
          VALUES ($1,'loot',$2,'loot.opened',$3::jsonb)`,
         [randomUUID(), openingId, JSON.stringify({
           playerId: command.playerId,
-          source: command.source,
-          referenceId: command.referenceId,
-          metadata: command.metadata ?? {},
+          entitlementId: entitlement.id,
+          source: entitlement.source,
+          referenceId: entitlement.reference_id,
+          metadata: entitlement.metadata,
           result,
         })],
       );
@@ -187,9 +326,89 @@ export class PostgresLootStore {
       client.release();
     }
   }
+
+  public async expireDue(now = new Date(), limit = 100): Promise<number> {
+    assertLootDate(now, "now");
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
+      throw new RangeError("limit must be a safe integer between 1 and 1000");
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const due = await client.query<{ id: string; player_id: string }>(
+        `SELECT id,player_id FROM loot_entitlements
+          WHERE status='available' AND expires_at <= $1
+          ORDER BY expires_at,id
+          FOR UPDATE SKIP LOCKED
+          LIMIT $2`,
+        [now, limit],
+      );
+      for (const row of due.rows) {
+        await client.query("UPDATE loot_entitlements SET status='expired' WHERE id=$1", [row.id]);
+        await client.query(
+          `INSERT INTO outbox_events (id,aggregate_type,aggregate_id,event_type,payload)
+           VALUES ($1,'loot_entitlement',$2,'loot.entitlement.expired',$3::jsonb)`,
+          [randomUUID(), row.id, JSON.stringify({ playerId: row.player_id, expiredAt: now.toISOString() })],
+        );
+      }
+      await client.query("COMMIT");
+      return due.rowCount ?? 0;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async close(): Promise<void> {
+    await this.pool.end();
+  }
 }
 
-async function readReplay(
+async function readEntitlementReplay(
+  client: PoolClient,
+  playerId: string,
+  idempotencyKey: string,
+  requestHash: Buffer,
+): Promise<LootEntitlementResult | null> {
+  const replay = await client.query<EntitlementReplayRow>(
+    `SELECT request_hash,result FROM loot_entitlements
+      WHERE player_id=$1 AND idempotency_key=$2`,
+    [playerId, idempotencyKey],
+  );
+  return entitlementReplayResult(replay.rows[0], requestHash, "idempotency");
+}
+
+async function readEntitlementSourceReplay(
+  client: PoolClient,
+  playerId: string,
+  source: string,
+  referenceId: string,
+  requestHash: Buffer,
+): Promise<LootEntitlementResult | null> {
+  const replay = await client.query<EntitlementReplayRow>(
+    `SELECT request_hash,result FROM loot_entitlements
+      WHERE player_id=$1 AND source=$2 AND reference_id=$3`,
+    [playerId, source, referenceId],
+  );
+  return entitlementReplayResult(replay.rows[0], requestHash, "source");
+}
+
+function entitlementReplayResult(
+  row: EntitlementReplayRow | undefined,
+  requestHash: Buffer,
+  conflict: "idempotency" | "source",
+): LootEntitlementResult | null {
+  if (!row) return null;
+  if (row.request_hash.length !== requestHash.length || !timingSafeEqual(row.request_hash, requestHash)) {
+    if (conflict === "idempotency") throw new LootEntitlementIdempotencyConflictError();
+    throw new LootEntitlementSourceConflictError();
+  }
+  return { ...row.result, replayed: true };
+}
+
+async function readOpeningReplay(
   client: PoolClient,
   command: OpenLootCommand,
   requestHash: Buffer,
@@ -207,13 +426,26 @@ async function readReplay(
   return { ...row.result, replayed: true };
 }
 
-async function loadActiveTable(client: PoolClient, tableId: string, now: Date): Promise<LootTable> {
-  const tableResult = await client.query<LootTableRow>(
-    `SELECT table_id,version,pity_group,pity_after
+async function loadActiveTableRow(client: PoolClient, tableId: string, now: Date): Promise<LootTableRow> {
+  const result = await client.query<LootTableRow>(
+    `SELECT table_id,version,pity_group,pity_after,published_at
        FROM loot_table_versions
       WHERE table_id=$1 AND active=true AND published_at IS NOT NULL AND published_at <= $2
       FOR SHARE`,
     [tableId, now],
+  );
+  const row = result.rows[0];
+  if (!row) throw new LootEntitlementTableNotFoundError();
+  return row;
+}
+
+async function loadEntitledTable(client: PoolClient, entitlement: EntitlementRow): Promise<LootTable> {
+  const tableResult = await client.query<LootTableRow>(
+    `SELECT table_id,version,pity_group,pity_after,published_at
+       FROM loot_table_versions
+      WHERE table_id=$1 AND version=$2 AND published_at IS NOT NULL AND published_at <= $3
+      FOR SHARE`,
+    [entitlement.table_id, entitlement.table_version, entitlement.issued_at],
   );
   const tableRow = tableResult.rows[0];
   if (!tableRow) throw new LootTableNotFoundError();
@@ -224,7 +456,6 @@ async function loadActiveTable(client: PoolClient, tableId: string, now: Date): 
       ORDER BY entry_kind,entry_id`,
     [tableRow.table_id, tableRow.version],
   );
-
   return {
     tableId: tableRow.table_id,
     version: tableRow.version,
@@ -265,8 +496,4 @@ function assertSafeNonNegativeInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new RangeError(`${name} must be a non-negative safe integer`);
   }
-}
-
-function assertValidDate(value: Date, name: string): void {
-  if (!Number.isFinite(value.getTime())) throw new RangeError(`${name} must be a valid date`);
 }
