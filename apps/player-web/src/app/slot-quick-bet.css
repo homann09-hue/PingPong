@@ -1,0 +1,156 @@
+.slot-quick-bet {
+  position: fixed;
+  z-index: 22;
+  right: 22px;
+  bottom: 178px;
+  width: min(360px, calc(100vw - 44px));
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--slot-primary, #8f6bff) 42%, rgba(255, 255, 255, 0.18));
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(28, 18, 52, 0.96), rgba(10, 7, 24, 0.94));
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+}
+
+.slot-quick-bet > header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.slot-quick-bet > header > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--slot-primary, #8f6bff), var(--slot-secondary, #ff5ad9));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--slot-primary, #8f6bff) 38%, transparent);
+}
+
+.slot-quick-bet > header svg {
+  width: 20px;
+  height: 20px;
+}
+
+.slot-quick-bet > header small,
+.slot-quick-bet > header strong {
+  display: block;
+}
+
+.slot-quick-bet > header small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.slot-quick-bet > header strong {
+  margin-top: 2px;
+  font-size: 0.94rem;
+}
+
+.slot-quick-bet > header em {
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 850;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.slot-quick-bet-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.slot-quick-bet-options button {
+  display: grid;
+  min-height: 58px;
+  place-items: center;
+  gap: 2px;
+  padding: 7px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035));
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.slot-quick-bet-options button:hover,
+.slot-quick-bet-options button:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--slot-primary, #8f6bff);
+  outline: none;
+}
+
+.slot-quick-bet-options button.is-active {
+  border-color: color-mix(in srgb, var(--slot-primary, #8f6bff) 78%, #fff);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--slot-primary, #8f6bff) 42%, rgba(255, 255, 255, 0.12)), rgba(255, 255, 255, 0.06));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--slot-primary, #8f6bff) 24%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.slot-quick-bet-options button span {
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.slot-quick-bet-options button small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.slot-quick-bet-options button svg {
+  width: 14px;
+  height: 14px;
+  color: #ffd76a;
+}
+
+@media (max-width: 980px) {
+  .slot-quick-bet {
+    right: 16px;
+    bottom: 160px;
+    width: min(330px, calc(100vw - 32px));
+  }
+}
+
+@media (max-width: 720px) {
+  .slot-quick-bet {
+    position: fixed;
+    right: 12px;
+    bottom: calc(108px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .slot-quick-bet-options {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .slot-quick-bet-options::-webkit-scrollbar {
+    display: none;
+  }
+
+  .slot-quick-bet-options button {
+    flex: 0 0 74px;
+    scroll-snap-align: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-quick-bet-options button {
+    transition: none;
+  }
+}
