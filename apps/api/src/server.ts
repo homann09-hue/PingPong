@@ -45,6 +45,12 @@ const storeWebhookToken = process.env.STORE_WEBHOOK_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const demoMode = process.env.DEMO_MODE === "true";
+const productionRuntime = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+
+if (demoMode && productionRuntime) {
+  throw new Error("DEMO_MODE is forbidden in production and hosted deployments");
+}
+
 /**
  * Der Push-Zustellungs-Worker darf nur in genau einer Instanz laufen, sonst wuerden mehrere
  * Repliken dieselben Zustellungen greifen. Standard: an (Einzelinstanz-Betrieb).
