@@ -35,6 +35,7 @@ const nav = [
 
 export function AppShell({ profile, children }: Readonly<{ profile: Profile | null; children: React.ReactNode }>) {
   const pathname = usePathname();
+  const isSlotRoute = /^\/slots\/[^/?#]+/.test(pathname);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchInput = useRef<HTMLInputElement>(null);
@@ -42,6 +43,11 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
   const level = profile?.progression.level ?? 1;
   const vipPoints = profile?.vip?.points ?? 0;
   const vipProgress = Math.min(100, Math.max(8, (vipPoints % 1000) / 10));
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("slot-mobile-session", isSlotRoute);
+    return () => document.documentElement.classList.remove("slot-mobile-session");
+  }, [isSlotRoute]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -57,7 +63,7 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
     game.name.toLowerCase().includes(query.trim().toLowerCase())
     || game.category.toLowerCase().includes(query.trim().toLowerCase()));
 
-  return <div className="app-shell premium-shell">
+  return <div className={`app-shell premium-shell${isSlotRoute ? " is-slot-route" : ""}`}>
     <header className="topbar premium-topbar">
       <Link href="/" className="mobile-brand" aria-label="Zur Aurora-Lobby"><span className="brand-mark"><Crown weight="fill" /></span><strong>AURORA</strong></Link>
       <Link href="/account" className="top-player-card">
