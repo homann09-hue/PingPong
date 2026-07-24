@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
+import { issueBoundLootEntitlementWithinTransaction } from "../loot/postgres-loot-entitlement-issuer.js";
 import type { AchievementCategory, AchievementMetric, AchievementTier, AchievementView } from "./achievement-system.js";
 import {
   AchievementAlreadyClaimedError,
@@ -27,6 +28,9 @@ interface DefinitionRow {
   readonly metric: AchievementMetric;
   readonly target: string;
   readonly reward_coins: string;
+  readonly reward_loot_table_id: string | null;
+  readonly reward_loot_table_version: number | null;
+  readonly reward_loot_expires_in_seconds: number | null;
   readonly prerequisite_achievement_id: string | null;
   readonly prerequisite_version: number | null;
 }
@@ -69,7 +73,9 @@ export class PostgresAchievementStore implements AchievementStore {
       const result = await client.query<AchievementViewRow>(
         `SELECT definition.achievement_id,definition.version,definition.category,definition.tier,
                 definition.name,definition.description,definition.metric,definition.target,
-                definition.reward_coins,definition.prerequisite_achievement_id,definition.prerequisite_version,
+                definition.reward_coins,definition.reward_loot_table_id,
+                definition.reward_loot_table_version,definition.reward_loot_expires_in_seconds,
+                definition.prerequisite_achievement_id,definition.prerequisite_version,
                 COALESCE(progress.progress,0) AS progress,
                 progress.completed_at IS NOT NULL AS completed,
                 claim.id IS NOT NULL AS claimed,
@@ -122,6 +128,7 @@ export class PostgresAchievementStore implements AchievementStore {
       await client.query("SELECT backfill_player_achievement_progress($1,$2)", [command.playerId, now]);
       const definitionResult = await client.query<DefinitionRow>(
         `SELECT achievement_id,version,category,tier,name,description,metric,target,reward_coins,
+                reward_loot_table_id,reward_loot_table_version,reward_loot_expires_in_seconds,
                 prerequisite_achievement_id,prerequisite_version
            FROM achievement_definition_versions
           WHERE achievement_id=$1 AND active=true
@@ -171,12 +178,34 @@ export class PostgresAchievementStore implements AchievementStore {
       const claimId = randomUUID();
       const coinBalance = coinBefore + coins;
       const completionEvidence = progressRow.completion_evidence;
+
+      const lootReward = parseLootReward(definition);
+      const lootEntitlement = lootReward === null ? null : await issueBoundLootEntitlementWithinTransaction(client, {
+        playerId: command.playerId,
+        idempotencyKey: `achievement-entitlement:${definition.achievement_id}:v${definition.version}`,
+        tableId: lootReward.tableId,
+        tableVersion: lootReward.tableVersion,
+        source: "achievement",
+        referenceId: `${definition.achievement_id}:v${definition.version}`,
+        expiresAt: addSeconds(now, lootReward.expiresInSeconds),
+        metadata: {
+          claimId,
+          achievementId: definition.achievement_id,
+          achievementVersion: definition.version,
+          category: definition.category,
+          tier: definition.tier,
+          progress,
+          target,
+        },
+      }, now);
+
       const result: AchievementClaimResult = {
         claimId,
         achievementId: definition.achievement_id,
         achievementVersion: definition.version,
         coins,
         coinBalance,
+        lootEntitlement,
         progress,
         completionEvidence,
         replayed: false,
@@ -198,6 +227,7 @@ export class PostgresAchievementStore implements AchievementStore {
               achievementVersion: definition.version,
               progress,
               target,
+              lootEntitlementId: lootEntitlement?.entitlementId ?? null,
             })],
         );
       }
@@ -205,11 +235,12 @@ export class PostgresAchievementStore implements AchievementStore {
       await client.query(
         `INSERT INTO achievement_claims_v1
            (id,player_id,achievement_id,achievement_version,idempotency_key,request_hash,
-            progress_at_claim,completion_evidence,reward_coins,coin_balance_after,result,claimed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb,$12)`,
+            progress_at_claim,completion_evidence,reward_coins,coin_balance_after,
+            loot_entitlement_id,result,claimed_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12::jsonb,$13)`,
         [claimId, command.playerId, definition.achievement_id, definition.version,
           command.idempotencyKey, requestHash, progress, JSON.stringify(completionEvidence), coins,
-          coinBalance, JSON.stringify(result), now],
+          coinBalance, lootEntitlement?.entitlementId ?? null, JSON.stringify(result), now],
       );
       await client.query(
         `INSERT INTO outbox_events (id,aggregate_type,aggregate_id,event_type,payload)
@@ -285,6 +316,7 @@ async function readReplay(
 }
 
 function rowToView(row: AchievementViewRow): AchievementView {
+  const lootReward = parseLootReward(row);
   return {
     id: row.achievement_id,
     version: row.version,
@@ -295,6 +327,7 @@ function rowToView(row: AchievementViewRow): AchievementView {
     metric: row.metric,
     target: toSafeInteger(row.target, "achievement target"),
     coins: toSafeInteger(row.reward_coins, "achievement reward coins"),
+    ...(lootReward === null ? {} : { lootReward }),
     ...(row.prerequisite_achievement_id === null ? {} : { prerequisiteId: row.prerequisite_achievement_id }),
     rewardId: row.achievement_id,
     progress: toSafeInteger(row.progress, "achievement progress"),
@@ -302,6 +335,41 @@ function rowToView(row: AchievementViewRow): AchievementView {
     claimed: row.claimed,
     unlocked: row.unlocked,
   };
+}
+
+function parseLootReward(row: DefinitionRow): {
+  readonly tableId: string;
+  readonly tableVersion: number;
+  readonly expiresInSeconds: number;
+} | null {
+  const values = [
+    row.reward_loot_table_id,
+    row.reward_loot_table_version,
+    row.reward_loot_expires_in_seconds,
+  ];
+  if (values.every((value) => value === null)) return null;
+  if (values.some((value) => value === null)) throw new Error("Achievement loot reward configuration is incomplete");
+  const tableVersion = row.reward_loot_table_version!;
+  const expiresInSeconds = row.reward_loot_expires_in_seconds!;
+  if (!Number.isSafeInteger(tableVersion) || tableVersion < 1) {
+    throw new RangeError("Achievement loot table version must be a positive safe integer");
+  }
+  if (!Number.isSafeInteger(expiresInSeconds) || expiresInSeconds < 60 || expiresInSeconds > 2_592_000) {
+    throw new RangeError("Achievement loot entitlement TTL must be between 60 and 2592000 seconds");
+  }
+  return {
+    tableId: row.reward_loot_table_id!,
+    tableVersion,
+    expiresInSeconds,
+  };
+}
+
+function addSeconds(value: Date, seconds: number): Date {
+  const timestamp = value.getTime() + seconds * 1_000;
+  if (!Number.isSafeInteger(timestamp)) throw new RangeError("Achievement loot expiry exceeds safe date range");
+  const result = new Date(timestamp);
+  assertValidAchievementDate(result, "loot entitlement expiry");
+  return result;
 }
 
 function toSafeInteger(value: string | number, name: string): number {
