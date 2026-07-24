@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree, Heart, CheckCircle } from "@phosphor-icons/react";
+import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree, Heart, CheckCircle, Target, Medal, Timer, ArrowRight } from "@phosphor-icons/react";
 
 const liveWins = [
   { player: "Luna77", game: "Neon Nights", amount: "8.4 M" },
@@ -39,14 +39,23 @@ export function PremiumLiveRail() {
   const [activeCategory, setActiveCategory] = useState("Alle Spiele");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [bonusClaimed, setBonusClaimed] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(5 * 3600 + 42 * 60 + 18);
 
   useEffect(() => {
     const timer = window.setInterval(() => setActiveWin((current) => (current + 1) % liveWins.length), 3200);
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setSecondsLeft((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const win = liveWins[activeWin];
   const toggleFavorite = (title: string) => setFavorites((current) => current.includes(title) ? current.filter((item) => item !== title) : [...current, title]);
+  const hours = String(Math.floor(secondsLeft / 3600)).padStart(2, "0");
+  const minutes = String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, "0");
+  const seconds = String(secondsLeft % 60).padStart(2, "0");
 
   return (
     <section className="premium-live-layer" aria-label="Live-Casino-Highlights">
@@ -115,6 +124,34 @@ export function PremiumLiveRail() {
           <button type="button" className="premium-reward-card boost" onClick={() => document.getElementById("missions")?.scrollIntoView({ behavior: "smooth" })}><span><Lightning weight="fill" /></span><div><small>Aktiver Boost</small><strong>2× XP Rush</strong><p>Noch 18 Minuten</p></div><b>2×</b></button>
         </aside>
       </div>
+
+      <section className="premium-liveops" aria-labelledby="premium-liveops-title">
+        <div className="premium-world-header"><div><span>Live-Service-Zentrale</span><h2 id="premium-liveops-title">Heute läuft mehr</h2></div><Link href="/#events">Alle Events</Link></div>
+        <div className="premium-liveops-grid">
+          <article className="premium-tournament-card">
+            <div className="premium-tournament-glow" aria-hidden="true" />
+            <span className="premium-liveops-icon"><Trophy weight="fill" /></span>
+            <div className="premium-liveops-copy"><small>Wochenend-Turnier</small><strong>Neon Crown Clash</strong><p>Spiele dich in die Top 100 und sichere dir einen Anteil am 50-Millionen-Pool.</p></div>
+            <div className="premium-rank-block"><small>Dein Rang</small><strong>#148</strong><span>↑ 26 Plätze</span></div>
+            <div className="premium-countdown"><Timer weight="fill" /><span><b>{hours}</b><small>STD</small></span><i>:</i><span><b>{minutes}</b><small>MIN</small></span><i>:</i><span><b>{seconds}</b><small>SEK</small></span></div>
+            <Link href="/slots/neon-nights">Punkte sammeln <ArrowRight weight="bold" /></Link>
+          </article>
+
+          <article className="premium-quest-card">
+            <header><span><Target weight="fill" /></span><div><small>Tagesmission</small><strong>Bonusjäger</strong></div><b>3/5</b></header>
+            <p>Löse fünf Bonus-Runden in beliebigen Slots aus.</p>
+            <div className="premium-progress"><i style={{ width: "60%" }} /></div>
+            <footer><span><Gift weight="fill" /> 400K Coins</span><Link href="/#missions">Missionen</Link></footer>
+          </article>
+
+          <article className="premium-vip-card">
+            <header><span><Medal weight="fill" /></span><div><small>VIP-Fortschritt</small><strong>Gold III</strong></div><b>72%</b></header>
+            <p>Noch 2.800 VIP-Punkte bis Platin I und exklusiven Monatsboni.</p>
+            <div className="premium-progress vip"><i style={{ width: "72%" }} /></div>
+            <footer><span><Crown weight="fill" /> 7-Tage-Bonus +15%</span><Link href="/#rewards">VIP ansehen</Link></footer>
+          </article>
+        </div>
+      </section>
 
       <section className="premium-featured" id="featured" aria-labelledby="premium-featured-title">
         <div className="premium-world-header"><div><span>Für dich ausgewählt</span><h2 id="premium-featured-title">Empfohlene Slots</h2></div><Link href="/#all-games">Alle anzeigen</Link></div>
