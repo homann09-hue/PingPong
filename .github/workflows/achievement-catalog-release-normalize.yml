@@ -1,0 +1,39 @@
+name: achievement catalog release normalization
+permissions:
+  contents: write
+on:
+  pull_request:
+jobs:
+  apply:
+    if: github.head_ref == 'codex/achievement-foundation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Normalize initial catalog publication time
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('infra/postgres/038_achievement_persistence_v1.sql')
+          source = path.read_text()
+          old = 'true,now())'
+          count = source.count(old)
+          if count == 0:
+              print('Achievement catalog release timestamp is already normalized.')
+              raise SystemExit(0)
+          if count != 15:
+              raise SystemExit(f'Expected 15 catalog rows, found {count}')
+          source = source.replace(old, "true,TIMESTAMPTZ '2026-07-24T00:00:00Z')")
+          path.write_text(source)
+          PY
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/postgres/038_achievement_persistence_v1.sql
+          git commit -m "fix(postgres): pin achievement catalog release time"
+          git push origin HEAD:${GITHUB_HEAD_REF}
