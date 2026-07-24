@@ -1,0 +1,47 @@
+name: full node test diagnostics
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: github.head_ref == 'codex/mission-loot-rewards'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aurora_test
+          POSTGRES_USER: aurora
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aurora -d aurora_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgresql://aurora:test-only-password@localhost:5432/aurora_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture complete node suite
+        shell: bash
+        run: |
+          set +e
+          npm test > full-node-test-report.txt 2>&1
+          status=$?
+          echo "exit_code=$status" >> full-node-test-report.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-node-tests-${{ github.sha }}
+          path: full-node-test-report.txt
+          retention-days: 1
