@@ -71,6 +71,29 @@ export class PostgresInventoryStore {
     return this.mutate(command, now);
   }
 
+  /**
+   * Participates in an already-open PostgreSQL transaction. The caller owns
+   * commit and rollback, allowing loot, achievement, or event rewards to bind
+   * their evidence and the inventory ledger atomically.
+   */
+  public async grantWithinTransaction(
+    client: PoolClient,
+    command: GrantInventoryCommand,
+    now = new Date(),
+  ): Promise<InventoryMutationResult> {
+    validateInventoryMutation(command);
+    assertValidDate(now, "now");
+    if (command.expiresAt !== null && command.expiresAt.getTime() <= now.getTime()) {
+      throw new RangeError("expiresAt must be later than the inventory grant time");
+    }
+    const requestHash = inventoryRequestHash(command);
+    const player = await client.query("SELECT id FROM players WHERE id=$1 FOR UPDATE", [command.playerId]);
+    if (player.rowCount !== 1) throw new InventoryPlayerNotFoundError();
+    const replay = await readReplay(client, command, requestHash);
+    if (replay !== null) return replay;
+    return this.applyGrant(client, command, requestHash, now);
+  }
+
   public async consume(command: ConsumeInventoryCommand, now = new Date()): Promise<InventoryMutationResult> {
     validateInventoryMutation(command);
     assertValidDate(now, "now");
