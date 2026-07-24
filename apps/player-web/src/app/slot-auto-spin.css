@@ -1,0 +1,150 @@
+.auto-spin-control {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 84px;
+}
+
+.auto-spin-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 14px);
+  z-index: 30;
+  width: min(300px, calc(100vw - 28px));
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--slot-primary) 55%, rgba(255, 255, 255, 0.22));
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, rgba(31, 21, 55, 0.98), rgba(10, 7, 24, 0.98)),
+    var(--slot-cover) center / cover;
+  box-shadow:
+    0 22px 55px rgba(0, 0, 0, 0.58),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 28px color-mix(in srgb, var(--slot-primary) 24%, transparent);
+  backdrop-filter: blur(22px);
+  animation: auto-menu-enter 180ms ease-out both;
+}
+
+.auto-spin-menu::after {
+  content: "";
+  position: absolute;
+  right: 30px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  border-right: 1px solid color-mix(in srgb, var(--slot-primary) 55%, rgba(255, 255, 255, 0.22));
+  border-bottom: 1px solid color-mix(in srgb, var(--slot-primary) 55%, rgba(255, 255, 255, 0.22));
+  background: #100a24;
+  transform: rotate(45deg);
+}
+
+.auto-spin-menu > strong,
+.auto-spin-menu > small {
+  display: block;
+}
+
+.auto-spin-menu > strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auto-spin-menu > small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.72rem;
+}
+
+.auto-spin-menu > div {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.auto-spin-menu button {
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 13px;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.auto-spin-menu button:hover,
+.auto-spin-menu button:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--slot-primary);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--slot-primary) 45%, rgba(255, 255, 255, 0.12)), rgba(255, 255, 255, 0.06));
+  outline: none;
+}
+
+.auto-spin-control.is-open .auto-button {
+  border-color: var(--slot-primary);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--slot-primary) 32%, transparent);
+}
+
+.auto-button.running {
+  position: relative;
+  overflow: hidden;
+}
+
+.auto-button.running::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 10%, rgba(255, 255, 255, 0.2) 48%, transparent 86%);
+  transform: translateX(-130%);
+  animation: auto-running-sheen 1.4s linear infinite;
+}
+
+.auto-button.running em {
+  min-width: 28px;
+  text-align: center;
+  color: #fff;
+  background: color-mix(in srgb, var(--slot-primary) 78%, #111);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+@keyframes auto-menu-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes auto-running-sheen {
+  to { transform: translateX(130%); }
+}
+
+@media (max-width: 720px) {
+  .auto-spin-control {
+    min-width: 70px;
+  }
+
+  .auto-spin-menu {
+    position: fixed;
+    right: 14px;
+    bottom: calc(94px + env(safe-area-inset-bottom));
+    left: 14px;
+    width: auto;
+  }
+
+  .auto-spin-menu::after {
+    right: 31px;
+  }
+
+  .auto-spin-menu > div {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-spin-menu,
+  .auto-button.running::before {
+    animation: none;
+  }
+}
