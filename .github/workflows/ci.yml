@@ -30,7 +30,12 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - name: Test slot engine
+        run: npm run test -w @aurora/slot-engine
+      - name: Test API
+        run: npm run test -w @aurora/api
+      - name: Test player web
+        run: npm run test -w @aurora/player-web
       - run: npm run build
   flutter:
     runs-on: ubuntu-latest
