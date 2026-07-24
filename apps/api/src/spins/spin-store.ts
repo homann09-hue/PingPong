@@ -197,10 +197,11 @@ export interface SpinStore {
   close(): Promise<void>;
 }
 
-export function missionClaimRequestHash(command: ClaimMissionCommand): Buffer {
+export function missionClaimRequestHash(command: ClaimMissionCommand, periodKey: string): Buffer {
   return createHash("sha256").update(JSON.stringify({
     playerId: command.playerId,
     missionId: command.missionId,
+    periodKey,
   })).digest();
 }
 
