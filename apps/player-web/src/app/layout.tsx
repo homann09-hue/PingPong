@@ -18,35 +18,33 @@ import "./slot-intro.css";
 import "./mobile.css";
 import "./vegas.css";
 import "./premium-casino.css";
+import "./lotsa-app.css";
+import "./lotsa-menus.css";
+import "./lotsa-slots.css";
+import "./lotsa-motion.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
 export const metadata: Metadata = {
-  title: { default: "Aurora Casino", template: "%s · Aurora Casino" },
-  description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events, Jackpots und geteiltem Fortschritt.",
-  applicationName: "Aurora Casino",
+  title: { default: "Aurora Slots", template: "%s · Aurora Slots" },
+  description: "Mobile Social-Casino-App mit eigenständigen Themen-Slots, Missionen, Events, Club, Boostern und virtuellen Coins.",
+  applicationName: "Aurora Slots",
   metadataBase: new URL("https://aurora-player-web.vercel.app"),
   alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: "/assets/ui/player-avatar.png",
-    apple: "/assets/ui/player-avatar.png",
-  },
+  icons: { icon: "/assets/ui/player-avatar.png", apple: "/assets/ui/player-avatar.png" },
   openGraph: {
-    title: "Aurora Casino",
-    description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events und Jackpots.",
+    title: "Aurora Slots",
+    description: "Themen-Slots, Missionen, Events und Social-Casino-Progression mit virtuellem Spielgeld.",
     images: ["/assets/slots/pharaoh_oasis.png"],
   },
 };
 
 export const viewport: Viewport = {
-  // Ohne viewport-fit=cover liefert env(safe-area-inset-*) durchgehend 0 —
-  // die Safe-Area-Regeln in mobile.css waeren wirkungslos, und in einer
-  // nativen Huelle laege der Home-Indikator auf der unteren Leiste.
   viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
-  themeColor: "#120b2b",
+  themeColor: "#18052f",
   colorScheme: "dark",
 };
 

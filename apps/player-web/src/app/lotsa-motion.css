@@ -1,0 +1,63 @@
+/* Motion and reward presentation for the mobile slot-app shell. */
+:root {
+  --ls-ease-pop: cubic-bezier(.2,1.55,.45,1);
+  --ls-ease-smooth: cubic-bezier(.22,.72,.2,1);
+}
+
+@keyframes ls-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes ls-pulse { 0%,100%{transform:scale(1);filter:brightness(1)} 50%{transform:scale(1.06);filter:brightness(1.25)} }
+@keyframes ls-glow { 0%,100%{box-shadow:0 0 12px rgba(255,203,58,.35)} 50%{box-shadow:0 0 34px rgba(255,203,58,.85),0 0 70px rgba(181,63,255,.35)} }
+@keyframes ls-shine { from{transform:translateX(-160%) skewX(-22deg)} to{transform:translateX(260%) skewX(-22deg)} }
+@keyframes ls-drift { 0%{transform:scale(1.06) translate3d(-1%,0,0)} 50%{transform:scale(1.12) translate3d(1.5%,-1%,0)} 100%{transform:scale(1.06) translate3d(-1%,0,0)} }
+@keyframes ls-badge { 0%,100%{transform:rotate(-5deg) scale(1)} 50%{transform:rotate(4deg) scale(1.14)} }
+@keyframes ls-pop-in { 0%{opacity:0;transform:translateY(40px) scale(.72)} 70%{opacity:1;transform:translateY(-6px) scale(1.04)} 100%{opacity:1;transform:none} }
+@keyframes ls-overlay-in { from{opacity:0;backdrop-filter:blur(0)} to{opacity:1;backdrop-filter:blur(10px)} }
+@keyframes ls-coin-fall { 0%{opacity:0;transform:translate3d(0,-20vh,0) rotate(0)} 10%{opacity:1} 100%{opacity:0;transform:translate3d(var(--coin-x),110vh,0) rotate(900deg)} }
+@keyframes ls-confetti { 0%{opacity:0;transform:translate3d(0,0,0) rotate(0)} 12%{opacity:1} 100%{opacity:0;transform:translate3d(var(--conf-x),var(--conf-y),0) rotate(720deg)} }
+@keyframes ls-number-pulse { 0%,100%{text-shadow:0 0 8px rgba(255,210,64,.5)} 50%{text-shadow:0 0 20px #fff,0 0 42px #ffbf00;transform:scale(1.04)} }
+@keyframes ls-rail-breathe { 0%,100%{transform:translateX(0)} 50%{transform:translateX(-8px)} }
+@keyframes ls-slot-hit { 0%{filter:brightness(1)} 35%{filter:brightness(1.8) saturate(1.5)} 100%{filter:brightness(1)} }
+@keyframes ls-spin { to{transform:rotate(360deg)} }
+
+.ls-event-hero > img { animation:ls-drift 13s ease-in-out infinite; }
+.ls-event-hero::after { content:"";position:absolute;inset:-30% auto -30% -35%;width:22%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent);transform:skewX(-22deg);animation:ls-shine 6.5s ease-in-out infinite;pointer-events:none; }
+.ls-event-copy h1 { animation:ls-float 4.5s ease-in-out infinite; }
+.ls-event-copy a,.ls-lobby-bonus>button { animation:ls-glow 2.4s ease-in-out infinite; }
+.ls-event-hero aside strong { display:inline-block;animation:ls-number-pulse 2.1s ease-in-out infinite; }
+
+.ls-mini-promos a { transition:transform .22s var(--ls-ease-pop),filter .22s ease; }
+.ls-mini-promos a:nth-child(1){animation:ls-float 4.2s ease-in-out infinite}
+.ls-mini-promos a:nth-child(2){animation:ls-float 4.2s .55s ease-in-out infinite}
+.ls-mini-promos a:nth-child(3){animation:ls-float 4.2s 1.1s ease-in-out infinite}
+.ls-mini-promos a:hover,.ls-mini-promos a:active{transform:scale(1.06) translateY(-4px);filter:brightness(1.22)}
+
+.ls-theme-card { transition:transform .28s var(--ls-ease-pop),filter .28s ease; }
+.ls-theme-card:not(.locked):not(.offline):hover { transform:translateY(-10px) scale(1.035);filter:saturate(1.18) brightness(1.08);z-index:3; }
+.ls-theme-card:not(.locked):not(.offline):active { transform:scale(.96); }
+.ls-theme-art::after { content:"";position:absolute;inset:-45% auto -45% -45%;width:28%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:ls-shine 5.8s ease-in-out infinite;pointer-events:none; }
+.ls-theme-card:nth-child(2n) .ls-theme-art::after{animation-delay:1.2s}.ls-theme-card:nth-child(3n) .ls-theme-art::after{animation-delay:2.4s}
+.ls-theme-badges i { animation:ls-badge 1.8s var(--ls-ease-pop) infinite; }
+.ls-theme-action b { animation:ls-pulse 1.8s ease-in-out infinite; }
+.ls-featured-rail,.ls-new-rail { animation:ls-rail-breathe 8s ease-in-out infinite; }
+.ls-lobby-bonus { position:relative;overflow:hidden; }
+.ls-lobby-bonus::before { content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.18) 45%,transparent 65%);transform:translateX(-120%);animation:ls-shine 4.5s linear infinite;pointer-events:none; }
+.ls-lobby-bonus>button{position:relative;z-index:2;display:flex;align-items:center;gap:5px;padding:8px 10px;border:1px solid #ffcf4b;border-radius:9px;background:linear-gradient(180deg,#ca8d22,#76420c);color:#fff;font-size:9px;font-weight:1000;cursor:pointer}
+
+.ls-side-events { position:fixed;right:max(8px,env(safe-area-inset-right));top:30%;z-index:35;display:grid;gap:10px; }
+.ls-side-events a { position:relative;width:58px;min-height:58px;border-radius:18px;border:2px solid rgba(255,220,91,.75);background:linear-gradient(145deg,#7c20d9,#28104f);display:grid;place-items:center;color:#fff;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.42),0 0 20px rgba(178,62,255,.4);animation:ls-float 3.4s ease-in-out infinite; }
+.ls-side-events a:nth-child(2){animation-delay:.55s}.ls-side-events a:nth-child(3){animation-delay:1.1s}
+.ls-side-events svg{width:27px;height:27px}.ls-side-events i{position:absolute;right:-5px;top:-6px;min-width:21px;height:21px;padding:0 5px;border-radius:999px;background:#ff245e;color:#fff;font:800 11px/21px system-ui;text-align:center;box-shadow:0 0 12px #ff245e;animation:ls-pulse 1.25s infinite}
+
+.ls-reward-overlay { position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(10,1,24,.78);animation:ls-overlay-in .35s ease both; }
+.ls-reward-card { position:relative;width:min(92vw,520px);overflow:hidden;border:4px solid #ffd85b;border-radius:30px;padding:30px 24px 24px;text-align:center;background:radial-gradient(circle at 50% 15%,#a92cf0 0,#54109a 35%,#230843 72%,#12031f 100%);box-shadow:0 0 0 5px #8b3be0,0 0 70px rgba(255,205,49,.65);animation:ls-pop-in .65s var(--ls-ease-pop) both; }
+.ls-reward-card::before { content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent,#fff4 8%,transparent 18%);animation:ls-spin 7s linear infinite; }
+.ls-reward-card>*{position:relative;z-index:2}.ls-reward-card h2{margin:4px 0 8px;font-size:clamp(34px,9vw,62px);line-height:.9;color:#fff;text-transform:uppercase;text-shadow:0 4px 0 #7a1e00,0 0 20px #ffdf56}.ls-reward-card p{color:#f7dfff;font-weight:700}.ls-reward-amount{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0;font-size:clamp(34px,10vw,64px);font-weight:1000;color:#ffe468;text-shadow:0 4px 0 #9a5200,0 0 26px #ffcf33;animation:ls-number-pulse 1.5s infinite}.ls-reward-card button{width:100%;border:0;border-radius:18px;padding:16px;background:linear-gradient(#7cff42,#18a900);color:#fff;font-size:22px;font-weight:1000;text-transform:uppercase;text-shadow:0 2px 0 #087000;box-shadow:inset 0 2px #c8ffab,0 7px 0 #086b00,0 0 26px #46ff2f;animation:ls-pulse 1.7s infinite;cursor:pointer}.ls-reward-card button:disabled{opacity:.82}.ls-reward-card .close{position:absolute;right:12px;top:10px;width:38px;height:38px;padding:0;border-radius:50%;background:#281039;box-shadow:none;animation:none;font-size:18px;z-index:5}
+.ls-coin-rain,.ls-confetti-burst{position:absolute;inset:0;pointer-events:none;overflow:hidden}.ls-coin{position:absolute;left:50%;top:-10%;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6a2 0 8%,#ffd739 20%,#c87900 72%);border:2px solid #fff0a0;box-shadow:0 0 8px #ffd52f;animation:ls-coin-fall var(--coin-time) linear var(--coin-delay) infinite}.ls-confetti{position:absolute;left:50%;top:48%;width:10px;height:18px;border-radius:3px;background:var(--conf-color);animation:ls-confetti 1.6s var(--ls-ease-smooth) var(--conf-delay) both}
+
+.reel-frame.is-spinning { animation:ls-slot-hit .45s ease-in-out infinite alternate; }
+.symbol.winning { animation:ls-pulse .55s var(--ls-ease-pop) infinite,ls-glow .8s infinite;z-index:4; }
+.win-panel strong { display:inline-block;animation:ls-number-pulse 1s infinite; }
+.spin-button:not(:disabled) { animation:ls-glow 2s ease-in-out infinite; }
+
+@media (max-width:700px){.ls-side-events{right:5px;top:28%}.ls-side-events a{width:48px;min-height:48px;border-radius:15px}.ls-side-events svg{width:22px;height:22px}.ls-featured-rail,.ls-new-rail{animation:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
