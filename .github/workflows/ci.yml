@@ -31,51 +31,85 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
-      - name: Apply progression integration patch
+      - name: Remove temporary integration scaffolding
         if: github.event_name == 'pull_request' && github.head_ref == 'codex/core-systems-integration'
         shell: bash
         run: |
-          cat scripts/progression-integration.patch.part* > /tmp/progression-integration.patch
-          if git apply --check /tmp/progression-integration.patch; then
-            git apply /tmp/progression-integration.patch
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add apps/api/src/meta apps/api/src/spins infra/postgres
-            git commit -m "feat(api): integrate deterministic player progression"
-            git push origin HEAD:${GITHUB_HEAD_REF}
-          else
-            test -f apps/api/src/meta/spin-progression.ts
-            test -f infra/postgres/035_player_progression_curve_v1.sql
-            grep -q 'advanceSpinProgression' apps/api/src/spins/in-memory-spin-store.ts
-            grep -q 'advanceSpinProgression' apps/api/src/spins/postgres-spin-store.ts
-            echo "Progression integration is already applied."
+          shopt -s nullglob
+          patch_parts=(scripts/progression-integration.patch.part*)
+          if (( ${#patch_parts[@]} == 0 )); then
+            echo "Integration scaffolding is already removed."
+            exit 0
           fi
-      - name: Upload integration source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-systems-source-${{ github.sha }}
-          retention-days: 1
-          path: |
-            apps/api/src/spins
-            apps/api/src/meta/player-progression.ts
-            apps/api/src/economy/xp-booster.ts
-            apps/api/package.json
+          git rm "${patch_parts[@]}"
+          cat > .github/workflows/ci.yml <<'CLEAN_WORKFLOW'
+          name: ci
+          concurrency:
+            group: ci-${{ github.ref }}
+            cancel-in-progress: true
+          on:
+            pull_request:
+            push:
+              branches: [main]
+          jobs:
+            node:
+              runs-on: ubuntu-latest
+              services:
+                postgres:
+                  image: postgres:17-alpine
+                  env:
+                    POSTGRES_DB: aurora_test
+                    POSTGRES_USER: aurora
+                    POSTGRES_PASSWORD: test-only-password
+                  ports: ["5432:5432"]
+                  options: >-
+                    --health-cmd "pg_isready -U aurora -d aurora_test"
+                    --health-interval 2s
+                    --health-timeout 2s
+                    --health-retries 15
+              env:
+                TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with: { node-version: 22, cache: npm }
+                - run: npm ci
+                - run: npm run typecheck
+                - run: npm test
+                - run: npm run build
+                - run: npm run build -w @aurora/player-web
+            flutter:
+              runs-on: ubuntu-latest
+              defaults: { run: { working-directory: apps/mobile } }
+              steps:
+                - uses: actions/checkout@v4
+                - uses: subosito/flutter-action@v2
+                  with: { flutter-version: 3.44.6, channel: stable, cache: true }
+                - run: flutter pub get
+                - run: flutter analyze --no-fatal-infos
+                - run: flutter test
+                - run: flutter build web --release --no-web-resources-cdn --no-pub
+                - run: flutter build apk --debug --no-pub
+            ios:
+              runs-on: macos-latest
+              defaults: { run: { working-directory: apps/mobile } }
+              steps:
+                - uses: actions/checkout@v4
+                - uses: subosito/flutter-action@v2
+                  with: { flutter-version: 3.44.6, channel: stable, cache: true }
+                - run: flutter pub get
+                - run: flutter build ios --simulator --debug --no-codesign --no-pub
+          CLEAN_WORKFLOW
+          git add .github/workflows/ci.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(ci): clean progression integration scaffolding"
+          git push origin HEAD:${GITHUB_HEAD_REF}
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run typecheck
-      - name: Run Node tests
-        shell: bash
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee /tmp/node-test.log
-      - name: Upload Node test report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: node-test-report-${{ github.sha }}
-          retention-days: 1
-          path: /tmp/node-test.log
+      - run: npm test
       - run: npm run build
       - run: npm run build -w @aurora/player-web
   flutter:
