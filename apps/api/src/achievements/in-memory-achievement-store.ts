@@ -101,13 +101,14 @@ export class InMemoryAchievementStore implements AchievementStore {
     const previous = this.playerQueues.get(playerId) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>((resolve) => { release = resolve; });
-    this.playerQueues.set(playerId, previous.then(() => current));
+    const tail = previous.then(() => current);
+    this.playerQueues.set(playerId, tail);
     await previous;
     try {
       return await operation();
     } finally {
       release();
-      if (this.playerQueues.get(playerId) === current) this.playerQueues.delete(playerId);
+      if (this.playerQueues.get(playerId) === tail) this.playerQueues.delete(playerId);
     }
   }
 }
