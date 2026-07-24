@@ -33,7 +33,13 @@ jobs:
       - name: Test slot engine
         run: npm run test -w @aurora/slot-engine
       - name: Test API
-        run: npm run test -w @aurora/api
+        shell: bash
+        run: |
+          set +e
+          npm run test -w @aurora/api > api-test.log 2>&1
+          status=$?
+          tail -n 220 api-test.log
+          exit $status
       - name: Test player web
         run: npm run test -w @aurora/player-web
       - run: npm run build
