@@ -4,6 +4,12 @@ export type AchievementCategory = "journey" | "spins" | "wins" | "free_spins" | 
 export type AchievementTier = "bronze" | "silver" | "gold";
 export type AchievementMetric = "level" | "spins" | "total_won" | "free_spins" | "vip_points";
 
+export interface AchievementLootReward {
+  readonly tableId: string;
+  readonly tableVersion: number;
+  readonly expiresInSeconds: number;
+}
+
 export interface AchievementDefinition {
   readonly id: string;
   readonly version: number;
@@ -14,6 +20,7 @@ export interface AchievementDefinition {
   readonly metric: AchievementMetric;
   readonly target: number;
   readonly coins: number;
+  readonly lootReward?: AchievementLootReward;
   readonly prerequisiteId?: string;
 }
 
@@ -30,8 +37,16 @@ const chain = (
   metric: AchievementMetric,
   values: readonly [AchievementTier, string, string, number, number][],
 ): readonly AchievementDefinition[] => values.map(([tier, id, name, target, coins], index) => ({
-  id, version: 1, category, tier, name, metric, target, coins,
+  id,
+  version: 1,
+  category,
+  tier,
+  name,
+  metric,
+  target,
+  coins,
   description: descriptionFor(metric, target),
+  lootReward: lootRewardForTier(tier),
   ...(index > 0 ? { prerequisiteId: values[index - 1]![1] } : {}),
 }));
 
@@ -94,6 +109,14 @@ export function canClaimAchievement(
 ): boolean {
   return achievementProgress(definition, progression) >= definition.target
     && (definition.prerequisiteId === undefined || claimedRewards.has(definition.prerequisiteId));
+}
+
+function lootRewardForTier(tier: AchievementTier): AchievementLootReward {
+  return {
+    tableId: `achievement-${tier}-reward`,
+    tableVersion: 1,
+    expiresInSeconds: 7 * 24 * 60 * 60,
+  };
 }
 
 function switchMetric(metric: AchievementMetric, progression: PlayerProgression): number {
