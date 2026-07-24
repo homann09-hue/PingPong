@@ -28,6 +28,9 @@ jobs:
       TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
       - name: Apply progression integration patch
         if: github.event_name == 'pull_request' && github.head_ref == 'codex/core-systems-integration'
         shell: bash
