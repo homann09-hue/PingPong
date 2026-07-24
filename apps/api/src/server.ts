@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import Fastify from "fastify";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildApp, createHttpLoggerOptions } from "./http-app.js";
@@ -28,6 +29,7 @@ import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store
 import { PostgresEconomyAdminStore } from "./admin/postgres-economy-admin-store.js";
 import { InMemoryOperationsStore } from "./operations/in-memory-operations-store.js";
 import { PostgresOperationsStore } from "./operations/postgres-operations-store.js";
+import { PostgresDistributedRateLimiter } from "./security/distributed-rate-limiter.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -94,6 +96,22 @@ const pushWorker = new PushDeliveryWorker(
   (error) => console.error("Push delivery worker failed", error),
   (result) => metrics.recordPush(result),
 );
+
+const fastify = Fastify({ logger: createHttpLoggerOptions() });
+const registrationLimiter = demoMode ? null : PostgresDistributedRateLimiter.connect(databaseUrl!);
+if (registrationLimiter) {
+  fastify.addHook("onRequest", async (request, reply) => {
+    if (request.method !== "POST" || !request.url.startsWith("/v1/auth/guest")) return;
+    const subjectHash = createHash("sha256").update(request.ip, "utf8").digest("hex");
+    const decision = await registrationLimiter.consume(`guest-create:ip:${subjectHash}`, 20, 60 * 60 * 1_000);
+    reply.header("x-registration-ratelimit-remaining", decision.remaining);
+    if (!decision.allowed) {
+      return reply.header("retry-after", decision.retryAfterSeconds).code(429).send({ code: "GUEST_REGISTRATION_RATE_LIMITED" });
+    }
+  });
+  fastify.addHook("onClose", async () => registrationLimiter.close());
+}
+
 const app = buildApp({
   authenticator: identityService,
   spinStore,
@@ -112,7 +130,7 @@ const app = buildApp({
   identityService,
   monetizationService,
   storeWebhookToken: demoMode ? "local-store-webhook" : storeWebhookToken!,
-}, Fastify({ logger: createHttpLoggerOptions() }));
+}, fastify);
 const appReady = app.ready();
 
 if (!process.env.VERCEL) {
