@@ -15,9 +15,24 @@ describe("achievement system", () => {
     }
   });
 
+  it("binds every tier to an exact versioned loot reward", () => {
+    for (const achievement of achievementCatalog) {
+      expect(achievement.lootReward).toEqual({
+        tableId: `achievement-${achievement.tier}-reward`,
+        tableVersion: 1,
+        expiresInSeconds: 604_800,
+      });
+    }
+  });
+
   it("derives progress and unlocks higher tiers only after the prior claim", () => {
     const locked = achievementViews(progression, new Set());
-    expect(locked.find((item) => item.id === "achievement-high-roller")).toMatchObject({ progress: 100, completed: true, unlocked: false });
+    expect(locked.find((item) => item.id === "achievement-high-roller")).toMatchObject({
+      progress: 100,
+      completed: true,
+      unlocked: false,
+      lootReward: { tableId: "achievement-silver-reward", tableVersion: 1 },
+    });
     const unlocked = achievementViews(progression, new Set(["achievement-first-spin"]));
     expect(unlocked.find((item) => item.id === "achievement-high-roller")).toMatchObject({ completed: true, unlocked: true });
   });
