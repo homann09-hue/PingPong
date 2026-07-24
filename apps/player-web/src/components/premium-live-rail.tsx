@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree, Heart } from "@phosphor-icons/react";
+import { Fire, Gift, Lightning, Play, Sparkle, Trophy, SquaresFour, Crown, Star, ClockCounterClockwise, UsersThree, Heart, CheckCircle } from "@phosphor-icons/react";
 
 const liveWins = [
   { player: "Luna77", game: "Neon Nights", amount: "8.4 M" },
@@ -38,6 +38,7 @@ export function PremiumLiveRail() {
   const [activeWin, setActiveWin] = useState(0);
   const [activeCategory, setActiveCategory] = useState("Alle Spiele");
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [bonusClaimed, setBonusClaimed] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setActiveWin((current) => (current + 1) % liveWins.length), 3200);
@@ -50,6 +51,35 @@ export function PremiumLiveRail() {
   return (
     <section className="premium-live-layer" aria-label="Live-Casino-Highlights">
       <div className="premium-ambient" aria-hidden="true"><i /><i /><i /></div>
+
+      <section className="premium-welcome-grid" aria-label="Willkommen und Tagesbonus">
+        <article className="premium-welcome-card">
+          <div className="premium-welcome-copy">
+            <span><Sparkle weight="fill" /> Willkommen zurück</span>
+            <h2>Dein Casino wartet.</h2>
+            <p>Neue Jackpots, frische Missionen und deine Lieblingswelten sind bereit.</p>
+            <div><Link href="/slots/candy-carnival"><Play weight="fill" /> Weiterspielen</Link><small>Letzter Slot: Candy Carnival</small></div>
+          </div>
+          <div className="premium-welcome-coins" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+        </article>
+
+        <article className={bonusClaimed ? "premium-daily-chest claimed" : "premium-daily-chest"}>
+          <div className="premium-chest-scene" aria-hidden="true">
+            <span className="premium-chest-rays" />
+            <div className="premium-chest"><i /><b /><em /></div>
+            <span className="premium-chest-coin one">●</span><span className="premium-chest-coin two">●</span><span className="premium-chest-coin three">●</span>
+          </div>
+          <div className="premium-daily-copy">
+            <small>Tagesbonus · Tag 6</small>
+            <strong>{bonusClaimed ? "Bonus abgeholt" : "250.000 Coins warten"}</strong>
+            <p>{bonusClaimed ? "Morgen wartet die Mystery Chest auf dich." : "Halte deine Serie aktiv und öffne morgen die große Mystery Chest."}</p>
+            <button type="button" disabled={bonusClaimed} onClick={() => setBonusClaimed(true)}>{bonusClaimed ? <><CheckCircle weight="fill" /> Abgeholt</> : <><Gift weight="fill" /> Bonus abholen</>}</button>
+          </div>
+          <div className="premium-streak" aria-label="Tagesbonus-Serie">
+            {[1,2,3,4,5,6,7].map((day) => <span className={day <= 6 ? "done" : ""} key={day}>{day < 6 ? "✓" : day === 6 ? "HEUTE" : "?"}</span>)}
+          </div>
+        </article>
+      </section>
 
       <nav className="premium-category-nav" aria-label="Spielkategorien">
         {categories.map((category) => {
@@ -69,6 +99,7 @@ export function PremiumLiveRail() {
 
       <div className="premium-hero-grid">
         <article className="premium-season-hero">
+          <div className="premium-event-particles" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
           <div className="premium-orbit" aria-hidden="true"><span /><span /><span /></div>
           <div className="premium-season-copy">
             <span className="premium-kicker"><Fire weight="fill" /> Saison-Event</span>
@@ -76,7 +107,7 @@ export function PremiumLiveRail() {
             <p>Spiele dich durch animierte Casino-Welten, sammle Kronen und öffne den exklusiven Grand Vault.</p>
             <div className="premium-actions"><Link href="/slots/neon-nights"><Play weight="fill" /> Jetzt spielen</Link><button type="button" onClick={() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" })}>Event ansehen</button></div>
           </div>
-          <div className="premium-jackpot-core" aria-label="Event-Jackpot 24,8 Millionen Coins"><span>Event Jackpot</span><strong>24.8 M</strong><small>steigt live</small></div>
+          <div className="premium-jackpot-core" aria-label="Event-Jackpot 24,8 Millionen Coins"><span>Event Jackpot</span><strong>24.8 M</strong><small>steigt live</small><i aria-hidden="true" /></div>
         </article>
 
         <aside className="premium-reward-stack">
