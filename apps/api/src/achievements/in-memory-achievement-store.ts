@@ -73,6 +73,7 @@ export class InMemoryAchievementStore implements AchievementStore {
           achievementVersion: definition.version,
           coins: reward.coins,
           coinBalance: reward.coinBalance,
+          lootEntitlement: null,
           progress,
           completionEvidence,
           replayed: false,
