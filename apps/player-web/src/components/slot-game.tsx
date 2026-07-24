@@ -25,6 +25,7 @@ import { WinCelebration, winTierFor } from "./win-celebration";
 const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
 const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
+const autoSpinOptions = [10, 25, 50, 100] as const;
 
 let audioContext: AudioContext | null = null;
 function playTones(frequencies: readonly number[], step = 0.09, type: OscillatorType = "triangle", volume = 0.05) {
@@ -85,6 +86,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [turbo, setTurbo] = useState(false);
   const [sound, setSound] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [autoMenuOpen, setAutoMenuOpen] = useState(false);
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
   const [autoRemaining, setAutoRemaining] = useState(0);
@@ -113,7 +115,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     if (autoRemaining <= 0 || spinning) return undefined;
     const timer = setTimeout(() => {
       void spinRef.current();
-      setAutoRemaining((remaining) => remaining - 1);
+      setAutoRemaining((remaining) => Math.max(0, remaining - 1));
     }, turbo ? 320 : 780);
     return () => clearTimeout(timer);
   }, [autoRemaining, spinning, turbo]);
@@ -132,6 +134,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
+    setAutoMenuOpen(false);
     setSpinning(true);
     setStoppedReels(0);
     setWinCells(new Set());
@@ -163,6 +166,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       if (profile) setProfile({ ...profile, coinBalance: body.coinBalance });
     } catch (cause) {
       setStoppedReels(5);
+      setAutoRemaining(0);
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
       if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
       else if (code === "HIGH_ROLLER_MEMBERSHIP_REQUIRED") setMessage("Dieser Slot ist dem High Roller Club vorbehalten.");
@@ -171,6 +175,19 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     } finally {
       setSpinning(false);
     }
+  }
+
+  function startAutoSpins(rounds: number) {
+    if (!profile || spinning) return;
+    setAutoMenuOpen(false);
+    setAutoRemaining(rounds);
+    setMessage(`Auto-Spin gestartet · ${rounds} Runden`);
+  }
+
+  function stopAutoSpins() {
+    setAutoRemaining(0);
+    setAutoMenuOpen(false);
+    setMessage("Auto-Spin gestoppt");
   }
 
   const themeStyle = {
@@ -203,10 +220,13 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </div>
       <div className={`win-panel ${win > 0 ? "has-win" : ""}`} aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(animatedWin)}</strong>}</div>
       <div className="slot-controls">
-        <div className="bet-control"><button disabled={spinning || betIndex === 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhöhen"><Plus weight="bold" /></button></div>
+        <div className="bet-control"><button disabled={spinning || betIndex === 0 || autoRemaining > 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1 || autoRemaining > 0} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhöhen"><Plus weight="bold" /></button></div>
         <button className={`turbo-button ${turbo ? "selected" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo}><Lightning weight="fill" /><span>Turbo</span></button>
-        <button className="spin-button" onClick={spin} disabled={spinning || !profile} aria-label={spinning ? "Walzen drehen" : `Für ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? `${stoppedReels}/${reels.length}` : "Spin"}</span></button>
-        <button className={autoRemaining > 0 ? "auto-button running" : "auto-button"} onClick={() => (autoRemaining > 0 ? setAutoRemaining(0) : setAutoRemaining(10))} disabled={!profile} aria-label={autoRemaining > 0 ? "Autoplay stoppen" : "10 Runden automatisch drehen"}><ArrowsClockwise weight="bold" /><span>Auto<em>{autoRemaining > 0 ? autoRemaining : "10x"}</em></span></button>
+        <button className="spin-button" onClick={spin} disabled={spinning || !profile || autoRemaining > 0} aria-label={spinning ? "Walzen drehen" : `Für ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? `${stoppedReels}/${reels.length}` : "Spin"}</span></button>
+        <div className={`auto-spin-control ${autoMenuOpen ? "is-open" : ""}`}>
+          {autoMenuOpen && autoRemaining === 0 && <div className="auto-spin-menu" role="menu" aria-label="Auto-Spin Runden wählen"><strong>Auto-Spin</strong><small>Anzahl der Runden</small><div>{autoSpinOptions.map((rounds) => <button key={rounds} type="button" role="menuitem" onClick={() => startAutoSpins(rounds)}>{rounds}</button>)}</div></div>}
+          <button className={autoRemaining > 0 ? "auto-button running" : "auto-button"} onClick={() => autoRemaining > 0 ? stopAutoSpins() : setAutoMenuOpen((value) => !value)} disabled={!profile || spinning} aria-expanded={autoMenuOpen} aria-label={autoRemaining > 0 ? `Autoplay stoppen, ${autoRemaining} Runden verbleiben` : "Auto-Spin Auswahl öffnen"}><ArrowsClockwise weight="bold" /><span>{autoRemaining > 0 ? "Stop" : "Auto"}<em>{autoRemaining > 0 ? autoRemaining : "Auswahl"}</em></span></button>
+        </div>
       </div>
       {celebration?.tier && <WinCelebration tier={celebration.tier} amount={celebration.amount} primary={game.primary} secondary={game.secondary} onDone={() => setCelebration(null)} />}
       <p className="play-money-notice">Nur zur Unterhaltung · Virtuelle Coins haben keinen Geldwert · Ergebnisse kommen vom Server</p>
