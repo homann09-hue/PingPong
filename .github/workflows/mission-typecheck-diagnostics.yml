@@ -1,0 +1,31 @@
+name: mission typecheck diagnostics
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: github.head_ref == 'codex/mission-loot-rewards'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > mission-typecheck.txt 2>&1
+          status=$?
+          echo "exit_code=$status" >> mission-typecheck.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mission-typecheck-${{ github.sha }}
+          path: mission-typecheck.txt
+          retention-days: 1
