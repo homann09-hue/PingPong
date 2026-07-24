@@ -1,5 +1,5 @@
 export const highRollerClubRules = {
-  version: 3,
+  version: 4,
   entryPoints: 20_000,
   accessDays: 7,
   losingSpinCashbackBasisPoints: 200,

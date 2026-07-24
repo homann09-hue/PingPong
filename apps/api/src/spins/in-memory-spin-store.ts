@@ -14,6 +14,7 @@ import { loyaltyRewardOffer, loyaltyRewardsStatus, type LoyaltyRedemption, type 
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 import { missionCatalog, missionUnlock, missionWindow, type MissionDefinition } from "../missions/mission-system.js";
 import { highRollerCashback, highRollerClubRules, highRollerSourcePoints, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus, type HighRollerFixedSource } from "../economy/high-roller-club.js";
+import { advanceSpinProgression } from "../meta/spin-progression.js";
 
 /** Deterministic test adapter mirroring database settlement semantics. */
 export class InMemorySpinStore implements SpinStore {
@@ -74,21 +75,19 @@ export class InMemorySpinStore implements SpinStore {
       this.jackpotPools.set(triggeredTier, jackpotDefinitions.find((item) => item.tier === triggeredTier)!.seedAmount);
     }
     const previous = this.progression.get(command.playerId) ?? {
-      level: 12, xp: 625, spins: 0, totalWon: 0, freeSpins: 0,
+      level: 12, xp: 0, spins: 0, totalWon: 0, freeSpins: 0,
       vipPoints: 2_450,
     };
     const activeBoostSpins = this.activeBoostSpins.get(command.playerId) ?? 0;
     const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
-    const earnedXp = Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
-    const accumulatedXp = previous.xp + earnedXp;
-    const progression = {
-      level: previous.level + Math.floor(accumulatedXp / 1_000),
-      xp: accumulatedXp % 1_000,
-      spins: previous.spins + 1,
-      totalWon: previous.totalWon + spin.totalWin,
-      freeSpins: previous.freeSpins + spin.freeSpinsPlayed,
-      vipPoints: previous.vipPoints + Math.max(1, Math.floor(command.bet / 100)),
-    };
+    const progressionResult = advanceSpinProgression({
+      previous,
+      bet: command.bet,
+      xpMultiplier,
+      totalWin: spin.totalWin,
+      freeSpinsPlayed: spin.freeSpinsPlayed,
+    });
+    const progression = progressionResult.progression;
     const highRollerActive = (this.highRollerActiveUntil.get(command.playerId)?.getTime() ?? 0) > Date.now();
     const cashback = highRollerCashback(command.bet, spin.totalWin, highRollerActive);
     const winBalance = current - command.bet + spin.totalWin;
@@ -109,7 +108,7 @@ export class InMemorySpinStore implements SpinStore {
     const economy = this.economy.get(command.playerId) ?? {};
     for (const [currency, amount] of Object.entries(spinEconomyDeltas({
       bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
-      levelsGained: progression.level - previous.level, highRollerActive,
+      levelsGained: progressionResult.levelsGained, highRollerActive,
     })) as [SpinEconomyCurrency, number][]) {
       if (amount <= 0) continue;
       const before = economy[currency] ?? 0;
@@ -551,7 +550,7 @@ export class InMemorySpinStore implements SpinStore {
     const coinBalance = this.balances.get(playerId) ?? this.defaultBalance;
     const gemBalance = this.gemBalances.get(playerId) ?? 320;
     const progression = this.progression.get(playerId) ?? {
-      level: 12, xp: 625, spins: 0, totalWon: 0, freeSpins: 0, vipPoints: 2_450,
+      level: 12, xp: 0, spins: 0, totalWon: 0, freeSpins: 0, vipPoints: 2_450,
     };
     return {
       coinBalance,

@@ -17,11 +17,12 @@ import "./clans-ui.css";
 import "./slot-intro.css";
 import "./mobile.css";
 import "./vegas.css";
+import "./premium-casino.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
 export const metadata: Metadata = {
-  title: { default: "Aurora Casino", template: "%s Â· Aurora Casino" },
+  title: { default: "Aurora Casino", template: "%s · Aurora Casino" },
   description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events, Jackpots und geteiltem Fortschritt.",
   applicationName: "Aurora Casino",
   metadataBase: new URL("https://aurora-player-web.vercel.app"),
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Ohne viewport-fit=cover liefert env(safe-area-inset-*) durchgehend 0 â
+  // Ohne viewport-fit=cover liefert env(safe-area-inset-*) durchgehend 0 —
   // die Safe-Area-Regeln in mobile.css waeren wirkungslos, und in einer
   // nativen Huelle laege der Home-Indikator auf der unteren Leiste.
   viewportFit: "cover",

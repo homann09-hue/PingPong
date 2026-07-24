@@ -16,6 +16,7 @@ import { boosterStatus, xpBoosterRules, type BoosterActivation, type BoosterCraf
 import { loyaltyRewardOffer, loyaltyRewardsCatalog, loyaltyRewardsStatus, type LoyaltyRedemption, type LoyaltyRewardsStatus } from "../economy/loyalty-rewards.js";
 import { type MissionCadence, type MissionRewards } from "../missions/mission-system.js";
 import { highRollerCashback, highRollerClubRules, highRollerSourcePoints, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus, type HighRollerFixedSource } from "../economy/high-roller-club.js";
+import { advanceSpinProgression } from "../meta/spin-progression.js";
 
 interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
 interface WalletRow { balance: string }
@@ -108,22 +109,28 @@ export class PostgresSpinStore implements SpinStore {
         "SELECT level, xp, vip_points FROM players WHERE id = $1 FOR UPDATE", [command.playerId],
       );
       if (!playerResult.rows[0]) throw new Error("Player does not exist");
-      const previousXp = Number(playerResult.rows[0].xp);
+      const previousXp = this.safeInteger(playerResult.rows[0].xp, "Player XP");
       const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
-      const accumulatedXp = previousXp + Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
       const activity = await client.query<{ spins: string; total_won: string; free_spins: string }>(
         `SELECT COUNT(*) AS spins, COALESCE(SUM(win), 0) AS total_won,
                 COALESCE(SUM((result->>'freeSpinsPlayed')::integer), 0) AS free_spins
            FROM spins WHERE player_id = $1`, [command.playerId],
       );
-      const progression: PlayerProgression = {
-        level: playerResult.rows[0].level + Math.floor(accumulatedXp / 1_000),
-        xp: accumulatedXp % 1_000,
-        spins: Number(activity.rows[0]?.spins ?? 0) + 1,
-        totalWon: Number(activity.rows[0]?.total_won ?? 0) + spin.totalWin,
-        freeSpins: Number(activity.rows[0]?.free_spins ?? 0) + spin.freeSpinsPlayed,
-        vipPoints: Number(playerResult.rows[0].vip_points) + Math.max(1, Math.floor(command.bet / 100)),
-      };
+      const progressionResult = advanceSpinProgression({
+        previous: {
+          level: playerResult.rows[0].level,
+          xp: previousXp,
+          spins: this.safeInteger(activity.rows[0]?.spins ?? "0", "Player spin count"),
+          totalWon: this.safeInteger(activity.rows[0]?.total_won ?? "0", "Player total won"),
+          freeSpins: this.safeInteger(activity.rows[0]?.free_spins ?? "0", "Player free spins"),
+          vipPoints: this.safeInteger(playerResult.rows[0].vip_points, "Player VIP points"),
+        },
+        bet: command.bet,
+        xpMultiplier,
+        totalWin: spin.totalWin,
+        freeSpinsPlayed: spin.freeSpinsPlayed,
+      });
+      const progression = progressionResult.progression;
       const membership = await client.query<{ active_until: Date }>(
         "SELECT active_until FROM high_roller_memberships WHERE player_id=$1", [command.playerId],
       );
@@ -167,7 +174,7 @@ export class PostgresSpinStore implements SpinStore {
       }
       for (const [currency, amount] of Object.entries(spinEconomyDeltas({
         bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
-        levelsGained: progression.level - playerResult.rows[0].level, highRollerActive,
+        levelsGained: progressionResult.levelsGained, highRollerActive,
       })) as [SpinEconomyCurrency, number][]) {
         if (amount <= 0) continue;
         const updated = await client.query<{ balance: string }>(

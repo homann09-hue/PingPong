@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/player_progression.dart';
+
 /// Shared premium player HUD used by the lobby and every slot cabinet.
 class TopHud extends StatelessWidget {
   const TopHud({
@@ -235,7 +237,7 @@ class TopHud extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: LinearProgressIndicator(
-          value: (xp % 1000) / 1000,
+          value: playerLevelProgress(level: level, xp: xp),
           backgroundColor: Colors.transparent,
           valueColor: const AlwaysStoppedAnimation(Color(0xffff3ee8)),
         ),
