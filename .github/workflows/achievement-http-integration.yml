@@ -1,0 +1,27 @@
+name: achievement HTTP integration
+permissions:
+  contents: write
+on:
+  pull_request:
+jobs:
+  apply:
+    if: github.head_ref == 'codex/achievement-foundation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Apply achievement composition integration
+        shell: bash
+        run: |
+          if grep -q 'readonly achievementStore?: AchievementStore' apps/api/src/http-app.ts; then
+            echo "Achievement HTTP integration is already applied."
+            exit 0
+          fi
+          node scripts/apply-achievement-http-integration.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/api/src/http-app.ts apps/api/src/server.ts
+          git commit -m "feat(api): route achievement claims through persistent store"
+          git push origin HEAD:${GITHUB_HEAD_REF}
