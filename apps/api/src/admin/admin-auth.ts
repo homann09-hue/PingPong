@@ -5,6 +5,8 @@ export type AdminRole = "liveops_editor" | "liveops_publisher" | "liveops_audito
 export interface AdminPrincipal { readonly subject: string; readonly roles: readonly AdminRole[] }
 export interface AdminAuthenticator { authenticate(authorization: string | undefined): Promise<AdminPrincipal | null> }
 
+const MAX_ADMIN_TOKEN_SECONDS = 15 * 60;
+
 /** Verifies short-lived workforce tokens issued for the dedicated admin audience. */
 export class AdminJwtAuthenticator implements AdminAuthenticator {
   private readonly key: Uint8Array;
@@ -18,11 +20,18 @@ export class AdminJwtAuthenticator implements AdminAuthenticator {
       const { payload } = await jwtVerify(authorization.slice(7), this.key, {
         algorithms: ["HS256"], issuer: "aurora-workforce", audience: "aurora-admin",
       });
+      const now = Math.floor(Date.now() / 1_000);
+      if (typeof payload.iat !== "number" || typeof payload.exp !== "number") return null;
+      if (payload.iat > now + 30 || payload.exp <= now || payload.exp <= payload.iat) return null;
+      if (payload.exp - payload.iat > MAX_ADMIN_TOKEN_SECONDS) return null;
+
       const allowed = new Set<AdminRole>(["liveops_editor", "liveops_publisher", "liveops_auditor", "social_moderator",
         "economy_support", "economy_approver", "economy_auditor", "operations_viewer"]);
       const roles = Array.isArray(payload.roles) ? payload.roles.filter((role): role is AdminRole =>
         typeof role === "string" && allowed.has(role as AdminRole)) : [];
-      return typeof payload.sub === "string" && roles.length > 0 ? { subject: payload.sub, roles } : null;
+      return typeof payload.sub === "string" && payload.sub.length > 0 && roles.length > 0
+        ? { subject: payload.sub, roles }
+        : null;
     } catch { return null; }
   }
 }
