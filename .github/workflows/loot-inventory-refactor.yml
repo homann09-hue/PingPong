@@ -1,28 +1,40 @@
-name: loot inventory transaction refactor
-permissions:
-  contents: write
+name: loot API diagnostics
 on:
   pull_request:
 jobs:
-  apply:
+  diagnose:
     if: github.head_ref == 'codex/loot-foundation'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aurora_test
+          POSTGRES_USER: aurora
+          POSTGRES_PASSWORD: test-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aurora -d aurora_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-      - name: Apply transaction entry patch
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build -w @aurora/slot-engine
+      - name: Run API tests
         shell: bash
         run: |
-          if git apply --check scripts/loot-inventory-transaction.patch; then
-            git apply scripts/loot-inventory-transaction.patch
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add apps/api/src/inventory/postgres-inventory-store.ts
-            git commit -m "feat(api): expose transactional inventory grants"
-            git push origin HEAD:${GITHUB_HEAD_REF}
-          else
-            grep -q 'grantWithinTransaction' apps/api/src/inventory/postgres-inventory-store.ts
-            echo "Inventory transaction entry is already applied."
-          fi
+          set -o pipefail
+          npm run test -w @aurora/api 2>&1 | tee /tmp/loot-api-tests.log
+      - name: Upload API test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loot-api-test-report-${{ github.sha }}
+          retention-days: 1
+          path: /tmp/loot-api-tests.log
