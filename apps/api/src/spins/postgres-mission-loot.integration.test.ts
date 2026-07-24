@@ -58,9 +58,9 @@ databaseSuite("mission loot reward producer", () => {
         `INSERT INTO mission_progress
            (player_id,mission_id,mission_version,period_key,progress,completed_at)
          VALUES
-           ($1,'daily-spins-10',3,'2026-07-24',10,$3),
-           ($1,'daily-wager-10000',3,'2026-07-24',10000,$3)`,
-        [playerId, rollbackPlayerId, now],
+           ($1,'daily-spins-10',3,'2026-07-24',10,$2),
+           ($1,'daily-wager-10000',3,'2026-07-24',10000,$2)`,
+        [playerId, now],
       );
       await client.query(
         `INSERT INTO loot_table_versions
