@@ -21,9 +21,14 @@ databaseSuite("achievement authoritative backfill", () => {
     try {
       for (const migration of [
         "001_core.sql",
+        "036_inventory_ledger_v1.sql",
+        "037_loot_openings_v1.sql",
         "038_achievement_persistence_v1.sql",
         "039_achievement_immutability.sql",
         "040_achievement_authoritative_backfill.sql",
+        "041_loot_entitlements_v1.sql",
+        "042_loot_entitlement_invariants.sql",
+        "043_achievement_loot_rewards_v1.sql",
       ]) {
         await client.query(await readFile(new URL(`../../../../infra/postgres/${migration}`, import.meta.url), "utf8"));
       }
@@ -60,10 +65,12 @@ databaseSuite("achievement authoritative backfill", () => {
     expect(views.find((item) => item.id === "achievement-journey-25")).toMatchObject({
       progress: 25,
       completed: true,
+      lootReward: { tableId: "achievement-gold-reward", tableVersion: 1 },
     });
     expect(views.find((item) => item.id === "achievement-vip-7500")).toMatchObject({
       progress: 7_500,
       completed: true,
+      lootReward: { tableId: "achievement-gold-reward", tableVersion: 1 },
     });
     expect(views.find((item) => item.id === "achievement-high-roller")).toMatchObject({
       progress: 100,
