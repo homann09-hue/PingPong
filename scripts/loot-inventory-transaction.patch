@@ -2,7 +2,7 @@ diff --git a/apps/api/src/inventory/postgres-inventory-store.ts b/apps/api/src/i
 index 0369aa4..0000000 100644
 --- a/apps/api/src/inventory/postgres-inventory-store.ts
 +++ b/apps/api/src/inventory/postgres-inventory-store.ts
-@@ -72,6 +72,30 @@ export class PostgresInventoryStore {
+@@ -72,6 +72,29 @@ export class PostgresInventoryStore {
      return this.mutate(command, now);
    }
  
