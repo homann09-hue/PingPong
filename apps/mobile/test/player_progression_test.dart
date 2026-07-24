@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aurora_casino/services/player_progression.dart';
+import 'package:aurora_mobile/services/player_progression.dart';
 
 void main() {
   group('player progression curve v1', () {
