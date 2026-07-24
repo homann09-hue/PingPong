@@ -1,22 +1,10 @@
 "use client";
 
-
 import { Gift } from "@phosphor-icons/react/dist/csr/Gift";
 import { Diamond } from "@phosphor-icons/react/dist/csr/Diamond";
 import { Coins } from "@phosphor-icons/react/dist/csr/Coins";
 import { useCallback, useEffect, useState } from "react";
 import { coinNumber, timeLeft } from "@/lib/format";
-
-
-/**
- * Shop. Bis hierher zeigte die Lobby nur Platzhalter mit der Aufschrift
- * "Bald verfuegbar" — dabei war der Katalog serverseitig fertig.
- *
- * Wichtig fuer die Social-Casino-Einordnung: hier wird ausschliesslich die
- * virtuelle Waehrung Gems gegen virtuelle Coins getauscht. Kein Echtgeld,
- * keine Auszahlung, kein realer Gegenwert.
- */
-
 
 interface ShopOffer {
   readonly id: string;
@@ -28,7 +16,6 @@ interface ShopOffer {
   readonly expiresAt: string | null;
 }
 
-
 interface ShopPurchase {
   readonly coins: number;
   readonly gemsSpent: number;
@@ -36,21 +23,18 @@ interface ShopPurchase {
   readonly gemBalance: number;
 }
 
-
 const purchaseErrors: Readonly<Record<string, string>> = {
-  INSUFFICIENT_GEMS: "Dafuer reichen deine Gems nicht.",
+  INSUFFICIENT_GEMS: "Dafür reichen deine Gems nicht.",
   SHOP_OFFER_LIMIT_REACHED: "Dieses Angebot hast du heute schon genutzt.",
   SHOP_OFFER_NOT_FOUND: "Das Angebot ist gerade abgelaufen.",
   RATE_LIMITED: "Kurz durchatmen und noch einmal versuchen.",
 };
-
 
 export function ShopSection({ gems, onWalletChanged }: Readonly<{ gems: number; onWalletChanged: () => void }>) {
   const [offers, setOffers] = useState<readonly ShopOffer[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
-
 
   const load = useCallback(async () => {
     try {
@@ -62,20 +46,16 @@ export function ShopSection({ gems, onWalletChanged }: Readonly<{ gems: number; 
     }
   }, []);
 
-
   useEffect(() => { void load(); }, [load]);
-
-
-  // Nur ein Timer fuer alle Karten — nicht einer je Angebot.
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
-
   async function purchase(offer: ShopOffer) {
     if (busy) return;
-    setBusy(offer.id); setNotice(null);
+    setBusy(offer.id);
+    setNotice(null);
     try {
       const response = await fetch(`/api/player/shop/offers/${offer.id}/purchase`, {
         method: "POST",
@@ -98,37 +78,29 @@ export function ShopSection({ gems, onWalletChanged }: Readonly<{ gems: number; 
     }
   }
 
-
-  return <section className="lobby-section" id="shop" aria-labelledby="shop-title">
-    <div className="section-heading">
-      <div>
-        <span className="eyebrow"><Gift weight="fill" /> Gems gegen Coins tauschen</span>
-        <h2 id="shop-title">Shop</h2>
-      </div>
-      <span className="gem-balance"><Diamond weight="fill" /> {coinNumber(gems)}</span>
-    </div>
-
+  return <section className="fl-system-section fl-shop-system" id="shop" aria-labelledby="shop-title">
+    <header className="fl-system-heading">
+      <div><span><Gift weight="fill" /> Coin Shop</span><h2 id="shop-title">Premium Packs</h2></div>
+      <strong className="fl-system-balance"><Diamond weight="fill" /> {coinNumber(gems)}</strong>
+    </header>
 
     {notice && <div className={`account-notice ${notice.tone}`} role="status">{notice.text}</div>}
 
-
-    <div className="shop-grid">
+    <div className="shop-grid fl-shop-grid">
       {offers === null && <p className="section-empty">Angebote werden geladen …</p>}
       {offers?.length === 0 && <p className="section-empty">Gerade sind keine Angebote aktiv.</p>}
-      {offers?.map((offer) => {
+      {offers?.map((offer, index) => {
         const affordable = gems >= offer.costGems;
         const remaining = offer.expiresAt ? new Date(offer.expiresAt).getTime() - now : null;
         const expired = remaining !== null && remaining <= 0;
-        return <article className={offer.featured ? "shop-card featured arc-shine" : "shop-card"} key={offer.id}>
+        return <article className={offer.featured ? "shop-card fl-shop-pack featured arc-shine" : "shop-card fl-shop-pack"} key={offer.id}>
           <span className="shop-badge">{offer.badge}</span>
+          <div className={`fl-pack-emblem pack-${index % 4}`}><Gift weight="fill" /><Coins weight="fill" /></div>
+          <small className="fl-pack-kicker">{offer.featured ? "BEST VALUE" : "FORTUNE PACK"}</small>
           <h3>{offer.title}</h3>
           <p className="shop-coins"><Coins weight="fill" /> {coinNumber(offer.coins)}</p>
           {remaining !== null && <small className="shop-timer">{expired ? "Abgelaufen" : `Noch ${timeLeft(offer.expiresAt ?? undefined)}`}</small>}
-          <button
-            className="claim-button"
-            disabled={busy !== null || !affordable || expired}
-            onClick={() => void purchase(offer)}
-          >
+          <button className="claim-button fl-gold-action" disabled={busy !== null || !affordable || expired} onClick={() => void purchase(offer)}>
             {busy === offer.id
               ? "…"
               : affordable
@@ -139,11 +111,6 @@ export function ShopSection({ gems, onWalletChanged }: Readonly<{ gems: number; 
       })}
     </div>
 
-
-    <p className="shop-disclaimer">
-      Coins und Gems sind virtuelles Spielgeld ohne realen Gegenwert. Sie koennen
-      nicht ausgezahlt und nicht in Echtgeld umgetauscht werden.
-    </p>
+    <p className="shop-disclaimer">Coins und Gems sind virtuelles Spielgeld ohne realen Gegenwert. Sie können nicht ausgezahlt und nicht in Echtgeld umgetauscht werden.</p>
   </section>;
 }
-
