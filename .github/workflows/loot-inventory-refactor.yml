@@ -1,0 +1,28 @@
+name: loot inventory transaction refactor
+permissions:
+  contents: write
+on:
+  pull_request:
+jobs:
+  apply:
+    if: github.head_ref == 'codex/loot-foundation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Apply transaction entry patch
+        shell: bash
+        run: |
+          if git apply --check scripts/loot-inventory-transaction.patch; then
+            git apply scripts/loot-inventory-transaction.patch
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/api/src/inventory/postgres-inventory-store.ts
+            git commit -m "feat(api): expose transactional inventory grants"
+            git push origin HEAD:${GITHUB_HEAD_REF}
+          else
+            grep -q 'grantWithinTransaction' apps/api/src/inventory/postgres-inventory-store.ts
+            echo "Inventory transaction entry is already applied."
+          fi
