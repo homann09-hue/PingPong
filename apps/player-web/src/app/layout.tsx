@@ -36,9 +36,11 @@ import "./slot-spin-states.css";
 import "./slot-cabinet-v2.css";
 import "./slot-auto-spin.css";
 import "./slot-performance-hud.css";
+import "./slot-win-feed.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 import { SlotPerformanceHud } from "@/components/slot-performance-hud";
+import { SlotWinFeed } from "@/components/slot-win-feed";
 
 export const metadata: Metadata = {
   title: { default: "Aurora Casino", template: "%s · Aurora Casino" },
@@ -54,5 +56,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { viewportFit: "cover", width: "device-width", initialScale: 1, themeColor: "#120b2b", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate />{children}<SlotPerformanceHud /><LegalFooter /></body></html>;
+  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate />{children}<SlotPerformanceHud /><SlotWinFeed /><LegalFooter /></body></html>;
 }
