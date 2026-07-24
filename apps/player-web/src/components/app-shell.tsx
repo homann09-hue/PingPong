@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell } from "@phosphor-icons/react/dist/csr/Bell";
-import { CalendarDots } from "@phosphor-icons/react/dist/csr/CalendarDots";
 import { Coins } from "@phosphor-icons/react/dist/csr/Coins";
 import { Compass } from "@phosphor-icons/react/dist/csr/Compass";
 import { Crown } from "@phosphor-icons/react/dist/csr/Crown";
@@ -21,6 +20,7 @@ import { Trophy } from "@phosphor-icons/react/dist/csr/Trophy";
 import { UsersThree } from "@phosphor-icons/react/dist/csr/UsersThree";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useRef, useState } from "react";
+import { PremiumLiveRail } from "@/components/premium-live-rail";
 import { games } from "@/lib/catalog";
 import { coinNumber } from "@/lib/format";
 import type { Profile } from "@/lib/contracts";
@@ -83,7 +83,7 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
         <div className="search-head">
           <MagnifyingGlass weight="bold" />
           <input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Slot oder Kategorie suchen …" aria-label="Suchbegriff" />
-          <button onClick={() => setSearchOpen(false)} aria-label="Suche schliessen"><X weight="bold" /></button>
+          <button onClick={() => setSearchOpen(false)} aria-label="Suche schließen"><X weight="bold" /></button>
         </div>
         <ul className="search-results">
           {results.map((game) => <li key={game.id}>
@@ -114,7 +114,10 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
       </Link>
     </aside>
 
-    <main className="page-content">{children}</main>
+    <main className="page-content">
+      {pathname === "/" && <PremiumLiveRail />}
+      {children}
+    </main>
 
     <nav className="bottom-nav" aria-label="Mobile Navigation">
       {nav.slice(0, 3).map((item) => { const Icon = item.icon; const active = item.href === "/" && pathname === "/"; return <Link key={item.label} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold"} /><span>{item.label}</span></Link>; })}
