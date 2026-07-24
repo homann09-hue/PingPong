@@ -73,21 +73,21 @@ INSERT INTO achievement_definition_versions
   (achievement_id,version,category,tier,name,description,metric,target,reward_coins,
    prerequisite_achievement_id,prerequisite_version,active,published_at)
 VALUES
-  ('achievement-journey-2',1,'journey','bronze','AUFBRUCH','Erreiche Level 2','level',2,100000,NULL,NULL,true,now()),
-  ('achievement-journey-10',1,'journey','silver','CASINO-ENTDECKER','Erreiche Level 10','level',10,750000,'achievement-journey-2',1,true,now()),
-  ('achievement-journey-25',1,'journey','gold','LEGENDÄRE REISE','Erreiche Level 25','level',25,3000000,'achievement-journey-10',1,true,now()),
-  ('achievement-first-spin',1,'spins','bronze','FIRST SPIN','Spiele 1 Spin','spins',1,75000,NULL,NULL,true,now()),
-  ('achievement-high-roller',1,'spins','silver','HIGH ROLLER','Spiele 100 Spins','spins',100,500000,'achievement-first-spin',1,true,now()),
-  ('achievement-spin-master',1,'spins','gold','SPIN MASTER','Spiele 1.000 Spins','spins',1000,5000000,'achievement-high-roller',1,true,now()),
-  ('achievement-collector',1,'wins','bronze','COIN COLLECTOR','Gewinne insgesamt 250.000 Coins','total_won',250000,250000,NULL,NULL,true,now()),
-  ('achievement-millionaire',1,'wins','silver','MILLIONENJÄGER','Gewinne insgesamt 5.000.000 Coins','total_won',5000000,1000000,'achievement-collector',1,true,now()),
-  ('achievement-vault-breaker',1,'wins','gold','VAULT BREAKER','Gewinne insgesamt 50.000.000 Coins','total_won',50000000,7500000,'achievement-millionaire',1,true,now()),
-  ('achievement-free-spins-3',1,'free_spins','bronze','BONUS STARTER','Spiele insgesamt 3 Freispiele','free_spins',3,200000,NULL,NULL,true,now()),
-  ('achievement-free-spins-25',1,'free_spins','silver','FREE-SPIN FAN','Spiele insgesamt 25 Freispiele','free_spins',25,1000000,'achievement-free-spins-3',1,true,now()),
-  ('achievement-free-spins-100',1,'free_spins','gold','BONUS LEGEND','Spiele insgesamt 100 Freispiele','free_spins',100,5000000,'achievement-free-spins-25',1,true,now()),
-  ('achievement-vip-100',1,'vip','bronze','VIP ANWÄRTER','Sammle 100 VIP-Punkte','vip_points',100,150000,NULL,NULL,true,now()),
-  ('achievement-vip-1000',1,'vip','silver','VIP SILBER','Sammle 1.000 VIP-Punkte','vip_points',1000,1000000,'achievement-vip-100',1,true,now()),
-  ('achievement-vip-7500',1,'vip','gold','VIP PLATIN','Sammle 7.500 VIP-Punkte','vip_points',7500,7500000,'achievement-vip-1000',1,true,now());
+  ('achievement-journey-2',1,'journey','bronze','AUFBRUCH','Erreiche Level 2','level',2,100000,NULL,NULL,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-journey-10',1,'journey','silver','CASINO-ENTDECKER','Erreiche Level 10','level',10,750000,'achievement-journey-2',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-journey-25',1,'journey','gold','LEGENDÄRE REISE','Erreiche Level 25','level',25,3000000,'achievement-journey-10',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-first-spin',1,'spins','bronze','FIRST SPIN','Spiele 1 Spin','spins',1,75000,NULL,NULL,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-high-roller',1,'spins','silver','HIGH ROLLER','Spiele 100 Spins','spins',100,500000,'achievement-first-spin',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-spin-master',1,'spins','gold','SPIN MASTER','Spiele 1.000 Spins','spins',1000,5000000,'achievement-high-roller',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-collector',1,'wins','bronze','COIN COLLECTOR','Gewinne insgesamt 250.000 Coins','total_won',250000,250000,NULL,NULL,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-millionaire',1,'wins','silver','MILLIONENJÄGER','Gewinne insgesamt 5.000.000 Coins','total_won',5000000,1000000,'achievement-collector',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-vault-breaker',1,'wins','gold','VAULT BREAKER','Gewinne insgesamt 50.000.000 Coins','total_won',50000000,7500000,'achievement-millionaire',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-free-spins-3',1,'free_spins','bronze','BONUS STARTER','Spiele insgesamt 3 Freispiele','free_spins',3,200000,NULL,NULL,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-free-spins-25',1,'free_spins','silver','FREE-SPIN FAN','Spiele insgesamt 25 Freispiele','free_spins',25,1000000,'achievement-free-spins-3',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-free-spins-100',1,'free_spins','gold','BONUS LEGEND','Spiele insgesamt 100 Freispiele','free_spins',100,5000000,'achievement-free-spins-25',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-vip-100',1,'vip','bronze','VIP ANWÄRTER','Sammle 100 VIP-Punkte','vip_points',100,150000,NULL,NULL,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-vip-1000',1,'vip','silver','VIP SILBER','Sammle 1.000 VIP-Punkte','vip_points',1000,1000000,'achievement-vip-100',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z'),
+  ('achievement-vip-7500',1,'vip','gold','VIP PLATIN','Sammle 7.500 VIP-Punkte','vip_points',7500,7500000,'achievement-vip-1000',1,true,TIMESTAMPTZ '2026-07-24T00:00:00Z');
 
 CREATE OR REPLACE FUNCTION project_achievement_progress(
   p_player_id uuid,
