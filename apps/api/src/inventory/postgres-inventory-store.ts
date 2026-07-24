@@ -398,7 +398,8 @@ async function finalizeMutation(
     [operationId, JSON.stringify(result), requestHash],
   );
   if (update.rowCount !== 1) throw new Error("Inventory operation result could not be finalized");
-  await insertOutbox(client, operationId, command.playerId, `inventory.${command.operationType}ed`, result);
+  const eventType = command.operationType === "grant" ? "inventory.granted" : "inventory.consumed";
+  await insertOutbox(client, operationId, command.playerId, eventType, result);
   return result;
 }
 
