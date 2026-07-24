@@ -26,6 +26,16 @@ jobs:
       TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
     steps:
       - uses: actions/checkout@v4
+      - name: Upload integration source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-systems-source-${{ github.sha }}
+          retention-days: 1
+          path: |
+            apps/api/src/spins
+            apps/api/src/meta/player-progression.ts
+            apps/api/src/economy/xp-booster.ts
+            apps/api/package.json
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
