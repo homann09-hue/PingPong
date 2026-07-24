@@ -25,10 +25,8 @@ const allowedRoutes = [
   /^rewards\/(hourly|daily)$/,
   /^rewards\/(hourly|daily)\/claim$/,
   /^rewards\/[a-z0-9-]+\/claims$/,
-  // Glucksrad: Status und Dreh. Das Segment bestimmt ausschliesslich der Server.
   /^rewards\/wheels\/standard$/,
   /^rewards\/wheels\/standard\/spin$/,
-  // Boost-Center: Sammelmarken, Booster, Loyalitaetstausch und High Roller Club.
   /^economy\/check-win$/,
   /^economy\/check-win\/claim$/,
   /^economy\/boosters$/,
@@ -42,22 +40,14 @@ const allowedRoutes = [
   /^slots\/availability$/,
   /^slots\/[a-z0-9-]+\/paytable$/,
   /^slots\/[a-z0-9-]+\/spins$/,
-
-  // Shop, Store und Belegpruefung.
   /^shop\/offers$/,
   /^shop\/offers\/[A-Za-z0-9_-]{1,64}\/purchase$/,
   /^store\/products$/,
   /^store\/purchases\/verify$/,
-
-  // Wallet-Historie und Event-Meilensteine.
   /^wallet\/transactions$/,
   /^events\/[A-Za-z0-9_-]{1,64}\/milestones\/[A-Za-z0-9_-]{1,64}\/claim$/,
-
-  // Turniere und LiveOps-Konfiguration.
   /^tournaments\/active$/,
   /^liveops$/,
-
-  // Soziales: Freunde und Clans.
   /^social\/overview$/,
   /^social\/friend-requests$/,
   /^social\/friend-requests\/[A-Za-z0-9_-]{1,64}\/accept$/,
@@ -67,18 +57,25 @@ const allowedRoutes = [
   /^clans\/invitations\/[A-Za-z0-9_-]{1,64}\/accept$/,
   /^clans\/members\/[A-Za-z0-9_-]{1,64}(\/role)?$/,
   /^clans\/feed\/[A-Za-z0-9_-]{1,64}(\/reports)?$/,
-
-  // Push-Einstellungen und Geraeteregistrierung.
   /^messaging\/preferences$/,
   /^messaging\/installations$/,
   /^messaging\/installations\/[A-Za-z0-9_-]{1,64}$/,
-
-  // Telemetrie.
   /^analytics\/events$/,
 ];
 
+const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export function isAllowedPlayerPath(path: string): boolean {
   return allowedRoutes.some((pattern) => pattern.test(path));
+}
+
+export function isTrustedMutationRequest(request: NextRequest): boolean {
+  if (safeMethods.has(request.method)) return true;
+  const expectedOrigin = process.env.AURORA_WEB_ORIGIN ?? request.nextUrl.origin;
+  const origin = request.headers.get("origin");
+  if (!origin || origin !== expectedOrigin) return false;
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return fetchSite === null || fetchSite === "same-origin" || fetchSite === "none";
 }
 
 export function cookieOptions(maxAge: number) {
@@ -140,6 +137,9 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
 /** Same-origin player BFF. It keeps platform bearer credentials out of browser JavaScript. */
 export async function proxyPlayerRequest(request: NextRequest, path: string): Promise<NextResponse> {
   if (!isAllowedPlayerPath(path)) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ code: "CSRF_BLOCKED" }, { status: 403, headers: { "cache-control": "private, no-store" } });
+  }
   try {
     let accessToken = request.cookies.get(accessCookie)?.value;
     const requestBody = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
