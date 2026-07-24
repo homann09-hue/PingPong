@@ -19,6 +19,7 @@ import "./mobile.css";
 import "./vegas.css";
 import "./premium-casino.css";
 import "./fortune-legends.css";
+import "./fortune-slot.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 
