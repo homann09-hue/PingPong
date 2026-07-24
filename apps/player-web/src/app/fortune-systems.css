@@ -1,0 +1,671 @@
+.fl-system-section {
+  position: relative;
+  margin-top: 14px;
+  overflow: hidden;
+  padding: 18px;
+  border: 1px solid rgba(201, 171, 255, .18);
+  border-radius: 19px;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(125, 44, 150, .12), transparent 34%),
+    linear-gradient(180deg, rgba(22, 14, 31, .98), rgba(8, 5, 13, .99));
+  box-shadow: 0 22px 58px rgba(0, 0, 0, .52), inset 0 1px rgba(255,255,255,.05);
+}
+
+.fl-system-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(118deg, transparent 34%, rgba(255,255,255,.025), transparent 66%);
+}
+
+.fl-system-heading {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 15px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(246, 212, 111, .12);
+}
+
+.fl-system-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.fl-system-heading span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c69f43;
+  font-size: 8px;
+  font-weight: 1000;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+.fl-system-heading span svg {
+  width: 18px;
+  height: 18px;
+  color: #f4cc61;
+}
+
+.fl-system-heading h2 {
+  margin: 0;
+  color: #f6d984;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(22px, 3vw, 33px);
+  font-weight: 1000;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 2px #4f2508;
+}
+
+.fl-system-heading > strong,
+.fl-system-balance {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #f3cf6a;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.fl-system-balance {
+  padding: 8px 11px;
+  border: 1px solid rgba(102, 218, 255, .35);
+  border-radius: 10px;
+  background: #100b17;
+  color: #87e2ff;
+}
+
+.fl-system-balance svg { width: 19px; height: 19px; }
+
+.fl-gold-action,
+.fl-purple-action,
+.fl-dark-action {
+  border: 1px solid #edc557 !important;
+  background: linear-gradient(180deg, #d79d28, #7b480e) !important;
+  color: #fff5c5 !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.42), 0 8px 18px rgba(0,0,0,.28) !important;
+  font-weight: 1000 !important;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.fl-purple-action {
+  border-color: #c956fa !important;
+  background: linear-gradient(180deg, #9630dc, #42116c) !important;
+}
+
+.fl-dark-action {
+  border-color: rgba(255,255,255,.15) !important;
+  background: linear-gradient(180deg, #25172f, #0d0913) !important;
+  color: #bbb0c2 !important;
+}
+
+.fl-gold-action:disabled,
+.fl-purple-action:disabled,
+.fl-dark-action:disabled {
+  opacity: .48;
+  filter: saturate(.5);
+}
+
+/* Lucky Wheel */
+.fl-wheel-system {
+  min-height: 410px;
+  background:
+    radial-gradient(circle at 68% 46%, rgba(132, 45, 177, .22), transparent 29%),
+    radial-gradient(circle at 22% 62%, rgba(214, 132, 22, .11), transparent 28%),
+    linear-gradient(180deg, #140b1d, #08050d);
+}
+
+.fl-wheel-card {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(210px, .8fr) minmax(280px, 1.15fr) minmax(120px, .45fr) !important;
+  gap: 22px !important;
+  align-items: center !important;
+  min-height: 315px !important;
+  overflow: visible !important;
+  padding: 14px 18px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.fl-wheel-card.is-live {
+  position: relative !important;
+  z-index: 1 !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 315px !important;
+  border-radius: 0 !important;
+  backdrop-filter: none !important;
+}
+
+.fl-wheel-copy {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.fl-wheel-copy > small {
+  color: #b445ee;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .16em;
+}
+
+.fl-wheel-copy > strong {
+  color: #f7d779;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(30px, 4vw, 48px);
+  line-height: .9;
+  text-transform: uppercase;
+  text-shadow: 0 3px #5a2608, 0 0 18px rgba(246,212,111,.2);
+}
+
+.fl-wheel-copy > p {
+  max-width: 330px;
+  margin: 0;
+  color: #9d92a5;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.fl-wheel-card .fl-wheel-stage {
+  width: min(100%, 310px) !important;
+  aspect-ratio: 1;
+  margin: 0 auto !important;
+  filter: drop-shadow(0 18px 28px rgba(0,0,0,.55));
+}
+
+.fl-wheel-card .wheel-disc {
+  border: 8px solid #704818 !important;
+  box-shadow: 0 0 0 3px #e3b750, 0 0 0 8px #28140c, 0 0 30px rgba(164,67,215,.28), inset 0 0 28px rgba(0,0,0,.4) !important;
+}
+
+.fl-wheel-card .wheel-pointer {
+  z-index: 5;
+  border-top-color: #f5d36b !important;
+  filter: drop-shadow(0 4px 3px #000);
+}
+
+.fl-wheel-card .wheel-hub {
+  border-color: #e6bd59 !important;
+  background: radial-gradient(circle at 38% 32%, #ffd96e, #825015 58%, #261207 100%) !important;
+  box-shadow: 0 0 0 5px rgba(16,7,17,.8), 0 0 20px rgba(246,212,111,.34) !important;
+}
+
+.fl-wheel-card .wheel-label {
+  color: #fff5d3 !important;
+  font-size: 8px !important;
+  font-weight: 1000 !important;
+  text-shadow: 0 2px 3px #000;
+}
+
+.fl-wheel-card .wheel-button {
+  width: 100% !important;
+  min-height: 54px !important;
+  margin: 0 !important;
+  border-radius: 11px !important;
+}
+
+.fl-wheel-card .wheel-result,
+.fl-wheel-card .wheel-error {
+  margin: 5px 0 0 !important;
+  padding: 8px 10px;
+  border: 1px solid rgba(79, 217, 66, .28);
+  border-radius: 8px;
+  background: rgba(26, 83, 24, .25);
+  color: #a8ff9b !important;
+  font-size: 9px;
+}
+
+.fl-wheel-card .wheel-error {
+  border-color: rgba(225, 84, 70, .3);
+  background: rgba(99, 26, 23, .28);
+  color: #ff9f95 !important;
+}
+
+/* Shop */
+.fl-shop-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.fl-shop-pack {
+  position: relative;
+  display: flex !important;
+  min-height: 300px;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  padding: 17px 14px 14px !important;
+  border: 1px solid rgba(246, 212, 111, .18) !important;
+  border-radius: 15px !important;
+  background:
+    radial-gradient(circle at 50% 27%, rgba(135, 48, 155, .2), transparent 30%),
+    linear-gradient(180deg, #1b1025, #0a0610 82%) !important;
+  text-align: center;
+}
+
+.fl-shop-pack.featured {
+  border-color: rgba(246, 212, 111, .58) !important;
+  box-shadow: 0 0 30px rgba(246, 212, 111, .13), inset 0 0 35px rgba(246,212,111,.04) !important;
+  transform: translateY(-3px);
+}
+
+.fl-shop-pack .shop-badge {
+  position: absolute;
+  z-index: 3;
+  top: 9px;
+  left: 9px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 4px;
+  background: #b32c31;
+  color: white;
+  font-size: 6px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+}
+
+.fl-pack-emblem {
+  position: relative;
+  display: grid;
+  width: 94px;
+  height: 94px;
+  place-items: center;
+  margin: 15px auto 8px;
+  border: 2px solid #bb842b;
+  border-radius: 28px;
+  background: radial-gradient(circle at 42% 33%, #ffcf49, #9e4c12 54%, #30130d 100%);
+  color: #ffe989;
+  box-shadow: 0 0 0 5px rgba(59,25,15,.8), 0 0 24px rgba(233,151,33,.22), inset 0 1px rgba(255,255,255,.45);
+  transform: rotate(-5deg);
+}
+
+.fl-pack-emblem svg:first-child { width: 58px; height: 58px; filter: drop-shadow(0 4px 4px rgba(0,0,0,.5)); }
+.fl-pack-emblem svg:last-child { position: absolute; right: -7px; bottom: -7px; width: 38px; height: 38px; color: #ffd958; filter: drop-shadow(0 3px 3px #000); }
+.fl-pack-emblem.pack-1 { background: radial-gradient(circle at 42% 33%, #e580ff, #7625b8 54%, #241033 100%); border-color: #be5ff0; }
+.fl-pack-emblem.pack-2 { background: radial-gradient(circle at 42% 33%, #75deff, #235cc2 54%, #0d1737 100%); border-color: #5ca7ef; }
+.fl-pack-emblem.pack-3 { background: radial-gradient(circle at 42% 33%, #8dff75, #288d31 54%, #0d2e16 100%); border-color: #61d668; }
+
+.fl-pack-kicker {
+  color: #ae8f47;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: .13em;
+}
+
+.fl-shop-pack h3 {
+  margin: 4px 0 7px !important;
+  color: #f4d478 !important;
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.fl-shop-pack .shop-coins {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: #ffe05d !important;
+  font-size: 18px !important;
+  font-weight: 1000;
+}
+
+.fl-shop-pack .shop-coins svg { width: 22px; height: 22px; }
+.fl-shop-pack .shop-timer { margin-bottom: 8px; color: #a092a8; font-size: 8px; }
+.fl-shop-pack .claim-button { width: 100%; min-height: 42px; margin-top: auto; }
+
+/* Boost and loyalty */
+.fl-boost-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.fl-reward-card {
+  position: relative;
+  display: flex;
+  min-height: 315px;
+  flex-direction: column;
+  padding: 16px !important;
+  border: 1px solid rgba(246,212,111,.17) !important;
+  border-radius: 15px !important;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(159,68,183,.18), transparent 28%),
+    linear-gradient(180deg, #1a1023, #0a0610) !important;
+}
+
+.fl-reward-card > header {
+  display: grid !important;
+  grid-template-columns: 66px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.fl-reward-card .boost-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 2px solid #bd8b2e;
+  border-radius: 19px;
+  background: radial-gradient(circle at 40% 32%, #f4c858, #7d4313 59%, #28110a);
+  color: #ffe57f;
+  box-shadow: 0 0 17px rgba(246,212,111,.17), inset 0 1px rgba(255,255,255,.35);
+}
+
+.fl-reward-card .boost-icon svg { width: 35px; height: 35px; }
+.fl-reward-card .boost-icon.stamp { border-color: #b154dd; background: radial-gradient(circle at 40% 32%, #d173ef, #67249c 59%, #210d31); }
+.fl-reward-card .boost-icon.crown { border-color: #e2b54d; background: radial-gradient(circle at 40% 32%, #ffd867, #9a5412 59%, #2c1309); }
+
+.fl-reward-card > header div { display: grid; gap: 3px; }
+.fl-reward-card > header small { color: #9f7dbe; font-size: 7px; font-weight: 1000; letter-spacing: .11em; }
+.fl-reward-card > header strong { color: #f2d275; font-family: Georgia, "Times New Roman", serif; font-size: 16px; text-transform: uppercase; }
+.fl-reward-card > header p { margin: 0; color: #95899e; font-size: 8px; line-height: 1.4; }
+
+.fl-reward-value {
+  display: grid;
+  justify-items: center;
+  margin: 20px 0 9px;
+}
+
+.fl-reward-value strong {
+  color: #f7da78;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 27px;
+}
+
+.fl-reward-value small {
+  color: #86798f;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.fl-reward-card .progress-track { height: 8px !important; margin-bottom: 12px; }
+.fl-reward-card .boost-active { margin: 0 0 8px; color: #9df28d; font-size: 8px; text-align: center; }
+.fl-reward-card > .claim-button,
+.fl-reward-card > .boost-actions { margin-top: auto; }
+.fl-reward-card .boost-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.fl-reward-card .claim-button { min-height: 42px; }
+
+.fl-high-roller-card {
+  border-color: rgba(246,212,111,.38) !important;
+  box-shadow: 0 0 26px rgba(246,212,111,.08), inset 0 0 38px rgba(246,212,111,.025) !important;
+}
+
+.fl-loyalty-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 19px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(246,212,111,.12);
+}
+
+.fl-loyalty-heading span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #f3d276;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.fl-loyalty-heading strong { color: #ae9f72; font-size: 8px; letter-spacing: .1em; }
+
+.fl-loyalty-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 9px !important;
+}
+
+.fl-loyalty-card {
+  display: grid;
+  min-height: 180px;
+  justify-items: center;
+  align-content: start;
+  gap: 5px;
+  padding: 13px !important;
+  border: 1px solid rgba(246,212,111,.15) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #171020, #0a0710) !important;
+  text-align: center;
+}
+
+.fl-loyalty-card > svg { width: 39px; height: 39px; color: #efc65c; filter: drop-shadow(0 0 10px rgba(246,212,111,.19)); }
+.fl-loyalty-card > small { color: #897d90; font-size: 7px; }
+.fl-loyalty-card > strong { color: #f3d277; font-size: 14px; }
+.fl-loyalty-card > span { color: #a18fa9; font-size: 8px; }
+.fl-loyalty-card button { width: 100%; min-height: 37px; margin-top: auto; }
+
+/* Social and clan */
+.fl-clan-system {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(128, 44, 156, .17), transparent 28%),
+    linear-gradient(180deg, #140c1d, #08050d);
+}
+
+.fl-clan-banner {
+  display: grid !important;
+  grid-template-columns: 86px 1fr auto;
+  gap: 15px;
+  align-items: center;
+  padding: 15px !important;
+  border: 1px solid rgba(246,212,111,.2) !important;
+  border-radius: 15px !important;
+  background: linear-gradient(100deg, #2c171d, #18101f 52%, #0d0913) !important;
+}
+
+.fl-clan-crest {
+  display: grid !important;
+  width: 76px !important;
+  height: 76px !important;
+  place-items: center;
+  border: 2px solid #d5a940 !important;
+  border-radius: 24px !important;
+  background: radial-gradient(circle at 45% 33%, #edc153, #864513 56%, #28110b) !important;
+  color: #ffe37a !important;
+  box-shadow: 0 0 20px rgba(246,212,111,.15), inset 0 1px rgba(255,255,255,.35);
+}
+
+.fl-clan-crest svg { width: 34px; height: 34px; }
+.fl-clan-crest strong { font-size: 9px; letter-spacing: .1em; }
+.fl-clan-banner .clan-title { display: grid; gap: 3px; }
+.fl-clan-banner .clan-title small { color: #b18a51; font-size: 7px; font-weight: 1000; letter-spacing: .13em; }
+.fl-clan-banner .clan-title strong { color: #f6d77d; font-family: Georgia, "Times New Roman", serif; font-size: 24px; text-transform: uppercase; }
+.fl-clan-banner .clan-title span { color: #968a9d; font-size: 9px; }
+.fl-clan-banner button { min-width: 84px; min-height: 39px; }
+
+.fl-clan-grid {
+  display: grid !important;
+  grid-template-columns: minmax(260px, .8fr) minmax(340px, 1.2fr) !important;
+  gap: 12px !important;
+  margin-top: 12px;
+}
+
+.fl-friends-panel,
+.fl-chat-panel,
+.fl-clan-list {
+  overflow: hidden;
+  border: 1px solid rgba(246,212,111,.13);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #171020, #0a0710);
+}
+
+.fl-social-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin: 0 !important;
+  padding: 6px !important;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: #0a0610 !important;
+}
+
+.fl-social-tabs span {
+  padding: 7px 4px !important;
+  border-radius: 6px;
+  color: #746a7b !important;
+  font-size: 7px !important;
+  font-weight: 1000 !important;
+  text-align: center;
+}
+
+.fl-social-tabs span.active {
+  background: linear-gradient(180deg, #3c242c, #25151f) !important;
+  color: #f4d16f !important;
+}
+
+.fl-friends-panel ul {
+  margin: 0;
+  padding: 6px 11px 12px !important;
+  list-style: none;
+}
+
+.fl-friends-panel li {
+  display: grid !important;
+  grid-template-columns: 9px 36px 1fr auto !important;
+  gap: 8px;
+  align-items: center;
+  min-height: 51px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+}
+
+.fl-friends-panel .member-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #655d69;
+}
+
+.fl-friends-panel .member-dot.online { background: #54d94b; box-shadow: 0 0 8px rgba(84,217,75,.58); }
+.fl-social-avatar { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #ad7c2d; border-radius: 50%; background: radial-gradient(circle, #5e2d58, #191021); color: #f5d578; font-family: Georgia, serif; font-weight: 1000; }
+.fl-friends-panel .member-name { display: grid !important; }
+.fl-friends-panel .member-name strong { color: #ede3ee; font-size: 10px; }
+.fl-friends-panel .member-name small { color: #766c7d; font-size: 7px; }
+.fl-friends-panel .member-meta { display: flex; align-items: center; gap: 4px; color: #c4a657; font-size: 7px; }
+.fl-friends-panel .member-meta svg { width: 13px; height: 13px; }
+
+.fl-feed-compose {
+  display: grid !important;
+  grid-template-columns: 1fr 42px;
+  gap: 7px;
+  padding: 10px !important;
+}
+
+.fl-feed-compose input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.11) !important;
+  border-radius: 9px !important;
+  outline: 0;
+  background: #0a0610 !important;
+  color: white !important;
+}
+
+.fl-feed-compose button { width: 42px; height: 42px; padding: 0; }
+.fl-feed-list { max-height: 290px; margin: 0; padding: 0 11px 12px !important; overflow: auto; list-style: none; }
+.fl-feed-list > li { padding: 9px 0 !important; border-bottom: 1px solid rgba(255,255,255,.055); }
+.fl-feed-list .feed-head { display: flex; justify-content: space-between; gap: 8px; }
+.fl-feed-list .feed-head strong { color: #f0d27b; font-size: 9px; }
+.fl-feed-list .feed-head small { color: #6f6576; font-size: 7px; }
+.fl-feed-list p { margin: 4px 0 0; color: #aaa0af; font-size: 9px; line-height: 1.4; }
+
+.fl-clan-discover {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fl-clan-list h3 {
+  margin: 0;
+  padding: 13px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: #f2cf6e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+}
+
+.fl-clan-row {
+  display: grid !important;
+  grid-template-columns: 54px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 73px;
+  padding: 9px 12px !important;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+}
+
+.fl-clan-row .fl-clan-crest {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 15px !important;
+}
+
+.fl-clan-row .fl-clan-crest svg { width: 22px; height: 22px; }
+.fl-clan-row-main { display: grid; gap: 3px; }
+.fl-clan-row-main strong { color: #f0e5ee; font-size: 10px; }
+.fl-clan-row-main small { color: #786e7f; font-size: 8px; }
+.fl-clan-row button { min-width: 76px; min-height: 36px; }
+.fl-clan-system .clan-note { margin: 12px 0 0; color: #675f6c; font-size: 8px; text-align: center; }
+
+@media (max-width: 1100px) {
+  .fl-shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .fl-boost-grid { grid-template-columns: 1fr !important; }
+  .fl-reward-card { min-height: 250px; }
+  .fl-loyalty-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 780px) {
+  .fl-system-section { padding: 13px; border-radius: 15px; }
+  .fl-system-heading { align-items: start; }
+  .fl-system-heading > strong { max-width: 40%; text-align: right; }
+  .fl-wheel-card { grid-template-columns: 1fr !important; gap: 12px !important; padding: 4px !important; }
+  .fl-wheel-copy { justify-items: center; text-align: center; }
+  .fl-wheel-card .wheel-button { width: min(100%, 260px) !important; margin: 0 auto !important; }
+  .fl-clan-grid,
+  .fl-clan-discover { grid-template-columns: 1fr !important; }
+  .fl-clan-banner { grid-template-columns: 66px 1fr !important; }
+  .fl-clan-banner .fl-clan-crest { width: 62px !important; height: 62px !important; }
+  .fl-clan-banner button { grid-column: 1 / -1; width: 100%; }
+}
+
+@media (max-width: 520px) {
+  .fl-system-heading h2 { font-size: 20px; }
+  .fl-system-heading > strong { font-size: 6px; }
+  .fl-shop-grid,
+  .fl-loyalty-grid { grid-template-columns: 1fr 1fr !important; gap: 7px !important; }
+  .fl-shop-pack { min-height: 245px; padding: 11px 8px 9px !important; }
+  .fl-pack-emblem { width: 68px; height: 68px; border-radius: 21px; }
+  .fl-pack-emblem svg:first-child { width: 42px; height: 42px; }
+  .fl-pack-emblem svg:last-child { width: 29px; height: 29px; }
+  .fl-shop-pack h3 { font-size: 12px; }
+  .fl-shop-pack .shop-coins { font-size: 13px !important; }
+  .fl-reward-card { min-height: 270px; padding: 12px !important; }
+  .fl-reward-card > header { grid-template-columns: 50px 1fr; }
+  .fl-reward-card .boost-icon { width: 48px; height: 48px; border-radius: 15px; }
+  .fl-reward-card .boost-icon svg { width: 27px; height: 27px; }
+  .fl-reward-card > header strong { font-size: 13px; }
+  .fl-loyalty-card { min-height: 160px; padding: 9px !important; }
+  .fl-clan-row { grid-template-columns: 45px 1fr !important; }
+  .fl-clan-row button { grid-column: 1 / -1; width: 100%; }
+}
