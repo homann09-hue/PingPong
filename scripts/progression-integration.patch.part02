@@ -1,0 +1,91 @@
++import { InMemorySpinStore } from "./in-memory-spin-store.js";
++
++const losingSpin: SpinResult = {
++  configId: "progression-test",
++  configVersion: 1,
++  mathModelVersion: "test",
++  seed: "1",
++  baseBet: 10_000,
++  wager: 10_000,
++  bonusBuy: false,
++  stops: [0, 0, 0],
++  grid: [["A"], ["A"], ["A"]],
++  wins: [],
++  rounds: [{ phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin: 0, events: [] }],
++  freeSpinsPlayed: 0,
++  totalWin: 0,
++  maxWinReached: false,
++  maxWinMultiplier: 1_000,
++};
++
++describe("InMemorySpinStore progression curve", () => {
++  it("uses the shared curve for multi-level settlement and idempotent replay", async () => {
++    const store = new InMemorySpinStore(100_000);
++    const playerId = randomUUID();
++    const idempotencyKey = randomUUID();
++    const command = {
++      playerId,
++      idempotencyKey,
++      slotId: "progression-test",
++      configVersion: 1,
++      bet: 10_000,
++      seed: 1n,
++    };
++
++    const first = await store.settle(command, () => losingSpin);
++    const replay = await store.settle(command, () => { throw new Error("must not recalculate"); });
++
++    expect(first.progression).toMatchObject({
++      level: 14,
++      xp: 133,
++      spins: 1,
++      totalWon: 0,
++      freeSpins: 0,
++      vipPoints: 2_550,
++    });
++    expect(replay).toEqual(first);
++    expect((await store.getHighRollerClub(playerId, new Date())).points).toBe(2_100);
++  });
++});
+diff --git a/apps/api/src/spins/in-memory-spin-store.ts b/apps/api/src/spins/in-memory-spin-store.ts
+index 8739435..a8d01c9 100644
+--- a/apps/api/src/spins/in-memory-spin-store.ts
++++ b/apps/api/src/spins/in-memory-spin-store.ts
+@@ -14,6 +14,7 @@ import { loyaltyRewardOffer, loyaltyRewardsStatus, type LoyaltyRedemption, type
+ import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
+ import { missionCatalog, missionUnlock, missionWindow, type MissionDefinition } from "../missions/mission-system.js";
+ import { highRollerCashback, highRollerClubRules, highRollerSourcePoints, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus, type HighRollerFixedSource } from "../economy/high-roller-club.js";
++import { advanceSpinProgression } from "../meta/spin-progression.js";
+ 
+ /** Deterministic test adapter mirroring database settlement semantics. */
+ export class InMemorySpinStore implements SpinStore {
+@@ -74,21 +75,19 @@ export class InMemorySpinStore implements SpinStore {
+       this.jackpotPools.set(triggeredTier, jackpotDefinitions.find((item) => item.tier === triggeredTier)!.seedAmount);
+     }
+     const previous = this.progression.get(command.playerId) ?? {
+-      level: 12, xp: 625, spins: 0, totalWon: 0, freeSpins: 0,
++      level: 12, xp: 0, spins: 0, totalWon: 0, freeSpins: 0,
+       vipPoints: 2_450,
+     };
+     const activeBoostSpins = this.activeBoostSpins.get(command.playerId) ?? 0;
+     const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
+-    const earnedXp = Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
+-    const accumulatedXp = previous.xp + earnedXp;
+-    const progression = {
+-      level: previous.level + Math.floor(accumulatedXp / 1_000),
+-      xp: accumulatedXp % 1_000,
+-      spins: previous.spins + 1,
+-      totalWon: previous.totalWon + spin.totalWin,
+-      freeSpins: previous.freeSpins + spin.freeSpinsPlayed,
+-      vipPoints: previous.vipPoints + Math.max(1, Math.floor(command.bet / 100)),
+-    };
++    const progressionResult = advanceSpinProgression({
++      previous,
++      bet: command.bet,
++      xpMultiplier,
++      totalWin: spin.totalWin,
++      freeSpinsPlayed: spin.freeSpinsPlayed,
++    });
++    const progression = progressionResult.progression;
+     const highRollerActive = (this.highRollerActiveUntil.get(command.playerId)?.getTime() ?? 0) > Date.now();
+     const cashback = highRollerCashback(command.bet, spin.totalWin, highRollerActive);
