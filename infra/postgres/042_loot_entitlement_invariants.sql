@@ -29,4 +29,18 @@ BEFORE UPDATE ON loot_entitlements
 FOR EACH ROW
 EXECUTE FUNCTION protect_loot_entitlement_identity();
 
+CREATE OR REPLACE FUNCTION prevent_loot_entitlement_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'loot entitlements are append-only';
+END;
+$$;
+
+CREATE TRIGGER loot_entitlements_delete_guard
+BEFORE DELETE ON loot_entitlements
+FOR EACH ROW
+EXECUTE FUNCTION prevent_loot_entitlement_delete();
+
 COMMIT;
