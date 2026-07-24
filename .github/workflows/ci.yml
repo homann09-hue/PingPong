@@ -33,6 +33,7 @@ jobs:
       - name: Test slot engine
         run: npm run test -w @aurora/slot-engine
       - name: Test API
+        id: api-tests
         shell: bash
         run: |
           set +e
@@ -40,6 +41,14 @@ jobs:
           status=$?
           tail -n 220 api-test.log
           exit $status
+      - name: Upload API test log
+        if: failure() && steps.api-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-log
+          path: api-test.log
+          if-no-files-found: error
+          retention-days: 3
       - name: Test player web
         run: npm run test -w @aurora/player-web
       - run: npm run build
