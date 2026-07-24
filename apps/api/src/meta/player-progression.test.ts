@@ -94,7 +94,7 @@ describe("player progression", () => {
     expect(() => applyPlayerXp({ level: 1, xpIntoLevel: -1 }, 1)).toThrow(RangeError);
     expect(() => applyPlayerXp({ level: 1, xpIntoLevel: 0 }, -1)).toThrow(RangeError);
     expect(() => applyPlayerXp({ level: 1, xpIntoLevel: 0 }, 1.5)).toThrow(RangeError);
-    expect(() => applyPlayerXp({ level: 1, xpIntoLevel: 0 }, Number.MAX_SAFE_INTEGER)).toThrow(RangeError);
+    expect(() => applyPlayerXp({ level: 1, xpIntoLevel: 0 }, Number.MAX_SAFE_INTEGER + 1)).toThrow(RangeError);
     expect(() => applyPlayerXp(
       { level: 1, xpIntoLevel: xpRequiredForNextLevel(1) },
       0,
