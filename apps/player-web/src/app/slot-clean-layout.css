@@ -1,0 +1,136 @@
+/* Focused slot route.
+ * The slot screen must read as one cabinet, not as a dashboard made from
+ * several independently positioned widgets. This file is intentionally loaded
+ * last so it can neutralize legacy shell offsets and experimental overlays.
+ */
+
+.premium-shell.is-slot-route .premium-side-nav,
+.premium-shell.is-slot-route .bottom-nav {
+  display: none !important;
+}
+
+.premium-shell.is-slot-route {
+  min-height: 100dvh;
+  background: #03040b;
+}
+
+.premium-shell.is-slot-route .page-content {
+  width: 100% !important;
+  min-height: 100dvh;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.premium-shell.is-slot-route .slot-stage {
+  display: flex;
+  min-height: 100dvh !important;
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden !important;
+  padding: 112px clamp(12px, 1.7vw, 26px) 18px !important;
+}
+
+.premium-shell.is-slot-route .slot-header,
+.premium-shell.is-slot-route .jackpot-strip,
+.premium-shell.is-slot-route .reel-frame,
+.premium-shell.is-slot-route .win-panel,
+.premium-shell.is-slot-route .slot-controls {
+  width: min(100%, 1180px);
+  max-width: 1180px !important;
+}
+
+.premium-shell.is-slot-route .slot-header {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
+.premium-shell.is-slot-route .jackpot-strip {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
+.premium-shell.is-slot-route .reel-frame {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin-bottom: 0;
+}
+
+.premium-shell.is-slot-route .win-panel {
+  flex: 0 0 auto;
+  min-height: 52px;
+  margin: 10px auto 8px;
+}
+
+.premium-shell.is-slot-route .slot-controls {
+  flex: 0 0 auto;
+}
+
+.premium-shell.is-slot-route .play-money-notice {
+  display: none !important;
+}
+
+/* Old experimental widgets were all fixed independently and covered the
+ * reels, controls and each other. They remain in the codebase for later
+ * redesign, but are never allowed to float above the live cabinet. */
+.slot-performance-hud,
+.slot-win-feed,
+.slot-feature-cards,
+.slot-quick-bet,
+.slot-feature-status,
+.slot-session-stats,
+.slot-immersive-controls {
+  display: none !important;
+}
+
+html.slot-mobile-session .legal-footer {
+  display: none !important;
+}
+
+@media (max-width: 980px) {
+  .premium-shell.is-slot-route .slot-stage {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html.slot-mobile-session,
+  html.slot-mobile-session body {
+    overflow: hidden;
+  }
+
+  .premium-shell.is-slot-route .premium-topbar {
+    min-height: calc(58px + env(safe-area-inset-top));
+  }
+
+  .premium-shell.is-slot-route .slot-stage {
+    min-height: 100dvh !important;
+    height: 100dvh;
+    overflow: hidden !important;
+    padding: calc(66px + env(safe-area-inset-top)) 7px calc(94px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .premium-shell.is-slot-route .slot-header {
+    margin-bottom: 5px;
+  }
+
+  .premium-shell.is-slot-route .jackpot-strip {
+    margin-bottom: 5px;
+  }
+
+  .premium-shell.is-slot-route .reel-frame {
+    min-height: 0 !important;
+  }
+
+  .premium-shell.is-slot-route .win-panel {
+    min-height: 42px;
+    margin: 8px auto 5px;
+  }
+
+  .premium-shell.is-slot-route .slot-controls {
+    right: 6px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    left: 6px !important;
+  }
+}
