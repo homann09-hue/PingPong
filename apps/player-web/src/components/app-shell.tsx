@@ -14,6 +14,7 @@ import { House } from "@phosphor-icons/react/dist/csr/House";
 import { List } from "@phosphor-icons/react/dist/csr/List";
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/csr/MagnifyingGlass";
 import { Medal } from "@phosphor-icons/react/dist/csr/Medal";
+import { Play } from "@phosphor-icons/react/dist/csr/Play";
 import { ShoppingBag } from "@phosphor-icons/react/dist/csr/ShoppingBag";
 import { Target } from "@phosphor-icons/react/dist/csr/Target";
 import { Trophy } from "@phosphor-icons/react/dist/csr/Trophy";
@@ -33,16 +34,27 @@ const nav = [
   { href: "/#missions", label: "Quests", icon: Target },
 ] as const;
 
+const mobileMenuItems = [
+  { href: "/#featured", label: "Top Slots", copy: "Beliebte Welten", icon: Crown },
+  { href: "/#jackpots", label: "Jackpots", copy: "Live-Pools", icon: Trophy },
+  { href: "/#events", label: "Events", copy: "Turniere & Drops", icon: Medal },
+  { href: "/#missions", label: "Missionen", copy: "Aufgaben & XP", icon: Target },
+  { href: "/#social", label: "Freunde", copy: "Crew & Clans", icon: UsersThree },
+  { href: "/#rewards", label: "VIP & Pass", copy: "Ränge & Prämien", icon: Gift },
+] as const;
+
 export function AppShell({ profile, children }: Readonly<{ profile: Profile | null; children: React.ReactNode }>) {
   const pathname = usePathname();
   const isSlotRoute = /^\/slots\/[^/?#]+/.test(pathname);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchInput = useRef<HTMLInputElement>(null);
   const claimableRewards = profile?.achievements?.filter((entry) => entry.completed && !entry.claimed && entry.unlocked).length ?? 0;
   const level = profile?.progression.level ?? 1;
   const vipPoints = profile?.vip?.points ?? 0;
   const vipProgress = Math.min(100, Math.max(8, (vipPoints % 1000) / 10));
+  const menuGames = games.slice(0, 4);
 
   useEffect(() => {
     document.documentElement.classList.toggle("slot-mobile-session", isSlotRoute);
@@ -50,18 +62,32 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
   }, [isSlotRoute]);
 
   useEffect(() => {
+    document.body.classList.toggle("mobile-casino-menu-open", mobileMenuOpen);
+    return () => document.body.classList.remove("mobile-casino-menu-open");
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen(true); }
-      if (event.key === "Escape") setSearchOpen(false);
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMobileMenuOpen(false);
+        setSearchOpen(true);
+      }
+      if (event.key === "Escape") {
+        setSearchOpen(false);
+        setMobileMenuOpen(false);
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
   useEffect(() => { if (searchOpen) searchInput.current?.focus(); else setQuery(""); }, [searchOpen]);
 
   const results = games.filter((game) =>
     game.name.toLowerCase().includes(query.trim().toLowerCase())
     || game.category.toLowerCase().includes(query.trim().toLowerCase()));
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return <div className={`app-shell premium-shell${isSlotRoute ? " is-slot-route" : ""}`}>
     <header className="topbar premium-topbar">
@@ -71,7 +97,7 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
         <span><strong>MaxMustermann</strong><small>Level {level}</small></span>
         <i style={{ "--player-progress": `${Math.min(100, level * 3)}%` } as React.CSSProperties} />
       </Link>
-      <button className="search-trigger" aria-label="Spiele durchsuchen" onClick={() => setSearchOpen(true)}><MagnifyingGlass weight="bold" /><span>Slots durchsuchen</span><kbd>⌘ K</kbd></button>
+      <button className="search-trigger" aria-label="Spiele durchsuchen" onClick={() => { setMobileMenuOpen(false); setSearchOpen(true); }}><MagnifyingGlass weight="bold" /><span>Slots durchsuchen</span><kbd>⌘ K</kbd></button>
       <div className="wallet-cluster" aria-label="Spieler-Guthaben">
         <div className="wallet-pill coin-wallet"><Coins weight="fill" /><span>{profile ? coinNumber(profile.coinBalance) : "—"}</span><Link href="/#shop" aria-label="Coins holen">+</Link></div>
         <div className="wallet-pill gem-wallet"><Diamond weight="fill" /><span>{profile ? coinNumber(profile.gemBalance ?? 0) : "—"}</span><Link href="/#shop" aria-label="Gems holen">+</Link></div>
@@ -103,6 +129,30 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
       </div>
     </div>}
 
+    {mobileMenuOpen && <div className="mobile-casino-overlay" role="dialog" aria-modal="true" aria-label="Casino-Menü" onClick={(event) => { if (event.target === event.currentTarget) closeMobileMenu(); }}>
+      <section className="mobile-casino-menu">
+        <header>
+          <div><span><Crown weight="fill" /></span><div><small>AURORA CASINO</small><strong>Was möchtest du spielen?</strong></div></div>
+          <button type="button" aria-label="Casino-Menü schließen" onClick={closeMobileMenu}><X weight="bold" /></button>
+        </header>
+        <div className="mobile-menu-wallets">
+          <span><Coins weight="fill" /><small>Coins</small><strong>{profile ? coinNumber(profile.coinBalance) : "—"}</strong></span>
+          <span><Diamond weight="fill" /><small>Gems</small><strong>{profile ? coinNumber(profile.gemBalance ?? 0) : "—"}</strong></span>
+          <Link href="/#shop" onClick={closeMobileMenu}><ShoppingBag weight="fill" /> Shop</Link>
+        </div>
+        <nav className="mobile-menu-grid" aria-label="Casino-Bereiche">
+          {mobileMenuItems.map((item) => { const Icon = item.icon; return <Link href={item.href} key={item.label} onClick={closeMobileMenu}><span><Icon weight="fill" /></span><strong>{item.label}</strong><small>{item.copy}</small></Link>; })}
+        </nav>
+        <div className="mobile-menu-section-head"><div><small>Direkt starten</small><strong>Beliebte Slot-Welten</strong></div><button type="button" onClick={() => { closeMobileMenu(); setSearchOpen(true); }}><MagnifyingGlass weight="bold" /> Suchen</button></div>
+        <div className="mobile-menu-games">
+          {menuGames.map((game) => <Link href={`/slots/${game.id}`} key={game.id} onClick={closeMobileMenu}>
+            <span><Image src={game.cover} alt="" fill sizes="38vw" /></span>
+            <div><strong>{game.name}</strong><small>{game.category}</small><b><Play weight="fill" /> Spielen</b></div>
+          </Link>)}
+        </div>
+      </section>
+    </div>}
+
     <aside className="side-nav premium-side-nav" aria-label="Hauptnavigation">
       <Link href="/" className="side-brand" aria-label="Aurora Casino"><span className="brand-mark"><Crown weight="fill" /></span><strong>AURORA</strong><small>CASINO</small></Link>
       <nav>{nav.map((item) => {
@@ -126,9 +176,11 @@ export function AppShell({ profile, children }: Readonly<{ profile: Profile | nu
     </main>
 
     <nav className="bottom-nav" aria-label="Mobile Navigation">
-      {nav.slice(0, 3).map((item) => { const Icon = item.icon; const active = item.href === "/" && pathname === "/"; return <Link key={item.label} href={item.href} className={active ? "active" : ""}><Icon weight={active ? "fill" : "bold"} /><span>{item.label}</span></Link>; })}
+      <Link href="/" className={pathname === "/" ? "active" : ""}><House weight={pathname === "/" ? "fill" : "bold"} /><span>Lobby</span></Link>
+      <Link href="/#all-games"><Compass weight="bold" /><span>Slots</span></Link>
+      <button type="button" className={mobileMenuOpen ? "mobile-menu-trigger active" : "mobile-menu-trigger"} aria-label="Casino-Menü öffnen" aria-expanded={mobileMenuOpen} onClick={() => { setSearchOpen(false); setMobileMenuOpen((current) => !current); }}><List weight="bold" /><span>Menü</span></button>
       <Link href="/#shop"><ShoppingBag weight="bold" /><span>Shop</span></Link>
-      <Link href="/account" className={pathname === "/account" ? "active" : ""}><List weight="bold" /><span>Konto</span></Link>
+      <Link href="/account" className={pathname === "/account" ? "active" : ""}><Gear weight="bold" /><span>Konto</span></Link>
     </nav>
   </div>;
 }
