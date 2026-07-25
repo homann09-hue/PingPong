@@ -48,6 +48,7 @@ import "./slot-mobile-session.css";
 import "./slot-clean-layout.css";
 import "./slot-worlds.css";
 import "./slot-world-chrome.css";
+import "./canva-v2-system.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 import { SlotWorldChrome } from "@/components/slot-world-chrome";
@@ -63,7 +64,7 @@ export const metadata: Metadata = {
   openGraph: { title: "Aurora Casino", description: "Kostenlose Social-Casino-Slots mit virtuellen Coins, Missionen, Events und Jackpots.", images: ["/assets/slots/pharaoh_oasis.png"] },
 };
 
-export const viewport: Viewport = { viewportFit: "cover", width: "device-width", initialScale: 1, themeColor: "#120b2b", colorScheme: "dark" };
+export const viewport: Viewport = { viewportFit: "cover", width: "device-width", initialScale: 1, themeColor: "#120529", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate /><SlotWorldChrome />{children}<LegalFooter /></body></html>;
