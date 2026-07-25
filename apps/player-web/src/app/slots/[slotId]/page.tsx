@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SlotGame } from "@/components/slot-game";
+import { TrackSlotVisit } from "@/components/track-slot-visit";
 import { findGame, games } from "@/lib/catalog";
 
 export function generateStaticParams() {
@@ -22,5 +23,5 @@ export default async function SlotPage({ params }: Readonly<{ params: Promise<{ 
   const { slotId } = await params;
   const game = findGame(slotId);
   if (!game) notFound();
-  return <SlotGame game={game} />;
+  return <><TrackSlotVisit slotId={game.id} /><SlotGame game={game} /></>;
 }
