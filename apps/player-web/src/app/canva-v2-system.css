@@ -1,0 +1,270 @@
+/* Aurora V2 — app-wide social-casino design system derived from the selected Canva direction.
+ * This layer intentionally overrides the legacy patchwork and establishes one coherent visual language.
+ */
+:root {
+  --v2-bg: #120529;
+  --v2-bg-deep: #070215;
+  --v2-panel: rgba(31, 10, 58, .9);
+  --v2-panel-strong: #251044;
+  --v2-purple: #8a38ff;
+  --v2-pink: #ff49d7;
+  --v2-cyan: #42e8ff;
+  --v2-gold: #ffd35b;
+  --v2-green: #55e56f;
+  --v2-text: #fff9ff;
+  --v2-muted: #bfaed8;
+  --v2-border: rgba(255,255,255,.16);
+  --v2-shadow: 0 22px 60px rgba(3,0,12,.52);
+}
+
+html { background: var(--v2-bg-deep); }
+body {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255,73,215,.22), transparent 30%),
+    radial-gradient(circle at 88% 3%, rgba(66,232,255,.16), transparent 28%),
+    linear-gradient(180deg, #220640 0%, var(--v2-bg) 34%, var(--v2-bg-deep) 100%);
+  color: var(--v2-text);
+}
+
+.premium-shell:not(.is-slot-route) {
+  padding: 92px 22px 112px 122px;
+  background: transparent !important;
+}
+.premium-shell:not(.is-slot-route)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0 48%, rgba(255,255,255,.025) 49% 50%, transparent 51%),
+    radial-gradient(circle at 50% 100%, rgba(111,39,255,.18), transparent 42%);
+}
+
+.premium-topbar {
+  left: 104px !important;
+  height: 76px !important;
+  padding: 10px 22px !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  border-top: 0 !important;
+  border-radius: 0 0 24px 24px !important;
+  background: linear-gradient(180deg, rgba(43,12,75,.98), rgba(22,6,44,.96)) !important;
+  box-shadow: 0 14px 44px rgba(4,0,14,.45), inset 0 -1px rgba(255,255,255,.08) !important;
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+.top-player-card,
+.search-trigger,
+.wallet-pill,
+.notify-action,
+.settings-action {
+  border: 1px solid var(--v2-border) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.035)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.11), 0 10px 24px rgba(0,0,0,.22) !important;
+}
+.search-trigger { border-radius: 999px !important; }
+.wallet-pill { border-radius: 999px !important; }
+.coin-wallet { box-shadow: inset 0 0 0 1px rgba(255,211,91,.24), 0 10px 24px rgba(0,0,0,.2) !important; }
+.gem-wallet { box-shadow: inset 0 0 0 1px rgba(66,232,255,.24), 0 10px 24px rgba(0,0,0,.2) !important; }
+.wallet-pill a {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff27a, #ff8a26);
+  color: #451200;
+  font-weight: 950;
+}
+
+.premium-side-nav {
+  width: 104px !important;
+  gap: 18px !important;
+  padding: 14px 10px !important;
+  border-right: 1px solid rgba(255,255,255,.12) !important;
+  background: linear-gradient(180deg, #35105f 0%, #1d073b 48%, #0e031d 100%) !important;
+  box-shadow: 18px 0 48px rgba(3,0,12,.42), inset -1px 0 rgba(255,255,255,.07) !important;
+}
+.premium-side-nav .side-brand .brand-mark {
+  border: 2px solid #ffe06e !important;
+  background: radial-gradient(circle at 35% 25%, #fff5a7, #ffbd2f 38%, #8e3f00 80%) !important;
+  color: #4d1900 !important;
+  box-shadow: 0 0 22px rgba(255,211,91,.42), inset 0 2px rgba(255,255,255,.6) !important;
+}
+.premium-side-nav nav a,
+.premium-side-nav .nav-utility a {
+  min-height: 60px !important;
+  border-radius: 18px !important;
+  color: #d1bce9 !important;
+}
+.premium-side-nav nav a:hover,
+.premium-side-nav nav a.active {
+  border-color: rgba(255,255,255,.22) !important;
+  background: linear-gradient(145deg, rgba(255,73,215,.42), rgba(105,47,255,.48)) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 30px rgba(100,24,255,.3), inset 0 1px rgba(255,255,255,.24) !important;
+}
+.vip-rank-card {
+  border: 1px solid rgba(255,211,91,.42) !important;
+  background: linear-gradient(145deg, rgba(255,211,91,.2), rgba(119,43,255,.34)) !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.28) !important;
+}
+
+.page-content { width: min(100%, 1720px) !important; }
+
+/* Lobby content density and hierarchy */
+.premium-live-rail,
+.premium-welcome,
+.premium-section,
+.premium-liveops,
+.premium-community,
+.premium-pass,
+.premium-achievements,
+.premium-account {
+  border-color: rgba(255,255,255,.13) !important;
+}
+
+.premium-live-hero,
+.world-hero,
+.premium-welcome-card,
+.premium-jackpot-card,
+.premium-event-card,
+.premium-pass-card,
+.premium-social-card,
+.premium-achievement-card,
+.game-card,
+.game-cover {
+  box-shadow: var(--v2-shadow) !important;
+}
+
+.world-hero,
+.premium-live-hero,
+.premium-welcome-card {
+  border: 2px solid rgba(255,255,255,.17) !important;
+  border-radius: 28px !important;
+  background-color: #241044 !important;
+  overflow: hidden;
+}
+
+.section-heading h2,
+.premium-section h2 {
+  color: #fff !important;
+  font-size: clamp(28px, 3vw, 44px) !important;
+  letter-spacing: -.025em !important;
+  text-shadow: 0 4px 20px rgba(255,73,215,.28) !important;
+}
+.eyebrow,
+.section-heading small { color: var(--v2-gold) !important; }
+
+.category-row,
+.premium-category-nav {
+  position: sticky;
+  top: 84px;
+  z-index: 12;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px;
+  background: rgba(20,5,40,.8);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 35px rgba(0,0,0,.28);
+}
+.category-row button,
+.premium-category-nav a,
+.premium-category-nav button {
+  border: 1px solid rgba(255,255,255,.16) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.04)) !important;
+  color: #eadff6 !important;
+}
+.category-row button.selected,
+.premium-category-nav .active {
+  border-color: rgba(255,211,91,.72) !important;
+  background: linear-gradient(180deg, #ffe87b, #ff9f27) !important;
+  color: #4b1700 !important;
+  box-shadow: 0 8px 24px rgba(255,168,44,.25) !important;
+}
+
+.game-grid { gap: 18px !important; }
+.game-card,
+.game-cover {
+  border: 2px solid rgba(255,255,255,.15) !important;
+  border-radius: 22px !important;
+  background: linear-gradient(180deg, rgba(63,18,94,.96), rgba(24,7,45,.98)) !important;
+  overflow: hidden;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+.game-card:hover,
+.game-cover:hover {
+  transform: translateY(-6px) scale(1.015);
+  border-color: rgba(255,211,91,.62) !important;
+  box-shadow: 0 26px 70px rgba(4,0,15,.62), 0 0 30px rgba(255,73,215,.18) !important;
+}
+.cover-play,
+.hero-cta,
+.premium-primary-action {
+  border: 2px solid rgba(219,255,149,.88) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #baff69 0%, #39c722 55%, #16870d 100%) !important;
+  color: #083600 !important;
+  text-shadow: 0 1px rgba(255,255,255,.52) !important;
+  box-shadow: inset 0 3px rgba(255,255,255,.5), 0 7px 0 #0c5e08, 0 14px 30px rgba(37,190,28,.26) !important;
+}
+
+.jackpot-ticker,
+.premium-jackpot-strip {
+  border: 2px solid rgba(255,211,91,.46) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(86,28,103,.95), rgba(35,8,59,.98)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 16px 36px rgba(0,0,0,.34) !important;
+}
+
+.bottom-nav {
+  border-top: 2px solid rgba(255,255,255,.18) !important;
+  background: linear-gradient(180deg, rgba(69,19,105,.98), rgba(22,5,43,.99)) !important;
+  box-shadow: 0 -16px 40px rgba(0,0,0,.4), inset 0 1px rgba(255,255,255,.12) !important;
+}
+.bottom-nav a,
+.bottom-nav button { color: #d8c6e9 !important; }
+.bottom-nav .active,
+.bottom-nav .mobile-menu-trigger.active { color: #fff !important; }
+.mobile-menu-trigger {
+  border: 3px solid #ffdc68 !important;
+  background: radial-gradient(circle at 36% 25%, #fff69b, #ffb32f 42%, #7e2c00) !important;
+  color: #491500 !important;
+  box-shadow: 0 0 0 6px rgba(74,17,99,.95), 0 0 30px rgba(255,211,91,.4) !important;
+}
+
+.search-overlay,
+.mobile-casino-overlay { background: rgba(3,0,12,.78) !important; backdrop-filter: blur(12px); }
+.search-panel,
+.mobile-casino-menu {
+  border: 1px solid rgba(255,255,255,.18) !important;
+  background: linear-gradient(180deg, #34105b, #16052d) !important;
+  box-shadow: 0 30px 90px rgba(0,0,0,.66) !important;
+}
+
+@media (max-width: 980px) {
+  .premium-shell:not(.is-slot-route) { padding-left: 18px; }
+  .premium-topbar { left: 0 !important; border-radius: 0 0 18px 18px !important; }
+  .premium-side-nav { display: none !important; }
+}
+
+@media (max-width: 760px) {
+  .premium-shell:not(.is-slot-route) { padding: 70px 0 88px !important; }
+  .premium-topbar { height: 62px !important; padding: 6px 9px !important; }
+  .top-player-card,
+  .search-trigger,
+  .top-actions { display: none !important; }
+  .wallet-cluster { margin-left: auto !important; gap: 5px !important; }
+  .wallet-pill { min-height: 38px !important; padding-left: 9px !important; font-size: 12px !important; }
+  .wallet-pill a { width: 25px; height: 25px; }
+  .category-row,
+  .premium-category-nav { top: 64px; border-radius: 0; border-inline: 0; }
+  .game-grid { gap: 12px !important; }
+  .game-card,
+  .game-cover { border-radius: 18px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-card,
+  .game-cover { transition: none !important; }
+}
