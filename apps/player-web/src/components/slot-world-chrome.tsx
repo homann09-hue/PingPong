@@ -2,20 +2,22 @@
 
 import { usePathname } from "next/navigation";
 
-const worldIds = new Set([
-  "pharaoh-oasis",
-  "dragon-peak",
-  "candy-carnival",
-  "pirate-bay",
-  "neon-nights",
-  "frozen-kingdom",
-  "jungle-temple",
-  "vegas-gold",
-  "midnight-saloon",
-  "cosmic-voyage",
-]);
+const worlds = {
+  "pharaoh-oasis": { cabinet: "temple", marquee: "Tomb of the Sun", mechanic: "Mystery Chambers", atmosphere: "Goldener Wüstentempel" },
+  "dragon-peak": { cabinet: "forge", marquee: "Forge of the Dragon", mechanic: "Cascade Climb", atmosphere: "Vulkanische Bergfestung" },
+  "candy-carnival": { cabinet: "carnival", marquee: "Sweetstorm Carnival", mechanic: "Cluster Blast", atmosphere: "Leuchtender Zuckerjahrmarkt" },
+  "pirate-bay": { cabinet: "galleon", marquee: "Captain's Vault", mechanic: "Treasure Pick", atmosphere: "Sturmgaleone bei Nacht" },
+  "neon-nights": { cabinet: "nightclub", marquee: "Midnight Hyperclub", mechanic: "Walking Wild Rush", atmosphere: "Chromstadt und Neonclub" },
+  "frozen-kingdom": { cabinet: "ice-palace", marquee: "Throne of Winter", mechanic: "Frozen Free Spins", atmosphere: "Kristallpalast im Schneesturm" },
+  "jungle-temple": { cabinet: "jungle-shrine", marquee: "Emerald Shrine", mechanic: "Temple Wheel", atmosphere: "Überwachsene Ruinen im Monsun" },
+  "vegas-gold": { cabinet: "vegas-floor", marquee: "The Golden Strip", mechanic: "Hold & Win", atmosphere: "Art-déco-Casino am Strip" },
+  "midnight-saloon": { cabinet: "saloon", marquee: "Dead Man's Reel", mechanic: "Outlaw Respins", atmosphere: "Verrauchter Saloon bei Mitternacht" },
+  "cosmic-voyage": { cabinet: "starship", marquee: "Event Horizon", mechanic: "Warp Wilds", atmosphere: "Raumschiff am Rand eines Nebels" },
+} as const;
 
-function WorldDetails({ world }: Readonly<{ world: string }>) {
+type WorldId = keyof typeof worlds;
+
+function WorldDetails({ world }: Readonly<{ world: WorldId }>) {
   switch (world) {
     case "pharaoh-oasis":
       return <><i className="world-sun" /><i className="world-obelisk left" /><i className="world-obelisk right" /><i className="world-dust a" /><i className="world-dust b" /></>;
@@ -37,16 +39,26 @@ function WorldDetails({ world }: Readonly<{ world: string }>) {
       return <><i className="world-saloon-doors" /><i className="world-lamp left" /><i className="world-lamp right" /><i className="world-smoke a" /><i className="world-smoke b" /></>;
     case "cosmic-voyage":
       return <><i className="world-planet" /><i className="world-warp a" /><i className="world-warp b" /><i className="world-starfield" /><i className="world-comet" /></>;
-    default:
-      return null;
   }
 }
 
 export function SlotWorldChrome() {
   const pathname = usePathname();
   const match = pathname.match(/^\/slots\/([^/?#]+)/);
-  const world = match?.[1] ? decodeURIComponent(match[1]) : null;
-  if (!world || !worldIds.has(world)) return null;
+  const rawWorld = match?.[1] ? decodeURIComponent(match[1]) : null;
+  if (!rawWorld || !(rawWorld in worlds)) return null;
 
-  return <div className={`slot-world-chrome world-${world}`} aria-hidden="true"><WorldDetails world={world} /></div>;
+  const world = rawWorld as WorldId;
+  const config = worlds[world];
+  return <div className={`slot-world-chrome world-${world} cabinet-${config.cabinet}`} data-world={world} data-cabinet={config.cabinet} aria-hidden="true">
+    <div className="cabinet-identity">
+      <span className="cabinet-kicker">Aurora Original</span>
+      <strong className="cabinet-marquee">{config.marquee}</strong>
+      <span className="cabinet-atmosphere">{config.atmosphere}</span>
+    </div>
+    <div className="cabinet-mechanic"><small>Feature</small><strong>{config.mechanic}</strong><i /></div>
+    <div className="cabinet-side-lights left" /><div className="cabinet-side-lights right" />
+    <div className="cabinet-floor-glow" />
+    <WorldDetails world={world} />
+  </div>;
 }
