@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { JackpotTier, LiveEvent, Mission } from "@/lib/contracts";
+import { celebrate } from "@/lib/celebration-events";
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
@@ -40,7 +41,15 @@ export async function postClaim(path: string): Promise<{ ok: boolean; code?: str
       headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
       body: JSON.stringify({}),
     });
-    if (response.ok) return { ok: true };
+    if (response.ok) {
+      const eventClaim = path.includes("/events/");
+      celebrate({
+        kind: eventClaim ? "event-complete" : "reward",
+        title: eventClaim ? "MEILENSTEIN ERREICHT" : "REWARD GESICHERT",
+        subtitle: eventClaim ? "Deine Event-Belohnung wurde gutgeschrieben." : "Die Belohnung liegt jetzt in deinem Konto.",
+      });
+      return { ok: true };
+    }
     const body = await response.json().catch(() => null) as { code?: string } | null;
     return { ok: false, code: body?.code };
   } catch {
