@@ -55,7 +55,9 @@ import "./lobby-live-service-final.css";
 import "./canva-shell-perfection.css";
 import "./canva-shell-conflict-guard.css";
 import "./canva-motion-perfection.css";
+import "./celebration-hub.css";
 import { AgeGate } from "@/components/age-gate";
+import { CelebrationHub } from "@/components/celebration-hub";
 import { LegalFooter } from "@/components/legal-footer";
 import { MotionOrchestrator } from "@/components/motion-orchestrator";
 import { SlotWorldChrome } from "@/components/slot-world-chrome";
@@ -74,5 +76,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { viewportFit: "cover", width: "device-width", initialScale: 1, themeColor: "#120529", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate /><SlotWorldChrome /><MotionOrchestrator />{children}<LegalFooter /></body></html>;
+  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate /><SlotWorldChrome /><MotionOrchestrator /><CelebrationHub />{children}<LegalFooter /></body></html>;
 }
