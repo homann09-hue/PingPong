@@ -104,6 +104,8 @@ const symbolFiles: Readonly<Record<string, Readonly<Record<string, string>>>> = 
   frozen: { A: "snowflake", K: "wolf", Q: "scepter", J: "heart", W: "wild", S: "scatter", B: "scatter" },
   jungle: { A: "jaguar", K: "idol", Q: "macaw", J: "emerald", W: "wild", S: "scatter", B: "scatter" },
   vegas: { A: "roulette", K: "dice", Q: "seven", J: "chip", W: "wild", S: "scatter", B: "scatter" },
+  saloon: { A: "sheriff-star", K: "revolver", Q: "whiskey", J: "horseshoe", W: "cowboy-hat", S: "wanted-cards", B: "gold-buckle" },
+  cosmic: { A: "ringed-planet", K: "rocket", Q: "comet", J: "star", W: "warp-core", S: "portal", B: "alien-crystal" },
 };
 
 /** Bildpfad fuer einen Engine-Symbolcode, oder undefined fuer Textsymbole. */
