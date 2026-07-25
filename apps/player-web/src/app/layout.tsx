@@ -58,6 +58,7 @@ import "./canva-motion-perfection.css";
 import "./celebration-hub.css";
 import "./canva-slot-cabinet-perfection.css";
 import "./canva-slot-cabinet-final.css";
+import "./canva-symbol-art-perfection.css";
 import { AgeGate } from "@/components/age-gate";
 import { CelebrationHub } from "@/components/celebration-hub";
 import { LegalFooter } from "@/components/legal-footer";
