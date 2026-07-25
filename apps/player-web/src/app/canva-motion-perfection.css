@@ -1,0 +1,46 @@
+/* Canva-derived motion system: depth, reward feedback, ambient energy and mobile-safe interaction. */
+:root{--motion-ease:cubic-bezier(.2,.8,.2,1);--motion-spring:cubic-bezier(.16,1,.3,1);--motion-gold:#ffd66b;--motion-pink:#ff4bc8;--motion-cyan:#4ce9ff}
+.aurora-motion-layer{position:fixed;inset:0;z-index:5000;pointer-events:none;overflow:hidden}
+.aurora-tap-burst{position:absolute;width:10px;height:10px;transform:translate(-50%,-50%)}
+.aurora-tap-burst:before{content:"";position:absolute;inset:-14px;border:2px solid currentColor;border-radius:50%;animation:aurora-ring .72s var(--motion-ease) forwards}
+.aurora-tap-burst i{--angle:calc(var(--burst-index)*45deg);position:absolute;left:4px;top:4px;width:4px;height:12px;border-radius:99px;background:currentColor;box-shadow:0 0 12px currentColor;transform:rotate(var(--angle)) translateY(-7px);transform-origin:50% 14px;animation:aurora-particle .72s var(--motion-spring) forwards}
+.aurora-tap-burst--gold{color:var(--motion-gold)}.aurora-tap-burst--pink{color:var(--motion-pink)}.aurora-tap-burst--cyan{color:var(--motion-cyan)}
+
+.premium-shell:not(.is-slot-route) .page-content{view-transition-name:aurora-page}
+::view-transition-old(aurora-page){animation:aurora-page-out .18s ease both}::view-transition-new(aurora-page){animation:aurora-page-in .38s var(--motion-spring) both}
+
+.lsd__panel,.mission-item,.event-card,.achievement-card,.shop-card,.clan-card,.boost-card,.premium-game-tile,.premium-world-card,.game-card{transform-style:preserve-3d;backface-visibility:hidden}
+@media(hover:hover){.lsd__panel:hover,.mission-item:hover,.event-card:hover,.achievement-card:hover,.shop-card:hover,.clan-card:hover,.boost-card:hover{transform:translateY(-5px) perspective(900px) rotateX(1.2deg);filter:saturate(1.06) brightness(1.04)}}
+
+.claim-button,.milestone-claim,.lsd__quest button,.hero-cta,.premium-primary-action{position:relative;overflow:hidden;isolation:isolate}
+.claim-button:before,.milestone-claim:before,.lsd__quest button:before,.hero-cta:before,.premium-primary-action:before{content:"";position:absolute;inset:-45% auto -45% -35%;width:28%;transform:rotate(18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);animation:aurora-cta-sweep 3.8s ease-in-out infinite;z-index:-1}
+.claim-button:not(:disabled):hover,.milestone-claim:not(:disabled):hover,.lsd__quest button:not(:disabled):hover{filter:brightness(1.12);transform:translateY(-2px) scale(1.025)}
+
+.notify-action i,.lsd__inbox>span{animation:aurora-badge-pop 2.2s ease-in-out infinite;transform-origin:center}
+.wallet-pill svg,.lsd__economy-strip svg{animation:aurora-icon-float 3.2s ease-in-out infinite}
+.wallet-pill:nth-child(2) svg{animation-delay:.45s}
+.lsd__tile-play,.cover-play{box-shadow:0 0 0 0 rgba(255,255,255,.35);animation:aurora-play-pulse 2.4s ease-in-out infinite}
+
+.search-overlay,.mobile-casino-overlay,.lsd__inbox-popover{will-change:opacity,transform}
+.search-panel,.mobile-casino-menu,.lsd__inbox-popover{transform-origin:top center}
+
+.progress-track>i,.lsd__progress i{transition:width .7s var(--motion-spring)!important}
+.progress-track>i:before,.lsd__progress i:before{content:"";position:absolute;right:-2px;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;transform:translateY(-50%);box-shadow:0 0 14px #fff,0 0 26px currentColor;animation:aurora-progress-node 1.7s ease-in-out infinite}
+
+.premium-jackpot-core,.jackpot-ticker strong,.lsd__economy-strip span:first-child strong{animation:aurora-jackpot-breathe 2.6s ease-in-out infinite;transform-origin:center}
+.premium-season-hero,.premium-live-hero,.world-hero{animation:aurora-hero-drift 9s ease-in-out infinite}
+
+@keyframes aurora-ring{0%{opacity:.9;transform:scale(.2)}100%{opacity:0;transform:scale(2.5)}}
+@keyframes aurora-particle{0%{opacity:1;transform:rotate(var(--angle)) translateY(-5px) scale(1)}100%{opacity:0;transform:rotate(var(--angle)) translateY(-34px) scale(.3)}}
+@keyframes aurora-page-in{from{opacity:0;transform:translateY(14px) scale(.99);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+@keyframes aurora-page-out{to{opacity:0;transform:translateY(-6px);filter:blur(2px)}}
+@keyframes aurora-cta-sweep{0%,58%{transform:translateX(-180%) rotate(18deg)}82%,100%{transform:translateX(560%) rotate(18deg)}}
+@keyframes aurora-badge-pop{0%,72%,100%{transform:scale(1)}82%{transform:scale(1.2)}90%{transform:scale(.94)}}
+@keyframes aurora-icon-float{50%{transform:translateY(-2px) rotate(-3deg);filter:brightness(1.16)}}
+@keyframes aurora-play-pulse{50%{box-shadow:0 0 0 8px rgba(255,255,255,0),0 0 22px rgba(255,255,255,.32)}}
+@keyframes aurora-progress-node{50%{transform:translateY(-50%) scale(1.35);filter:brightness(1.2)}}
+@keyframes aurora-jackpot-breathe{50%{transform:scale(1.025);filter:brightness(1.18);text-shadow:0 0 24px rgba(255,214,107,.45)}}
+@keyframes aurora-hero-drift{50%{transform:translateY(-3px)}}
+
+@media(max-width:760px){.premium-season-hero,.premium-live-hero,.world-hero{animation-duration:12s}.aurora-tap-burst i{height:9px}.lsd__tile-play,.cover-play{animation:none}.claim-button:before,.milestone-claim:before,.lsd__quest button:before{animation-duration:5.4s}}
+@media(prefers-reduced-motion:reduce){.aurora-motion-layer{display:none}.premium-season-hero,.premium-live-hero,.world-hero,.notify-action i,.lsd__inbox>span,.wallet-pill svg,.lsd__economy-strip svg,.lsd__tile-play,.cover-play,.premium-jackpot-core,.jackpot-ticker strong,.lsd__economy-strip span:first-child strong,.progress-track>i:before,.lsd__progress i:before,.claim-button:before,.milestone-claim:before,.lsd__quest button:before,.hero-cta:before,.premium-primary-action:before{animation:none!important}.progress-track>i,.lsd__progress i{transition:none!important}}
