@@ -50,6 +50,7 @@ import "./slot-worlds.css";
 import "./slot-world-chrome.css";
 import "./canva-v2-system.css";
 import "./wow-motion-v3.css";
+import "./lobby-live-service-deck.css";
 import { AgeGate } from "@/components/age-gate";
 import { LegalFooter } from "@/components/legal-footer";
 import { SlotWorldChrome } from "@/components/slot-world-chrome";
