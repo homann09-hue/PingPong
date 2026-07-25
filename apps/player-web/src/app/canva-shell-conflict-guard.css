@@ -1,0 +1,112 @@
+/* Final conflict guard for the Canva-derived Aurora shell.
+ * Loaded last so legacy layers cannot reintroduce incompatible spacing, surfaces or stacking.
+ */
+:root{
+  --shell-sidebar-w:104px;
+  --shell-topbar-h:76px;
+  --shell-mobile-topbar-h:62px;
+  --shell-mobile-dock-h:70px;
+}
+
+html{scroll-padding-top:calc(var(--shell-topbar-h) + 18px)}
+body{overflow-x:hidden}
+body.mobile-casino-menu-open{overflow:hidden;touch-action:none}
+
+.premium-shell:not(.is-slot-route){
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+}
+.premium-shell:not(.is-slot-route) .page-content{
+  min-width:0!important;
+  max-width:1720px!important;
+  padding-inline:0!important;
+}
+
+/* Keep the shell in one deterministic stacking model. */
+.premium-topbar{z-index:120!important}
+.premium-side-nav{z-index:130!important}
+.bottom-nav{z-index:140!important}
+.search-overlay,.mobile-casino-overlay{z-index:900!important}
+.lsd__inbox-popover{z-index:950!important}
+
+/* Prevent old component rules from creating doubled borders, backgrounds and radii. */
+.premium-shell:not(.is-slot-route) :where(.lobby-section,.mission-item,.event-card,.achievement-card,.vip-progress,.shop-card,.clan-card,.boost-card,.wheel-card,.account-panel,.premium-section,.premium-account,.premium-community,.premium-pass-card,.premium-event-card){
+  background-clip:padding-box!important;
+  outline:0!important;
+}
+.premium-shell:not(.is-slot-route) :where(.mission-list,.event-grid,.achievement-grid,.game-grid){
+  min-width:0!important;
+}
+.premium-shell:not(.is-slot-route) :where(.mission-item,.event-card,.achievement-card,.shop-card,.clan-card,.boost-card){
+  min-width:0!important;
+  overflow:hidden!important;
+}
+
+/* Stable category navigation without colliding with the fixed topbar. */
+.category-row,.premium-category-nav{
+  top:calc(var(--shell-topbar-h) + 8px)!important;
+  max-width:100%!important;
+  overflow-x:auto!important;
+  overscroll-behavior-inline:contain;
+  scrollbar-width:none;
+}
+.category-row::-webkit-scrollbar,.premium-category-nav::-webkit-scrollbar{display:none}
+.category-row>* , .premium-category-nav>*{flex:0 0 auto}
+
+/* Search results stay usable on short phones and landscape screens. */
+.search-panel{max-height:calc(100dvh - 28px)!important}
+.search-results{overscroll-behavior:contain!important}
+.search-results li a{min-height:62px!important}
+.search-results li a:focus-visible{transform:translateX(4px);border-color:rgba(76,233,255,.42)!important;background:linear-gradient(90deg,rgba(76,233,255,.12),rgba(143,76,255,.08))!important}
+
+/* Touch targets and selected states. */
+.premium-side-nav nav a,.premium-side-nav .nav-utility a,.bottom-nav>a,.bottom-nav>button,.notify-action,.settings-action{touch-action:manipulation}
+.premium-side-nav nav a.active,.bottom-nav .active{font-weight:850!important}
+.wallet-pill span,.top-player-card small,.vip-rank-card small{font-variant-numeric:tabular-nums}
+
+/* Standard form elements inherit the same panel language. */
+.premium-shell:not(.is-slot-route) :where(input,select,textarea){
+  border:1px solid rgba(255,255,255,.15)!important;
+  border-radius:14px!important;
+  background:rgba(7,2,20,.56)!important;
+  color:#fff!important;
+}
+.premium-shell:not(.is-slot-route) :where(input,select,textarea)::placeholder{color:#9384a8!important}
+
+/* Mobile safe-area and overflow hardening. */
+@media(max-width:980px){
+  :root{--shell-topbar-h:66px}
+  html{scroll-padding-top:calc(var(--shell-topbar-h) + 12px)}
+  .premium-shell:not(.is-slot-route){padding-left:0!important;padding-right:0!important}
+  .premium-shell:not(.is-slot-route) .page-content{width:100%!important}
+}
+@media(max-width:760px){
+  :root{--shell-topbar-h:var(--shell-mobile-topbar-h)}
+  html{scroll-padding-top:calc(var(--shell-mobile-topbar-h) + 10px)}
+  .premium-shell:not(.is-slot-route){padding-bottom:calc(var(--shell-mobile-dock-h) + env(safe-area-inset-bottom) + 12px)!important}
+  .premium-topbar{padding-top:max(6px,env(safe-area-inset-top))!important;height:calc(var(--shell-mobile-topbar-h) + env(safe-area-inset-top))!important}
+  .bottom-nav{height:calc(var(--shell-mobile-dock-h) + env(safe-area-inset-bottom))!important}
+  .category-row,.premium-category-nav{top:calc(var(--shell-mobile-topbar-h) + env(safe-area-inset-top))!important}
+  .mobile-casino-menu{max-height:calc(100dvh - env(safe-area-inset-top) - 12px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;padding-bottom:calc(18px + env(safe-area-inset-bottom))!important}
+  .search-overlay{align-items:flex-start!important;padding-top:calc(env(safe-area-inset-top) + 10px)!important}
+  .search-panel{max-height:calc(100dvh - env(safe-area-inset-top) - 20px)!important}
+  .lobby-section,.premium-section{margin-inline:12px!important}
+}
+
+@media(max-width:390px){
+  .wallet-pill{padding-left:7px!important;gap:5px!important}
+  .wallet-pill span{max-width:72px;overflow:hidden;text-overflow:ellipsis}
+  .bottom-nav>a,.bottom-nav>button{min-width:48px!important;font-size:.68rem!important}
+  .mobile-brand strong{font-size:.82rem!important}
+}
+
+@media(orientation:landscape) and (max-height:520px){
+  .search-panel{max-height:calc(100dvh - 12px)!important}
+  .search-results{max-height:calc(100dvh - 82px)!important}
+  .mobile-casino-menu{max-height:96dvh!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .premium-shell:not(.is-slot-route) *{scroll-behavior:auto!important}
+}
