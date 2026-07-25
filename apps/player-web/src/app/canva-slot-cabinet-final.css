@@ -1,0 +1,65 @@
+/* Canva board DAHQaI0-OsE — final cabinet identity pass for all Aurora slot worlds. */
+.slot-world-chrome{--cabinet-accent:#ffd66b;--cabinet-accent-2:#8f4cff;--cabinet-metal:#2b153e;--cabinet-glow:rgba(143,76,255,.45);pointer-events:none;position:fixed;inset:0;z-index:21;overflow:hidden}
+.cabinet-identity{position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;z-index:28;width:min(560px,58vw);transform:translateX(-50%);display:grid;justify-items:center;gap:2px;padding:10px 54px 12px;border:1px solid color-mix(in srgb,var(--cabinet-accent) 48%,transparent);border-radius:12px 12px 28px 28px;background:linear-gradient(180deg,color-mix(in srgb,var(--cabinet-metal) 94%,#fff 6%),rgba(8,3,18,.96));box-shadow:inset 0 2px rgba(255,255,255,.18),inset 0 -8px 18px rgba(0,0,0,.38),0 12px 38px rgba(0,0,0,.55),0 0 28px var(--cabinet-glow);text-align:center;transform-origin:50% 0;animation:cabinet-marquee-enter .7s cubic-bezier(.16,1,.3,1) both}
+.cabinet-identity:before,.cabinet-identity:after{content:"";position:absolute;top:8px;width:38px;height:calc(100% - 16px);border-radius:10px;background:repeating-linear-gradient(180deg,var(--cabinet-accent) 0 5px,transparent 5px 11px);filter:drop-shadow(0 0 5px var(--cabinet-accent));opacity:.9;animation:cabinet-bulbs 1.4s steps(2,end) infinite}
+.cabinet-identity:before{left:9px}.cabinet-identity:after{right:9px;animation-delay:.7s}
+.cabinet-kicker{font-size:9px;font-weight:950;letter-spacing:.24em;text-transform:uppercase;color:color-mix(in srgb,var(--cabinet-accent) 84%,white)}
+.cabinet-marquee{font-size:clamp(18px,2.25vw,34px);line-height:.94;letter-spacing:.02em;text-transform:uppercase;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 8px var(--cabinet-accent),0 0 24px var(--cabinet-glow)}
+.cabinet-atmosphere{max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:800;letter-spacing:.08em;color:rgba(255,255,255,.7)}
+.cabinet-mechanic{position:fixed;top:112px;right:max(18px,env(safe-area-inset-right));z-index:27;display:grid;min-width:170px;padding:10px 14px 12px;border:1px solid color-mix(in srgb,var(--cabinet-accent-2) 58%,white 12%);border-radius:16px;background:linear-gradient(145deg,rgba(16,7,29,.94),color-mix(in srgb,var(--cabinet-metal) 88%,black));box-shadow:inset 0 1px rgba(255,255,255,.14),0 14px 34px rgba(0,0,0,.46),0 0 22px var(--cabinet-glow);overflow:hidden;animation:cabinet-feature-enter .7s .14s cubic-bezier(.16,1,.3,1) both}
+.cabinet-mechanic small{font-size:9px;font-weight:950;letter-spacing:.2em;text-transform:uppercase;color:var(--cabinet-accent)}
+.cabinet-mechanic strong{font-size:13px;line-height:1.15;color:#fff}.cabinet-mechanic i{position:absolute;left:0;bottom:0;width:72%;height:3px;border-radius:99px;background:linear-gradient(90deg,var(--cabinet-accent),var(--cabinet-accent-2));box-shadow:0 0 12px var(--cabinet-glow);animation:cabinet-feature-meter 3.2s ease-in-out infinite}
+.cabinet-side-lights{position:fixed;top:15%;bottom:14%;z-index:22;width:7px;border-radius:99px;background:repeating-linear-gradient(180deg,var(--cabinet-accent) 0 12px,transparent 12px 24px);filter:drop-shadow(0 0 8px var(--cabinet-accent));opacity:.72;animation:cabinet-runner 1.8s linear infinite}.cabinet-side-lights.left{left:12px}.cabinet-side-lights.right{right:12px;animation-direction:reverse}
+.cabinet-floor-glow{position:fixed;left:12%;right:12%;bottom:-8%;height:24%;z-index:20;border-radius:50%;background:radial-gradient(ellipse,var(--cabinet-glow),transparent 68%);filter:blur(8px);animation:cabinet-floor-pulse 3.4s ease-in-out infinite}
+
+/* Per-world materials and silhouettes. */
+.world-pharaoh-oasis{--cabinet-accent:#ffd15a;--cabinet-accent-2:#9a49ff;--cabinet-metal:#4d2d16;--cabinet-glow:rgba(255,183,50,.48)}
+.world-pharaoh-oasis .cabinet-identity{clip-path:polygon(7% 0,93% 0,100% 30%,94% 100%,6% 100%,0 30%);background:linear-gradient(180deg,#785121,#2a1408 68%,#110803)}
+.world-dragon-peak{--cabinet-accent:#ff7540;--cabinet-accent-2:#ff2c2c;--cabinet-metal:#35100d;--cabinet-glow:rgba(255,72,35,.52)}
+.world-dragon-peak .cabinet-identity{border-radius:8px 8px 24px 24px;background:linear-gradient(180deg,#651e13,#200706)}
+.world-candy-carnival{--cabinet-accent:#ff7cdd;--cabinet-accent-2:#8b5cff;--cabinet-metal:#49205d;--cabinet-glow:rgba(255,80,206,.5)}
+.world-candy-carnival .cabinet-identity{border-radius:28px 28px 18px 18px;background:linear-gradient(180deg,#7a3a91,#2f103d)}
+.world-pirate-bay{--cabinet-accent:#f3c36a;--cabinet-accent-2:#2ab9ff;--cabinet-metal:#26354a;--cabinet-glow:rgba(42,169,255,.5)}
+.world-pirate-bay .cabinet-identity{background:linear-gradient(180deg,#273f57,#111a25);box-shadow:inset 0 2px rgba(255,255,255,.18),inset 0 -8px 18px rgba(0,0,0,.38),0 12px 38px rgba(0,0,0,.55),0 0 28px rgba(42,169,255,.42)}
+.world-neon-nights{--cabinet-accent:#ff4fe1;--cabinet-accent-2:#3994ff;--cabinet-metal:#250838;--cabinet-glow:rgba(255,53,220,.55)}
+.world-neon-nights .cabinet-identity{border-radius:3px 3px 28px 28px;background:linear-gradient(180deg,#310b4d,#09051a)}
+.world-frozen-kingdom{--cabinet-accent:#8ff4ff;--cabinet-accent-2:#5b8cff;--cabinet-metal:#153651;--cabinet-glow:rgba(82,231,255,.48)}
+.world-frozen-kingdom .cabinet-identity{clip-path:polygon(9% 0,91% 0,100% 22%,94% 100%,6% 100%,0 22%);background:linear-gradient(180deg,#2c6683,#0e2039)}
+.world-jungle-temple{--cabinet-accent:#ffd052;--cabinet-accent-2:#25bd75;--cabinet-metal:#203c27;--cabinet-glow:rgba(8,160,93,.46)}
+.world-jungle-temple .cabinet-identity{background:linear-gradient(180deg,#3f5930,#162617)}
+.world-vegas-gold{--cabinet-accent:#ffd667;--cabinet-accent-2:#ff5268;--cabinet-metal:#501820;--cabinet-glow:rgba(255,197,47,.55)}
+.world-vegas-gold .cabinet-identity{border-radius:30px 30px 12px 12px;background:linear-gradient(180deg,#7a2632,#2d0b12)}
+.world-midnight-saloon{--cabinet-accent:#e7b45a;--cabinet-accent-2:#7e4ca9;--cabinet-metal:#36241f;--cabinet-glow:rgba(224,166,60,.44)}
+.world-midnight-saloon .cabinet-identity{border-radius:7px 7px 22px 22px;background:linear-gradient(180deg,#55362a,#21140f)}
+.world-cosmic-voyage{--cabinet-accent:#7da4ff;--cabinet-accent-2:#d35cff;--cabinet-metal:#171b4d;--cabinet-glow:rgba(91,140,255,.54)}
+.world-cosmic-voyage .cabinet-identity{clip-path:polygon(8% 0,92% 0,100% 50%,92% 100%,8% 100%,0 50%);background:linear-gradient(180deg,#252b73,#0b0d2b)}
+
+/* Make the actual game console inherit each cabinet without brittle color-string selectors. */
+body:has(.cabinet-temple) .slot-stage{--cabinet-shape:18px;--cabinet-control-bg:#35200f}
+body:has(.cabinet-forge) .slot-stage{--cabinet-shape:8px;--cabinet-control-bg:#2a0d0a}
+body:has(.cabinet-carnival) .slot-stage{--cabinet-shape:28px;--cabinet-control-bg:#40154d}
+body:has(.cabinet-galleon) .slot-stage{--cabinet-shape:14px;--cabinet-control-bg:#15283a}
+body:has(.cabinet-nightclub) .slot-stage{--cabinet-shape:4px;--cabinet-control-bg:#1a082c}
+body:has(.cabinet-ice-palace) .slot-stage{--cabinet-shape:20px;--cabinet-control-bg:#123149}
+body:has(.cabinet-jungle-shrine) .slot-stage{--cabinet-shape:18px;--cabinet-control-bg:#17301f}
+body:has(.cabinet-vegas-floor) .slot-stage{--cabinet-shape:26px;--cabinet-control-bg:#42141b}
+body:has(.cabinet-saloon) .slot-stage{--cabinet-shape:10px;--cabinet-control-bg:#2e1c17}
+body:has(.cabinet-starship) .slot-stage{--cabinet-shape:6px;--cabinet-control-bg:#151947}
+body:has(.slot-world-chrome) .reel-frame{border-radius:var(--cabinet-shape,18px)!important;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--slot-primary) 52%,white 8%),inset 0 0 28px rgba(0,0,0,.68),0 18px 50px rgba(0,0,0,.55),0 0 34px color-mix(in srgb,var(--slot-primary) 26%,transparent)!important}
+body:has(.slot-world-chrome) .slot-controls{border:1px solid color-mix(in srgb,var(--slot-primary) 45%,white 10%)!important;border-radius:calc(var(--cabinet-shape,18px) + 4px)!important;background:linear-gradient(180deg,color-mix(in srgb,var(--cabinet-control-bg) 88%,white 5%),color-mix(in srgb,var(--cabinet-control-bg) 92%,black))!important;box-shadow:inset 0 2px rgba(255,255,255,.12),inset 0 -10px 24px rgba(0,0,0,.35),0 18px 45px rgba(0,0,0,.5)!important}
+body:has(.slot-world-chrome) .spin-button{box-shadow:inset 0 4px rgba(255,255,255,.42),inset 0 -8px rgba(0,0,0,.24),0 8px 0 color-mix(in srgb,var(--slot-secondary) 75%,black),0 16px 30px color-mix(in srgb,var(--slot-primary) 30%,transparent)!important}
+body:has(.slot-world-chrome) .spin-button:not(:disabled):hover{transform:translateY(-3px) scale(1.045)!important;filter:brightness(1.12) saturate(1.08)}
+body:has(.slot-world-chrome) .jackpot-strip span{position:relative;overflow:hidden}body:has(.slot-world-chrome) .jackpot-strip span:after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 28%,rgba(255,255,255,.22),transparent 62%);transform:translateX(-130%);animation:cabinet-jackpot-sweep 4.6s ease-in-out infinite}
+
+@keyframes cabinet-marquee-enter{from{opacity:0;transform:translateX(-50%) translateY(-22px) scale(.94)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes cabinet-feature-enter{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes cabinet-bulbs{50%{opacity:.42;filter:drop-shadow(0 0 2px var(--cabinet-accent))}}
+@keyframes cabinet-feature-meter{0%,100%{width:28%;opacity:.65}50%{width:92%;opacity:1}}
+@keyframes cabinet-runner{to{background-position:0 48px}}
+@keyframes cabinet-floor-pulse{50%{opacity:.62;transform:scaleX(1.08)}}
+@keyframes cabinet-jackpot-sweep{0%,66%{transform:translateX(-130%)}92%,100%{transform:translateX(130%)}}
+
+@media(max-width:900px){.cabinet-identity{top:max(5px,env(safe-area-inset-top));width:min(500px,72vw);padding:7px 38px 9px}.cabinet-marquee{font-size:clamp(16px,3.2vw,25px)}.cabinet-atmosphere{display:none}.cabinet-mechanic{top:76px;right:8px;min-width:142px;padding:7px 10px 9px}.cabinet-side-lights{top:13%;bottom:18%;width:5px}}
+@media(max-width:620px){.cabinet-identity{width:74vw;max-width:none;padding:6px 30px 7px;border-radius:8px 8px 20px 20px}.cabinet-kicker{font-size:7px}.cabinet-marquee{font-size:15px}.cabinet-identity:before,.cabinet-identity:after{width:22px}.cabinet-mechanic{top:55px;right:5px;min-width:112px;max-width:34vw;padding:5px 8px 7px;border-radius:11px}.cabinet-mechanic small{font-size:7px}.cabinet-mechanic strong{font-size:10px}.cabinet-side-lights{display:none}.cabinet-floor-glow{left:0;right:0;bottom:-4%;height:18%}}
+@media(orientation:landscape) and (max-height:520px){.cabinet-identity{left:12px;top:8px;width:210px;transform:none;padding:5px 28px 6px}.cabinet-marquee{font-size:13px}.cabinet-kicker,.cabinet-atmosphere{display:none}.cabinet-mechanic{top:8px;right:12px}.cabinet-floor-glow{display:none}}
+@media(prefers-reduced-motion:reduce){.cabinet-identity,.cabinet-mechanic,.cabinet-identity:before,.cabinet-identity:after,.cabinet-mechanic i,.cabinet-side-lights,.cabinet-floor-glow,body:has(.slot-world-chrome) .jackpot-strip span:after{animation:none!important}.cabinet-identity,.cabinet-mechanic{transform:none;opacity:1}.cabinet-identity{transform:translateX(-50%)}}
