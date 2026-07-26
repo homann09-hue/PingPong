@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
 import { SlotFeatureHud } from "./slot-feature-hud";
 import { SlotMechanicFx } from "./slot-mechanic-fx";
+import { SlotWinOverlay } from "./slot-win-overlay";
 import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
 import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
@@ -32,7 +33,7 @@ const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
 const autoSpinOptions = [10, 25, 50, 100] as const;
 const noSpinEvents: readonly SpinEvent[] = [];
 
-type ActiveRoundBanner = RoundPresentation & { readonly key: string };
+ type ActiveRoundBanner = RoundPresentation & { readonly key: string };
 interface PlayableSpinRound {
   readonly phase: SpinRoundPhase;
   readonly index: number;
@@ -124,6 +125,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [betIndex, setBetIndex] = useState(0);
   const [grid, setGrid] = useState(initialGrid);
   const [winCells, setWinCells] = useState<Set<string>>(new Set());
+  const [displayWins, setDisplayWins] = useState<readonly SpinWin[]>([]);
   const [clearingCells, setClearingCells] = useState<Set<string>>(new Set());
   const [cascadeRefilling, setCascadeRefilling] = useState(false);
   const [win, setWin] = useState(0);
@@ -145,6 +147,10 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
   const grand = jackpots.find((entry) => entry.tier === "GRAND");
   const activeEvents = activeRound?.events ?? noSpinEvents;
+  const winOverlayActive = displayWins.length > 0
+    && stoppedReels >= reels.length
+    && clearingCells.size === 0
+    && !cascadeRefilling;
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +197,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       await wait(turbo ? 55 : 260);
       setCascadeRefilling(false);
       setWinCells(targetWinCells);
+      setDisplayWins(round.wins);
       return;
     }
 
@@ -198,6 +205,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setCascadeRefilling(false);
     setGrid(round.grid);
     setWinCells(targetWinCells);
+    setDisplayWins(round.wins);
     setStoppedReels(0);
 
     if (!animateReels) {
@@ -249,6 +257,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setSpinning(true);
     setStoppedReels(0);
     setWinCells(new Set());
+    setDisplayWins([]);
     setClearingCells(new Set());
     setCascadeRefilling(false);
     setWin(0);
@@ -281,6 +290,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     } catch (cause) {
       setStoppedReels(5);
       setAutoRemaining(0);
+      setDisplayWins([]);
       setClearingCells(new Set());
       setCascadeRefilling(false);
       setActiveRound(null);
@@ -344,6 +354,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeEvents} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
       <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${cascadeRefilling ? "is-cascade-refill" : ""}`} aria-label="Slot-Raster" aria-busy={spinning} data-cascade-refill={cascadeRefilling ? "true" : undefined}>
         <div className="spin-status" aria-hidden="true"><span>{turbo ? "TURBO" : "SPIN"}</span><i style={{ width: `${Math.max(0, Math.min(100, (stoppedReels / Math.max(1, reels.length)) * 100))}%` }} /></div>
+        <SlotWinOverlay wins={displayWins} grid={grid} active={winOverlayActive} cabinet={game.cabinet} />
         {reels.map(({ column, reel }) => <div className={`reel ${reel < stoppedReels ? "is-stopped" : "is-running"}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           <div className="reel-strip" aria-hidden="true">{[...column, ...column, ...column].map((symbol, index) => { const stripAsset = symbolAsset(game.symbolSet, symbol); return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>{stripAsset ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} /> : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}</div>; })}</div>
           {column.map((symbol, row) => {
