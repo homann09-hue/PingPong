@@ -1,0 +1,129 @@
+.symbol.is-cascade-clearing{
+  z-index:7;
+  isolation:isolate;
+  overflow:visible!important;
+  animation:slot-cascade-cell-release .34s cubic-bezier(.2,.72,.18,1) both;
+}
+.symbol.is-cascade-clearing::before{
+  content:"";
+  position:absolute;
+  inset:-8%;
+  z-index:4;
+  border:2px solid color-mix(in srgb,var(--slot-primary) 82%,white);
+  border-radius:inherit;
+  box-shadow:0 0 20px var(--slot-primary),inset 0 0 24px color-mix(in srgb,var(--slot-secondary) 58%,transparent);
+  animation:slot-cascade-cell-ring .34s ease-out both;
+  pointer-events:none;
+}
+.symbol.is-cascade-clearing>img,
+.symbol.is-cascade-clearing>.slot-symbol,
+.symbol.is-cascade-clearing>.low-symbol{
+  animation:slot-cascade-symbol-break .34s cubic-bezier(.16,.72,.22,1) both!important;
+  filter:brightness(1.7) saturate(1.35) drop-shadow(0 0 14px var(--slot-primary));
+}
+.slot-cascade-shatter{
+  position:absolute;
+  inset:0;
+  z-index:8;
+  pointer-events:none;
+}
+.slot-cascade-shatter i{
+  --shard-angle:calc(var(--shard-index,0)*60deg);
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:clamp(5px,12%,14px);
+  height:clamp(14px,34%,34px);
+  border-radius:60% 40% 70% 30%;
+  background:linear-gradient(180deg,#fff,var(--slot-primary) 34%,var(--slot-secondary));
+  box-shadow:0 0 10px var(--slot-primary);
+  transform-origin:50% 0;
+  animation:slot-cascade-shard .42s cubic-bezier(.14,.7,.2,1) both;
+}
+.slot-cascade-shatter i:nth-child(1){--shard-index:0}
+.slot-cascade-shatter i:nth-child(2){--shard-index:1}
+.slot-cascade-shatter i:nth-child(3){--shard-index:2}
+.slot-cascade-shatter i:nth-child(4){--shard-index:3}
+.slot-cascade-shatter i:nth-child(5){--shard-index:4}
+.slot-cascade-shatter i:nth-child(6){--shard-index:5}
+
+.reel-frame.is-cascade-refill{
+  overflow:visible;
+}
+.reel-frame.is-cascade-refill::before{
+  content:"";
+  position:absolute;
+  inset:-5% -2%;
+  z-index:5;
+  border-radius:inherit;
+  background:linear-gradient(180deg,transparent 0 18%,color-mix(in srgb,var(--slot-primary) 36%,transparent) 48%,transparent 78%);
+  mix-blend-mode:screen;
+  pointer-events:none;
+  animation:slot-cascade-refill-sweep .46s ease-out both;
+}
+.reel-frame.is-cascade-refill .reel>.symbol:not(.strip-symbol){
+  animation:slot-cascade-symbol-drop .42s cubic-bezier(.12,.78,.2,1) both!important;
+  animation-delay:calc(var(--reel-delay,0ms) / 5)!important;
+}
+.reel-frame.is-cascade-refill .reel:nth-of-type(2)>.symbol:not(.strip-symbol){animation-delay:20ms!important}
+.reel-frame.is-cascade-refill .reel:nth-of-type(3)>.symbol:not(.strip-symbol){animation-delay:40ms!important}
+.reel-frame.is-cascade-refill .reel:nth-of-type(4)>.symbol:not(.strip-symbol){animation-delay:60ms!important}
+.reel-frame.is-cascade-refill .reel:nth-of-type(5)>.symbol:not(.strip-symbol){animation-delay:80ms!important}
+.reel-frame.is-cascade-refill .reel:nth-of-type(6)>.symbol:not(.strip-symbol){animation-delay:100ms!important}
+
+.slot-world-forge .symbol.is-cascade-clearing::before{border-radius:2px;box-shadow:0 0 26px #ff6a2f,inset 0 0 20px #9d130b}
+.slot-world-carnival .symbol.is-cascade-clearing::before{border-radius:36%;box-shadow:0 0 24px #ff80de,inset 0 0 24px #7f63ff}
+.slot-world-ice-palace .slot-cascade-shatter i{clip-path:polygon(50% 0,100% 100%,0 78%);background:linear-gradient(180deg,#fff,#d7fbff 35%,#52cfff)}
+.slot-world-jungle-shrine .slot-cascade-shatter i{border-radius:1px;background:linear-gradient(180deg,#fff4b5,#e9c251 35%,#467438)}
+.slot-world-saloon .slot-cascade-shatter i{border-radius:1px;background:linear-gradient(180deg,#ffe4b4,#b77a3d 38%,#4b2510)}
+.slot-world-starship .reel-frame.is-cascade-refill::before{background:linear-gradient(180deg,transparent 0 8%,rgba(145,197,255,.72) 46%,transparent 72%)}
+
+@keyframes slot-cascade-cell-release{
+  0%{transform:scale(1);opacity:1}
+  34%{transform:scale(1.12);opacity:1}
+  100%{transform:scale(.12) rotate(7deg);opacity:0}
+}
+@keyframes slot-cascade-cell-ring{
+  0%{opacity:0;transform:scale(.55)}
+  36%{opacity:1;transform:scale(1.04)}
+  100%{opacity:0;transform:scale(1.5)}
+}
+@keyframes slot-cascade-symbol-break{
+  0%{transform:scale(1);opacity:1}
+  38%{transform:scale(1.14);opacity:1}
+  100%{transform:scale(.2) rotate(-8deg);opacity:0;filter:brightness(2.5) blur(2px)}
+}
+@keyframes slot-cascade-shard{
+  0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--shard-angle)) translateY(0) scale(.25)}
+  28%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--shard-angle)) translateY(-74px) rotate(38deg) scale(.9)}
+}
+@keyframes slot-cascade-refill-sweep{
+  0%{opacity:0;transform:translateY(-42%) scaleY(.3)}
+  30%{opacity:1}
+  100%{opacity:0;transform:translateY(55%) scaleY(1.1)}
+}
+@keyframes slot-cascade-symbol-drop{
+  0%{opacity:0;transform:translateY(-120%) scale(.82);filter:blur(7px) brightness(1.6)}
+  68%{opacity:1;transform:translateY(7%) scale(1.04);filter:blur(0) brightness(1.18)}
+  100%{opacity:1;transform:translateY(0) scale(1);filter:none}
+}
+
+@media(max-width:700px){
+  .slot-cascade-shatter i{height:22px}
+  .reel-frame.is-cascade-refill::before{inset:-3% -1%}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .symbol.is-cascade-clearing,
+  .symbol.is-cascade-clearing::before,
+  .symbol.is-cascade-clearing>img,
+  .symbol.is-cascade-clearing>.slot-symbol,
+  .symbol.is-cascade-clearing>.low-symbol,
+  .slot-cascade-shatter i,
+  .reel-frame.is-cascade-refill::before,
+  .reel-frame.is-cascade-refill .reel>.symbol:not(.strip-symbol){
+    animation-duration:1ms!important;
+    animation-delay:0ms!important;
+  }
+}
