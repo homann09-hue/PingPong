@@ -39,7 +39,9 @@ function eventNumber(event: SpinEvent | undefined, key: string): number | undefi
 function numbers(value: string | undefined): number[] {
   return (value ?? "")
     .split(",")
-    .map((entry) => Number(entry.trim()))
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map(Number)
     .filter((entry) => Number.isFinite(entry));
 }
 
@@ -101,6 +103,9 @@ export function resolveSlotBonusPresentation(events: readonly SpinEvent[]): Slot
   const highestPosition = spots.reduce((highest, spot) => Math.max(highest, spot.position), -1);
   const declaredBoardSize = eventNumber(event, "boardSize");
   const boardSize = Math.max(1, Math.min(30, Math.trunc(declaredBoardSize ?? Math.max(15, highestPosition + 1))));
+  const segment = eventNumber(event, "segment");
+  const tier = eventText(event, "tier");
+  const collectorCount = eventNumber(event, "collectorCount");
 
   return {
     mode,
@@ -109,9 +114,9 @@ export function resolveSlotBonusPresentation(events: readonly SpinEvent[]): Slot
     spots: spots.filter((spot) => spot.position < boardSize),
     picks,
     multiplier,
-    ...(eventNumber(event, "segment") !== undefined ? { segment: eventNumber(event, "segment") } : {}),
-    ...(eventText(event, "tier") ? { tier: eventText(event, "tier") } : {}),
+    ...(segment !== undefined ? { segment } : {}),
+    ...(tier ? { tier } : {}),
     respinSteps: mode === "hold-and-win" ? hold.respinSteps : 0,
-    ...(eventNumber(event, "collectorCount") !== undefined ? { collectorCount: eventNumber(event, "collectorCount") } : {}),
+    ...(collectorCount !== undefined ? { collectorCount } : {}),
   };
 }
