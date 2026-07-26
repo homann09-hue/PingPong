@@ -8,10 +8,14 @@ export interface MysteryRevealPresentation {
   readonly visibleCards: number;
 }
 
+export type FreeSpinPresentationMode = "entry" | "retrigger" | "active" | null;
+
 export interface FreeSpinRevealPresentation {
+  readonly mode: FreeSpinPresentationMode;
   readonly primary: string;
   readonly label: string;
   readonly awarded: number;
+  readonly spin: number;
   readonly multiplier: number;
   readonly extraWilds: number;
   readonly specialReels: boolean;
@@ -68,15 +72,24 @@ export function resolveFreeSpinReveal(
   const ladder = modifiers.find((entry) => eventText(entry, "mode") === "multiplier_ladder");
   const extraWilds = modifiers.find((entry) => eventText(entry, "mode") === "extra_wilds");
   const specialReels = modifiers.some((entry) => eventText(entry, "mode") === "special_reels");
-  const awarded = Math.max(0, Math.trunc(eventNumber(award, "count") ?? 0));
-  const multiplier = Math.max(1, Math.trunc(eventNumber(ladder, "multiplier") ?? 1));
-  const extraWildCount = Math.max(0, Math.trunc(eventNumber(extraWilds, "count") ?? 0));
+  const awarded = Math.max(0, Math.min(1_000, Math.trunc(eventNumber(award, "count") ?? 0)));
+  const spin = phase === "free_spin" ? Math.max(1, Math.min(10_000, Math.trunc(index))) : 0;
+  const multiplier = Math.max(1, Math.min(9_999, Math.trunc(eventNumber(ladder, "multiplier") ?? 1)));
+  const extraWildCount = Math.max(0, Math.min(100, Math.trunc(eventNumber(extraWilds, "count") ?? 0)));
   const positions = positionList(eventText(extraWilds, "positions"));
+  const mode: FreeSpinPresentationMode = awarded > 0
+    ? phase === "free_spin" ? "retrigger" : "entry"
+    : phase === "free_spin" ? "active" : null;
 
   return {
-    primary: awarded > 0 ? `+${awarded}` : phase === "free_spin" ? `${Math.max(1, index)}` : "+",
-    label: awarded > 0 ? "FREISPIELE" : phase === "free_spin" ? `FREISPIEL ${Math.max(1, index)}` : "FREISPIELE",
+    mode,
+    primary: mode === "entry" || mode === "retrigger" ? `+${awarded}` : mode === "active" ? `${spin}` : "",
+    label: mode === "entry" ? "FREISPIELE"
+      : mode === "retrigger" ? "RETRIGGER"
+      : mode === "active" ? `FREISPIEL ${spin}`
+      : "",
     awarded,
+    spin,
     multiplier,
     extraWilds: extraWildCount,
     specialReels,
