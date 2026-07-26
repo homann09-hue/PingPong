@@ -1,0 +1,221 @@
+.slot-fx-free-spin-copy{
+  position:absolute;
+  left:50%;
+  top:63%;
+  z-index:4;
+  display:grid;
+  justify-items:center;
+  gap:.55rem;
+  width:min(86vw,720px);
+  transform:translateX(-50%);
+  color:#fff;
+  text-align:center;
+  text-shadow:0 0 18px var(--fx-accent),0 3px 8px #000;
+  animation:slot-feature-copy-arrive 1.15s cubic-bezier(.14,.82,.2,1) both;
+}
+.slot-fx-free-spin-copy b{
+  font-size:clamp(1rem,3.2vw,2.75rem);
+  font-weight:1000;
+  letter-spacing:.2em;
+}
+.slot-fx-free-spin-copy>span{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:.45rem;
+  min-height:1.6rem;
+}
+.slot-fx-free-spin-copy em{
+  padding:.32rem .72rem;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 72%,white);
+  border-radius:999px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--fx-secondary) 45%,rgba(4,2,10,.9)),rgba(4,2,10,.9));
+  font-size:clamp(.58rem,1.35vw,.92rem);
+  font-style:normal;
+  font-weight:950;
+  letter-spacing:.1em;
+  box-shadow:0 0 18px color-mix(in srgb,var(--fx-accent) 42%,transparent),inset 0 0 12px rgba(255,255,255,.08);
+  animation:slot-feature-chip-arrive .72s cubic-bezier(.16,.9,.2,1) both;
+}
+.slot-fx-free-spin[data-award="true"] strong{
+  background:radial-gradient(circle,#fff 0 7%,#ffe676 8% 32%,var(--fx-accent) 50%,var(--fx-secondary) 76%);
+}
+
+.slot-fx-mystery{
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:clamp(1rem,4vh,2.6rem);
+  padding:8vh 5vw;
+  perspective:1200px;
+}
+.slot-fx-mystery-cards{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:min(92vw,1040px);
+  min-height:clamp(150px,28vh,330px);
+  perspective:1200px;
+}
+.slot-fx-mystery-cards i{
+  --card-offset:calc(var(--fx-index) - 5.5);
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:clamp(46px,8.2vw,116px);
+  aspect-ratio:.72;
+  margin-inline:clamp(-15px,-1vw,-4px);
+  overflow:hidden;
+  transform-style:preserve-3d;
+  animation:slot-mystery-server-card 1.18s cubic-bezier(.12,.82,.18,1) both!important;
+  animation-delay:calc(var(--fx-index)*48ms)!important;
+}
+.slot-fx-mystery-cards i::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:2;
+  border-radius:inherit;
+  background:
+    radial-gradient(circle at 35% 22%,rgba(255,255,255,.88),transparent 16%),
+    linear-gradient(145deg,color-mix(in srgb,var(--fx-secondary) 58%,#10031b),#05030b);
+  backface-visibility:hidden;
+  box-shadow:inset 0 0 24px color-mix(in srgb,var(--fx-accent) 24%,transparent);
+}
+.slot-fx-mystery-cards i::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  border-radius:inherit;
+  background:
+    radial-gradient(circle at 36% 24%,#fff,var(--fx-accent) 16%,var(--fx-secondary) 56%,#07020c 80%);
+  transform:rotateY(180deg);
+  backface-visibility:hidden;
+}
+.slot-fx-mystery-cards i>span,
+.slot-fx-mystery-cards i>em{
+  position:relative;
+  z-index:4;
+  grid-area:1/1;
+  backface-visibility:hidden;
+}
+.slot-fx-mystery-cards i>span{
+  color:#fff;
+  font-size:clamp(2rem,5vw,5rem);
+  font-weight:1000;
+  text-shadow:0 0 18px var(--fx-accent);
+  animation:slot-mystery-question-hide 1.18s ease both;
+  animation-delay:calc(var(--fx-index)*48ms);
+}
+.slot-fx-mystery-cards i>em{
+  max-width:90%;
+  color:#fff;
+  font-size:clamp(.72rem,2.1vw,1.8rem);
+  font-style:normal;
+  font-weight:1000;
+  letter-spacing:.05em;
+  text-align:center;
+  text-shadow:0 2px 5px #000,0 0 14px #fff;
+  opacity:0;
+  transform:rotateY(180deg);
+  animation:slot-mystery-target-show 1.18s ease both;
+  animation-delay:calc(var(--fx-index)*48ms);
+}
+.slot-fx-mystery-copy{
+  display:grid;
+  justify-items:center;
+  gap:.35rem;
+  color:#fff;
+  text-align:center;
+  text-shadow:0 0 20px var(--fx-accent),0 4px 10px #000;
+  animation:slot-feature-copy-arrive 1.25s cubic-bezier(.16,.86,.2,1) both;
+}
+.slot-fx-mystery-copy strong{
+  font-size:clamp(1.1rem,3vw,2.6rem);
+  font-weight:1000;
+  letter-spacing:.18em;
+}
+.slot-fx-mystery-copy span{
+  padding:.35rem .9rem;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 70%,white);
+  border-radius:999px;
+  background:rgba(5,2,12,.74);
+  font-size:clamp(.78rem,1.7vw,1.15rem);
+  font-weight:950;
+  letter-spacing:.12em;
+  box-shadow:0 0 22px color-mix(in srgb,var(--fx-accent) 38%,transparent);
+}
+
+.slot-fx-multiplier small{
+  position:absolute;
+  top:69%;
+  left:50%;
+  width:min(88vw,720px);
+  transform:translateX(-50%);
+  color:#fff;
+  font-size:clamp(.65rem,1.7vw,1.05rem);
+  font-weight:1000;
+  letter-spacing:.18em;
+  text-align:center;
+  text-shadow:0 0 18px var(--fx-accent),0 3px 8px #000;
+  animation:slot-feature-copy-arrive 1.08s ease-out both;
+}
+
+.slot-world-forge .slot-fx-mystery-cards i,
+.slot-world-forge .slot-fx-free-spin-copy em{border-radius:3px}
+.slot-world-carnival .slot-fx-mystery-cards i{border-radius:28%}
+.slot-world-ice-palace .slot-fx-mystery-cards i{clip-path:polygon(50% 0,96% 17%,100% 78%,50% 100%,0 78%,4% 17%)}
+.slot-world-saloon .slot-fx-mystery-cards i{border-radius:3px;border-color:#e1ad68}
+.slot-world-starship .slot-fx-mystery-cards i::before{background:repeating-linear-gradient(135deg,rgba(145,197,255,.26) 0 2px,transparent 2px 11px),linear-gradient(145deg,#1d2758,#070916)}
+
+@keyframes slot-feature-copy-arrive{
+  0%{opacity:0;transform:translate(-50%,18px) scale(.82);filter:blur(5px)}
+  42%{opacity:1;transform:translate(-50%,0) scale(1.04);filter:blur(0)}
+  100%{opacity:0;transform:translate(-50%,-10px) scale(.96)}
+}
+@keyframes slot-feature-chip-arrive{
+  0%{opacity:0;transform:translateY(12px) scale(.65)}
+  55%{opacity:1;transform:translateY(0) scale(1.08)}
+  100%{opacity:.95;transform:none}
+}
+@keyframes slot-mystery-server-card{
+  0%{opacity:0;transform:translateY(34%) rotateY(0deg) rotateZ(calc(var(--card-offset)*-2deg)) scale(.62);filter:blur(5px) brightness(1.8)}
+  30%{opacity:1;transform:translateY(0) rotateY(0deg) rotateZ(calc(var(--card-offset)*-1deg)) scale(1.04);filter:blur(0) brightness(1.25)}
+  66%{transform:translateY(calc(abs(var(--card-offset))*-1px)) rotateY(180deg) rotateZ(0) scale(1.08)}
+  100%{opacity:0;transform:translateY(-8%) rotateY(180deg) scale(.94);filter:brightness(1.35)}
+}
+@keyframes slot-mystery-question-hide{
+  0%,45%{opacity:1;transform:rotateY(0)}
+  56%,100%{opacity:0;transform:rotateY(180deg)}
+}
+@keyframes slot-mystery-target-show{
+  0%,48%{opacity:0;transform:rotateY(180deg) scale(.55)}
+  64%,90%{opacity:1;transform:rotateY(180deg) scale(1.08)}
+  100%{opacity:0;transform:rotateY(180deg) scale(.94)}
+}
+
+@media(max-width:700px){
+  .slot-fx-free-spin-copy{top:66%;gap:.35rem}
+  .slot-fx-free-spin-copy b{font-size:.86rem}
+  .slot-fx-free-spin-copy em{padding:.25rem .5rem;font-size:.5rem}
+  .slot-fx-mystery{padding:12vh 2vw 8vh;gap:1rem}
+  .slot-fx-mystery-cards{width:98vw;min-height:160px}
+  .slot-fx-mystery-cards i{width:clamp(40px,12vw,72px);margin-inline:-7px}
+  .slot-fx-mystery-copy strong{font-size:.9rem}
+  .slot-fx-mystery-copy span{font-size:.62rem}
+  .slot-fx-multiplier small{top:72%;font-size:.58rem}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .slot-fx-free-spin-copy,
+  .slot-fx-free-spin-copy em,
+  .slot-fx-mystery-cards i,
+  .slot-fx-mystery-cards i>span,
+  .slot-fx-mystery-cards i>em,
+  .slot-fx-mystery-copy,
+  .slot-fx-multiplier small{
+    animation-duration:1ms!important;
+    animation-delay:0ms!important;
+  }
+}
