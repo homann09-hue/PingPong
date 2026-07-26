@@ -7,6 +7,7 @@ import {
   resolveMultiplierReveal,
   resolveMysteryReveal,
 } from "@/lib/slot-feature-reveal-presentation";
+import { resolveSymbolUpgradePresentation } from "@/lib/slot-symbol-upgrade-presentation";
 
 export interface SlotMechanicFxProps {
   readonly phase: SpinRoundPhase;
@@ -16,7 +17,7 @@ export interface SlotMechanicFxProps {
   readonly cabinet: SlotCabinetMode;
 }
 
-type MechanicEffect = "cascade" | "walking-wild" | "free-spin" | "respin" | "bonus" | "mystery" | "multiplier" | "jackpot" | "hit";
+type MechanicEffect = "cascade" | "walking-wild" | "free-spin" | "respin" | "bonus" | "mystery" | "upgrade" | "multiplier" | "jackpot" | "hit";
 
 interface WalkingPath {
   readonly direction: "left" | "right";
@@ -56,6 +57,7 @@ function effectFor(phase: SpinRoundPhase, totalWin: number, events: readonly Spi
   if (phase === "bonus" || hasEvent(events, "bonus.awarded")) return "bonus";
   if (hasEvent(events, "wild.walked")) return "walking-wild";
   if (hasEvent(events, "mystery.revealed")) return "mystery";
+  if (hasEvent(events, "symbol.upgraded")) return "upgrade";
   if (phase === "free_spin" || hasEvent(events, "free_spins.awarded") || hasEvent(events, "free_spins.modified")) return "free-spin";
   if (phase === "cascade" || hasEvent(events, "cascade.started")) return "cascade";
   if (phase === "respin" || hasEvent(events, "respin.started")) return "respin";
@@ -116,6 +118,7 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
   const mystery = resolveMysteryReveal(events);
   const freeSpins = resolveFreeSpinReveal(phase, index, events);
   const multiplier = resolveMultiplierReveal(events);
+  const upgrade = resolveSymbolUpgradePresentation(events);
 
   return <div
     key={`${effect}-${phase}-${index}`}
@@ -159,6 +162,19 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
         {Array.from({ length: mystery.visibleCards }, (_, card) => <i key={card} data-position={mystery.positions[card] ?? undefined} style={indexedStyle(card)}><span>?</span><em>{mystery.target}</em></i>)}
       </div>
       <div className="slot-fx-mystery-copy"><strong>{mystery.count} MYSTERY</strong><span>{mystery.source} → {mystery.target}</span></div>
+    </div>}
+    {effect === "upgrade" && <div className="slot-fx-symbol-upgrade" data-exact={upgrade.exactPositionCount > 0 ? "true" : "false"}>
+      <header>
+        <small>{upgrade.triggerCount > 0 ? `${upgrade.triggerCount} TRIGGER` : "FEATURE"}</small>
+        <strong>SYMBOL UPGRADE</strong>
+        <em>{upgrade.totalCount} SYMBOLE</em>
+      </header>
+      <div className="slot-fx-symbol-upgrade-steps">
+        {upgrade.steps.map((step, stepIndex) => <i key={`${step.from}-${step.to}-${stepIndex}`} style={indexedStyle(stepIndex)}>
+          <span>{step.from}</span><b>→</b><em>{step.to}</em><small>×{step.count}</small>
+        </i>)}
+      </div>
+      {Array.from({ length: 18 }, (_, particle) => <u key={particle} style={indexedStyle(particle)} />)}
     </div>}
     {effect === "multiplier" && <div className="slot-fx-multiplier"><span>×{multiplier.multiplier}</span><small>{multiplier.label}</small></div>}
     {effect === "jackpot" && <div className="slot-fx-jackpot"><span className="slot-fx-jackpot-core">MAX</span>{Array.from({ length: 20 }, (_, ray) => <i key={ray} style={indexedStyle(ray)} />)}</div>}
