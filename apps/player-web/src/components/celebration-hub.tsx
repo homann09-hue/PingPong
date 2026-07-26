@@ -27,7 +27,13 @@ export function CelebrationHub() {
     const level = profile?.progression.level;
     if (!level) return;
     if (previousLevel.current !== null && level > previousLevel.current) {
-      setQueue((current) => [...current, { kind: "level-up", title: `LEVEL ${level}`, subtitle: "Neue Inhalte und Belohnungen freigeschaltet", level }].slice(-4));
+      const celebration: CelebrationDetail = {
+        kind: "level-up",
+        title: `LEVEL ${level}`,
+        subtitle: "Neue Inhalte und Belohnungen freigeschaltet",
+        level,
+      };
+      setQueue((current) => [...current, celebration].slice(-4));
     }
     previousLevel.current = level;
   }, [profile?.progression.level]);
