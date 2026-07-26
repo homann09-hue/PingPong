@@ -14,6 +14,7 @@ import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
+import { SlotMechanicFx } from "./slot-mechanic-fx";
 import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
 import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
@@ -126,6 +127,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
   const [autoRemaining, setAutoRemaining] = useState(0);
   const [roundBanner, setRoundBanner] = useState<ActiveRoundBanner | null>(null);
+  const [activeRound, setActiveRound] = useState<PlayableSpinRound | null>(null);
   const animatedWin = useAnimatedNumber(win, turbo ? 240 : 780);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
@@ -183,6 +185,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
       const round = rounds[roundIndex]!;
       const presentation = presentSpinRound(round, game.mechanicLabel);
+      setActiveRound(round);
       setRoundBanner({ ...presentation, key: `${round.phase}-${round.index}-${roundIndex}` });
       setMessage(presentation.detail);
       await revealRoundGrid(round, roundIndex === 0);
@@ -192,10 +195,11 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       if (sound && round.phase !== "base") {
         playTones(round.totalWin > 0 ? [392, 523, 659] : [294, 392], 0.08, "triangle", 0.035);
       }
-      await wait(turbo ? 90 : round.phase === "base" ? 240 : 620);
+      await wait(turbo ? 120 : round.phase === "base" ? 320 : 1_050);
     }
 
     setWin(body.spin.totalWin);
+    setActiveRound(null);
     setRoundBanner(null);
   }
 
@@ -207,6 +211,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setWinCells(new Set());
     setWin(0);
     setCelebration(null);
+    setActiveRound(null);
     setRoundBanner(null);
     setMessage(turbo ? "Turbo-Spin läuft …" : "Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
@@ -234,6 +239,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     } catch (cause) {
       setStoppedReels(5);
       setAutoRemaining(0);
+      setActiveRound(null);
       setRoundBanner(null);
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
       if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
@@ -270,7 +276,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     <section
       className={`slot-stage slot-world-${game.cabinet}`}
       data-cabinet={game.cabinet}
-      data-spin-phase={roundBanner?.phase ?? (spinning ? "base" : "idle")}
+      data-spin-phase={activeRound?.phase ?? (spinning ? "base" : "idle")}
       aria-labelledby="slot-title"
       aria-describedby="slot-atmosphere"
       style={themeStyle}
@@ -278,6 +284,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
       <p id="slot-atmosphere" className="slot-atmosphere">{game.atmosphere}</p>
+      {activeRound && <SlotMechanicFx phase={activeRound.phase} index={activeRound.index} totalWin={activeRound.totalWin} events={activeRound.events} cabinet={game.cabinet} />}
       {roundBanner && <div key={roundBanner.key} className="slot-round-banner" data-tone={roundBanner.tone} role="status" aria-live="polite"><strong>{roundBanner.label}</strong><span>{roundBanner.detail}</span></div>}
       {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}><span className="slot-intro-emblem" aria-hidden="true" /><p className="slot-intro-name">{game.name}</p><span className="slot-intro-bar" aria-hidden="true"><i /></span></div>}
       <header className="slot-header">
