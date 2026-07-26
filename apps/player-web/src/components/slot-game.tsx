@@ -66,6 +66,12 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+function winCellSet(wins: readonly SpinWin[], includeScatter = true): Set<string> {
+  return new Set(wins
+    .filter((win) => includeScatter || win.kind !== "scatter")
+    .flatMap((win) => win.cells.map(([reel, row]) => `${reel}:${row}`)));
+}
+
 function normalizeSpinRounds(body: SpinResult): readonly PlayableSpinRound[] {
   const source: readonly SpinRound[] = body.spin.rounds.length > 0 ? body.spin.rounds : [{
     phase: "base",
@@ -118,6 +124,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [betIndex, setBetIndex] = useState(0);
   const [grid, setGrid] = useState(initialGrid);
   const [winCells, setWinCells] = useState<Set<string>>(new Set());
+  const [clearingCells, setClearingCells] = useState<Set<string>>(new Set());
+  const [cascadeRefilling, setCascadeRefilling] = useState(false);
   const [win, setWin] = useState(0);
   const [message, setMessage] = useState("Setz deinen Einsatz und dreh los");
   const [spinning, setSpinning] = useState(false);
@@ -162,10 +170,34 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     return () => clearTimeout(timer);
   }, [autoRemaining, spinning, turbo]);
 
-  async function revealRoundGrid(round: PlayableSpinRound, animateReels: boolean) {
-    setGrid(round.grid);
-    setWinCells(new Set(round.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
+  async function revealRoundGrid(round: PlayableSpinRound, animateReels: boolean, previousRound?: PlayableSpinRound) {
+    const targetWinCells = winCellSet(round.wins);
     const reelCount = round.grid.length;
+
+    if (round.phase === "cascade" && previousRound) {
+      const removalCells = winCellSet(previousRound.wins, false);
+      if (removalCells.size > 0) {
+        setClearingCells(removalCells);
+        setWinCells(removalCells);
+        if (sound && !turbo) playTones([210, 165, 118], 0.05, "sawtooth", 0.024);
+        await wait(turbo ? 55 : 310);
+      }
+
+      setClearingCells(new Set());
+      setGrid(round.grid);
+      setWinCells(new Set());
+      setStoppedReels(reelCount);
+      setCascadeRefilling(true);
+      await wait(turbo ? 55 : 260);
+      setCascadeRefilling(false);
+      setWinCells(targetWinCells);
+      return;
+    }
+
+    setClearingCells(new Set());
+    setCascadeRefilling(false);
+    setGrid(round.grid);
+    setWinCells(targetWinCells);
     setStoppedReels(0);
 
     if (!animateReels) {
@@ -185,6 +217,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   async function revealResult(body: SpinResult) {
     const rounds = normalizeSpinRounds(body);
     let cumulativeWin = 0;
+    let previousRound: PlayableSpinRound | undefined;
 
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
       const round = rounds[roundIndex]!;
@@ -192,7 +225,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       setActiveRound(round);
       setRoundBanner({ ...presentation, key: `${round.phase}-${round.index}-${roundIndex}` });
       setMessage(presentation.detail);
-      await revealRoundGrid(round, roundIndex === 0);
+      await revealRoundGrid(round, roundIndex === 0, previousRound);
       cumulativeWin += round.totalWin;
       setWin(cumulativeWin);
 
@@ -200,9 +233,12 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         playTones(round.totalWin > 0 ? [392, 523, 659] : [294, 392], 0.08, "triangle", 0.035);
       }
       await wait(turbo ? 120 : round.phase === "base" ? 320 : 1_050);
+      previousRound = round;
     }
 
     setWin(body.spin.totalWin);
+    setClearingCells(new Set());
+    setCascadeRefilling(false);
     setActiveRound(null);
     setRoundBanner(null);
   }
@@ -213,6 +249,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setSpinning(true);
     setStoppedReels(0);
     setWinCells(new Set());
+    setClearingCells(new Set());
+    setCascadeRefilling(false);
     setWin(0);
     setCelebration(null);
     setActiveRound(null);
@@ -243,6 +281,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     } catch (cause) {
       setStoppedReels(5);
       setAutoRemaining(0);
+      setClearingCells(new Set());
+      setCascadeRefilling(false);
       setActiveRound(null);
       setRoundBanner(null);
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
@@ -302,18 +342,22 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
       <div className="jackpot-strip" aria-label="Progressive Jackpots">{jackpotOrder.map((tier) => { const entry = jackpots.find((jackpot) => jackpot.tier === tier); return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>; })}</div>
       <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeEvents} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
-      <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
+      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${cascadeRefilling ? "is-cascade-refill" : ""}`} aria-label="Slot-Raster" aria-busy={spinning} data-cascade-refill={cascadeRefilling ? "true" : undefined}>
         <div className="spin-status" aria-hidden="true"><span>{turbo ? "TURBO" : "SPIN"}</span><i style={{ width: `${Math.max(0, Math.min(100, (stoppedReels / Math.max(1, reels.length)) * 100))}%` }} /></div>
         {reels.map(({ column, reel }) => <div className={`reel ${reel < stoppedReels ? "is-stopped" : "is-running"}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           <div className="reel-strip" aria-hidden="true">{[...column, ...column, ...column].map((symbol, index) => { const stripAsset = symbolAsset(game.symbolSet, symbol); return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>{stripAsset ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} /> : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}</div>; })}</div>
           {column.map((symbol, row) => {
             const asset = symbolAsset(game.symbolSet, symbol);
-            const winning = winCells.has(`${reel}:${row}`);
+            const key = `${reel}:${row}`;
+            const winning = winCells.has(key);
+            const clearing = clearingCells.has(key);
             const cell = presentSlotCell(activeEvents, reel, row, symbol);
-            return <div className={`symbol ${winning ? "winning" : ""} ${cell.className}`} key={`${reel}-${row}`} title={cell.description} data-feature-cell={cell.description ? "true" : undefined}>
+            const title = [cell.description, clearing ? "Gewinnsymbol löst sich für die nächste Kaskade auf" : undefined].filter(Boolean).join(", ") || undefined;
+            return <div className={`symbol ${winning ? "winning" : ""} ${clearing ? "is-cascade-clearing" : ""} ${cell.className}`} key={key} title={title} data-feature-cell={cell.description ? "true" : undefined} data-cascade-clearing={clearing ? "true" : undefined}>
               {hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winning} /> : asset ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} /> : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}
               {cell.badge && <span className="slot-cell-badge" aria-hidden="true">{cell.badge}</span>}
               {cell.className && <span className="slot-cell-frame" aria-hidden="true" />}
+              {clearing && <span className="slot-cascade-shatter" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>}
             </div>;
           })}
         </div>)}
