@@ -107,6 +107,22 @@ export interface SpinWin {
   readonly cells: readonly [number, number][];
 }
 
+export type SpinRoundPhase = "base" | "free_spin" | "respin" | "cascade" | "bonus";
+
+export interface SpinEvent {
+  readonly type: string;
+  readonly data: Readonly<Record<string, number | string>>;
+}
+
+export interface SpinRound {
+  readonly phase: SpinRoundPhase;
+  readonly index: number;
+  readonly grid: readonly (readonly string[])[];
+  readonly wins: readonly SpinWin[];
+  readonly totalWin: number;
+  readonly events: readonly SpinEvent[];
+}
+
 export interface SpinResult {
   readonly coinBalance: number;
   readonly spin: {
@@ -115,7 +131,7 @@ export interface SpinResult {
     readonly totalWin: number;
     readonly freeSpinsPlayed: number;
     readonly winClass?: string;
-    readonly rounds: readonly { readonly phase: string; readonly totalWin: number }[];
+    readonly rounds: readonly SpinRound[];
   };
   readonly jackpots?: readonly { readonly tier: string; readonly amount: number }[];
 }
