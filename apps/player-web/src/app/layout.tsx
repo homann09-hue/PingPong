@@ -51,6 +51,7 @@ import "./slot-world-chrome.css";
 import "./slot-round-presentation.css";
 import "./slot-mechanic-fx.css";
 import "./slot-feature-hud.css";
+import "./slot-feature-status-live.css";
 import "./slot-cell-feature-fx.css";
 import "./slot-cascade-sequence.css";
 import "./slot-walking-wild-path.css";
