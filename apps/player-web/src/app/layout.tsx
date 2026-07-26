@@ -51,6 +51,7 @@ import "./slot-world-chrome.css";
 import "./slot-round-presentation.css";
 import "./slot-mechanic-fx.css";
 import "./slot-feature-hud.css";
+import "./slot-cell-feature-fx.css";
 import "./canva-v2-system.css";
 import "./wow-motion-v3.css";
 import "./lobby-live-service-deck.css";
