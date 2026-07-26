@@ -13,43 +13,59 @@ interface WalkingMove {
   readonly targetRow: number;
 }
 
+const MAX_EVENT_CELLS = 256;
+const MAX_BADGE_MULTIPLIER = 1_000;
+
 function eventText(event: SpinEvent | undefined, key: string): string | undefined {
   const value = event?.data[key];
   return typeof value === "string" ? value : undefined;
 }
 
-function eventNumber(event: SpinEvent | undefined, key: string): number | undefined {
+function eventNumber(event: SpinEvent | undefined, key: string, maximum = 1_000_000): number | undefined {
   const value = event?.data[key];
-  return typeof value === "number" ? value : undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(maximum, Math.max(0, value));
+}
+
+function parseCell(value: string): readonly [number, number] | null {
+  const [rawReel, rawRow, extra] = value.split(":");
+  if (extra !== undefined) return null;
+  const reel = Number(rawReel);
+  const row = Number(rawRow);
+  if (!Number.isInteger(reel) || !Number.isInteger(row) || reel < 0 || row < 0) return null;
+  return [reel, row];
 }
 
 function positions(value: string | undefined): ReadonlySet<string> {
-  return new Set((value ?? "").split(",").map((entry) => entry.trim()).filter(Boolean));
+  const entries = new Set<string>();
+  for (const token of (value ?? "").split(",")) {
+    if (entries.size >= MAX_EVENT_CELLS) break;
+    const cell = parseCell(token.trim());
+    if (cell) entries.add(`${cell[0]}:${cell[1]}`);
+  }
+  return entries;
 }
 
 function positionEntries(value: string | undefined): ReadonlyMap<string, number> {
   const entries = new Map<string, number>();
   for (const token of (value ?? "").split(",")) {
-    const [position, rawValue] = token.trim().split("=");
-    if (!position || rawValue === undefined) continue;
+    if (entries.size >= MAX_EVENT_CELLS) break;
+    const [rawPosition, rawValue, extra] = token.trim().split("=");
+    if (!rawPosition || rawValue === undefined || extra !== undefined) continue;
+    const cell = parseCell(rawPosition);
     const parsed = Number(rawValue);
-    if (Number.isFinite(parsed)) entries.set(position, parsed);
+    if (!cell || !Number.isFinite(parsed) || parsed <= 0) continue;
+    entries.set(`${cell[0]}:${cell[1]}`, Math.min(MAX_BADGE_MULTIPLIER, parsed));
   }
   return entries;
-}
-
-function parseCell(value: string): readonly [number, number] | null {
-  const [rawReel, rawRow] = value.split(":");
-  const reel = Number(rawReel);
-  const row = Number(rawRow);
-  return Number.isInteger(reel) && Number.isInteger(row) ? [reel, row] : null;
 }
 
 function walkingMoves(value: string | undefined): ReadonlyMap<string, WalkingMove> {
   const moves = new Map<string, WalkingMove>();
   for (const token of (value ?? "").split(",")) {
-    const [rawSource, rawTarget] = token.trim().split(">");
-    if (!rawSource || !rawTarget) continue;
+    if (moves.size >= MAX_EVENT_CELLS) break;
+    const [rawSource, rawTarget, extra] = token.trim().split(">");
+    if (!rawSource || !rawTarget || extra !== undefined) continue;
     const source = parseCell(rawSource);
     const target = parseCell(rawTarget);
     if (!source || !target) continue;
@@ -101,7 +117,7 @@ export function presentSlotCell(
       descriptions.push(`Walking Wild von Walze ${movement.sourceReel + 1} nach Walze ${movement.targetReel + 1}`);
     } else {
       states.push("walk-from-left", "walk-distance-1");
-      descriptions.push(`Walking Wild Schritt ${eventNumber(walking, "step") ?? ""}`.trim());
+      descriptions.push(`Walking Wild Schritt ${eventNumber(walking, "step", 1_000) ?? ""}`.trim());
     }
     badge = "WILD";
   }
@@ -130,7 +146,7 @@ export function presentSlotCell(
     badge = `×${multiplier}`;
   }
 
-  const expanded = events.find((event) => event.type === "wild.expanded" && eventNumber(event, "reel") === reel);
+  const expanded = events.find((event) => event.type === "wild.expanded" && eventNumber(event, "reel", 100) === reel);
   if (expanded) {
     states.push("is-expanded-wild");
     descriptions.push("expandiertes Wild");
@@ -138,9 +154,9 @@ export function presentSlotCell(
   }
 
   const stacked = events.find((event) => {
-    if (event.type !== "wild.stacked" || eventNumber(event, "reel") !== reel) return false;
-    const start = eventNumber(event, "startRow") ?? -1;
-    const size = eventNumber(event, "size") ?? 0;
+    if (event.type !== "wild.stacked" || eventNumber(event, "reel", 100) !== reel) return false;
+    const start = eventNumber(event, "startRow", 100) ?? -1;
+    const size = eventNumber(event, "size", 100) ?? 0;
     return row >= start && row < start + size;
   });
   if (stacked) {
@@ -150,9 +166,9 @@ export function presentSlotCell(
   }
 
   const scatter = events.find((event) => event.type === "scatter.hit" && eventText(event, "symbol") === symbol);
-  if (scatter) {
+  if (scatter && positions(eventText(scatter, "positions")).has(key)) {
     states.push("is-scatter-hit");
-    descriptions.push(`${eventNumber(scatter, "count") ?? ""} Scatter sichtbar`.trim());
+    descriptions.push(`${eventNumber(scatter, "count", MAX_EVENT_CELLS) ?? ""} Scatter sichtbar`.trim());
     badge ??= "SCATTER";
   }
 
@@ -166,8 +182,8 @@ export function presentSlotCell(
   if (states.length === 0) return { className: "" };
 
   return {
-    className: `slot-cell-feature ${states.join(" ")}`,
+    className: `slot-cell-feature ${[...new Set(states)].join(" ")}`,
     badge,
-    description: descriptions.join(", "),
+    description: [...new Set(descriptions)].join(", "),
   };
 }
