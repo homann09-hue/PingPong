@@ -6,6 +6,13 @@ export interface SlotCellPresentation {
   readonly description?: string;
 }
 
+interface WalkingMove {
+  readonly sourceReel: number;
+  readonly sourceRow: number;
+  readonly targetReel: number;
+  readonly targetRow: number;
+}
+
 function eventText(event: SpinEvent | undefined, key: string): string | undefined {
   const value = event?.data[key];
   return typeof value === "string" ? value : undefined;
@@ -29,6 +36,31 @@ function positionEntries(value: string | undefined): ReadonlyMap<string, number>
     if (Number.isFinite(parsed)) entries.set(position, parsed);
   }
   return entries;
+}
+
+function parseCell(value: string): readonly [number, number] | null {
+  const [rawReel, rawRow] = value.split(":");
+  const reel = Number(rawReel);
+  const row = Number(rawRow);
+  return Number.isInteger(reel) && Number.isInteger(row) ? [reel, row] : null;
+}
+
+function walkingMoves(value: string | undefined): ReadonlyMap<string, WalkingMove> {
+  const moves = new Map<string, WalkingMove>();
+  for (const token of (value ?? "").split(",")) {
+    const [rawSource, rawTarget] = token.trim().split(">");
+    if (!rawSource || !rawTarget) continue;
+    const source = parseCell(rawSource);
+    const target = parseCell(rawTarget);
+    if (!source || !target) continue;
+    moves.set(`${target[0]}:${target[1]}`, {
+      sourceReel: source[0],
+      sourceRow: source[1],
+      targetReel: target[0],
+      targetRow: target[1],
+    });
+  }
+  return moves;
 }
 
 export function presentSlotCell(
@@ -59,7 +91,18 @@ export function presentSlotCell(
   const walking = events.find((event) => event.type === "wild.walked");
   if (positions(eventText(walking, "positions")).has(key)) {
     states.push("is-walking-wild");
-    descriptions.push(`Walking Wild Schritt ${eventNumber(walking, "step") ?? ""}`.trim());
+    const movement = walkingMoves(eventText(walking, "moves")).get(key);
+    if (movement) {
+      const fromSide = movement.sourceReel < movement.targetReel ? "left" : "right";
+      const distance = Math.max(1, Math.min(4, Math.abs(movement.targetReel - movement.sourceReel)));
+      states.push(`walk-from-${fromSide}`, `walk-distance-${distance}`);
+      if (movement.sourceRow < movement.targetRow) states.push("walk-from-above");
+      if (movement.sourceRow > movement.targetRow) states.push("walk-from-below");
+      descriptions.push(`Walking Wild von Walze ${movement.sourceReel + 1} nach Walze ${movement.targetReel + 1}`);
+    } else {
+      states.push("walk-from-left", "walk-distance-1");
+      descriptions.push(`Walking Wild Schritt ${eventNumber(walking, "step") ?? ""}`.trim());
+    }
     badge = "WILD";
   }
 
