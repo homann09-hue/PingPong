@@ -28,8 +28,9 @@ describe("slot win overlay presentation", () => {
 
     expect(trace?.kind).toBe("path");
     expect(trace?.points.map((point) => point.reel)).toEqual([0, 1, 2, 3]);
-    expect(trace?.points[1]?.y).toBe(375);
+    expect(trace?.points[1]).toMatchObject({ y: 375, width: 200, height: 150 });
     expect(trace?.badge.x).toBeGreaterThan(600);
+    expect(trace?.label).toBe("LINIE 5 · H1 ×4");
   });
 
   it("reverses right-origin line wins without changing the authoritative cells", () => {
@@ -49,22 +50,27 @@ describe("slot win overlay presentation", () => {
       kind: "ways",
       amount: 4_000,
       ways: 8,
+      symbol: "A",
+      count: 3,
       cells: [[0, 0], [0, 1], [1, 0], [1, 2], [2, 1]],
     })], grid);
 
     expect(trace?.kind).toBe("ways");
     expect(trace?.edges).toEqual([]);
     expect(trace?.points).toHaveLength(5);
+    expect(trace?.label).toBe("8 WEGE · A ×5");
   });
 
   it("connects only orthogonally adjacent cluster cells", () => {
     const [trace] = presentSlotWinOverlay([win({
       kind: "cluster",
       amount: 2_500,
+      symbol: "K",
       cells: [[0, 0], [1, 0], [1, 1], [2, 1], [4, 4]],
     })], grid);
 
     expect(trace?.kind).toBe("cluster");
+    expect(trace?.label).toBe("CLUSTER 5 · K");
     expect(trace?.edges).toHaveLength(3);
     expect(trace?.edges.map((edge) => `${edge.from.reel}:${edge.from.row}>${edge.to.reel}:${edge.to.row}`)).toEqual([
       "0:0>1:0",
@@ -82,5 +88,6 @@ describe("slot win overlay presentation", () => {
     expect(traces).toHaveLength(1);
     expect(traces[0]?.kind).toBe("scatter");
     expect(traces[0]?.points).toHaveLength(1);
+    expect(traces[0]?.label).toBe("SCATTER 1");
   });
 });
