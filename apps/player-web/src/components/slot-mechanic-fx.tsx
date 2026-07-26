@@ -1,4 +1,6 @@
-import type { CSSProperties } from "react";
+"use client";
+
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { SpinEvent, SpinRoundPhase } from "@/lib/contracts";
 import type { SlotCabinetMode } from "@/lib/catalog";
 import { resolveSlotBonusPresentation, type SlotBonusPresentation } from "@/lib/slot-bonus-presentation";
@@ -8,6 +10,12 @@ import {
   resolveMysteryReveal,
   type FreeSpinRevealPresentation,
 } from "@/lib/slot-feature-reveal-presentation";
+import {
+  buildSlotMechanicSequence,
+  nextSlotMechanicStep,
+  slotMechanicEventSignature,
+  type SlotMechanicSequenceEffect,
+} from "@/lib/slot-mechanic-sequence";
 import { resolveSymbolUpgradePresentation } from "@/lib/slot-symbol-upgrade-presentation";
 
 export interface SlotMechanicFxProps {
@@ -17,8 +25,6 @@ export interface SlotMechanicFxProps {
   readonly events: readonly SpinEvent[];
   readonly cabinet: SlotCabinetMode;
 }
-
-type MechanicEffect = "cascade" | "walking-wild" | "free-spin" | "respin" | "bonus" | "mystery" | "upgrade" | "multiplier" | "jackpot" | "hit";
 
 interface WalkingPath {
   readonly direction: "left" | "right";
@@ -51,19 +57,6 @@ function walkingPath(events: readonly SpinEvent[]): WalkingPath {
   const distance = valid ? Math.max(1, Math.min(4, Math.abs(targetReel - sourceReel))) : 1;
   const direction = valid && targetReel < sourceReel ? "left" : "right";
   return { direction, count, distance };
-}
-
-function effectFor(phase: SpinRoundPhase, totalWin: number, events: readonly SpinEvent[]): MechanicEffect | null {
-  if (hasEvent(events, "max_win.reached")) return "jackpot";
-  if (phase === "bonus" || hasEvent(events, "bonus.awarded")) return "bonus";
-  if (hasEvent(events, "wild.walked")) return "walking-wild";
-  if (hasEvent(events, "mystery.revealed")) return "mystery";
-  if (hasEvent(events, "symbol.upgraded")) return "upgrade";
-  if (phase === "free_spin" || hasEvent(events, "free_spins.awarded") || hasEvent(events, "free_spins.modified")) return "free-spin";
-  if (phase === "cascade" || hasEvent(events, "cascade.started")) return "cascade";
-  if (phase === "respin" || hasEvent(events, "respin.started")) return "respin";
-  if (hasEvent(events, "multiplier.applied")) return "multiplier";
-  return totalWin > 0 ? "hit" : null;
 }
 
 const indexedStyle = (index: number) => ({ "--fx-index": index } as CSSProperties);
@@ -139,27 +132,40 @@ function FreeSpinFx({ presentation }: Readonly<{ presentation: FreeSpinRevealPre
 }
 
 export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Readonly<SlotMechanicFxProps>) {
-  const effect = effectFor(phase, totalWin, events);
-  if (!effect) return null;
-
   const walking = walkingPath(events);
   const bonus = resolveSlotBonusPresentation(events);
   const mystery = resolveMysteryReveal(events);
   const freeSpins = resolveFreeSpinReveal(phase, index, events);
   const multiplier = resolveMultiplierReveal(events);
   const upgrade = resolveSymbolUpgradePresentation(events);
+  const sequence = useMemo(
+    () => buildSlotMechanicSequence(phase, totalWin, events, freeSpins.mode),
+    [events, freeSpins.mode, phase, totalWin],
+  );
+  const signature = useMemo(
+    () => slotMechanicEventSignature(phase, index, totalWin, events),
+    [events, index, phase, totalWin],
+  );
+  const [activeStep, setActiveStep] = useState(0);
+  const normalizedStep = Math.min(activeStep, sequence.length);
+  const activeSequenceStep = sequence[normalizedStep];
+  const activeEffect = activeSequenceStep?.effect;
+  const persistentFreeSpin = freeSpins.mode === "active";
 
-  return <div
-    key={`${effect}-${phase}-${index}`}
-    className="slot-mechanic-fx"
-    data-effect={effect}
-    data-cabinet={cabinet}
-    data-multiplier={hasEvent(events, "multiplier.applied") ? "true" : "false"}
-    data-free-spin-mode={effect === "free-spin" ? freeSpins.mode ?? "none" : undefined}
-    aria-hidden="true"
-  >
-    <div className="slot-fx-vignette" />
+  useEffect(() => setActiveStep(0), [signature]);
 
+  useEffect(() => {
+    if (!activeSequenceStep) return undefined;
+    const timer = window.setTimeout(
+      () => setActiveStep((current) => nextSlotMechanicStep(current, sequence.length)),
+      activeSequenceStep.durationMs,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeSequenceStep, sequence.length]);
+
+  if (!activeEffect && !persistentFreeSpin) return null;
+
+  const renderEffect = (effect: SlotMechanicSequenceEffect) => <>
     {effect === "cascade" && <div className="slot-fx-cascade">
       <div className="slot-fx-impact" />
       {Array.from({ length: 16 }, (_, particle) => <i key={particle} style={indexedStyle(particle)} />)}
@@ -196,5 +202,26 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
     {effect === "multiplier" && <div className="slot-fx-multiplier"><span>×{multiplier.multiplier}</span><small>{multiplier.label}</small></div>}
     {effect === "jackpot" && <div className="slot-fx-jackpot"><span className="slot-fx-jackpot-core">MAX</span>{Array.from({ length: 20 }, (_, ray) => <i key={ray} style={indexedStyle(ray)} />)}</div>}
     {effect === "hit" && <div className="slot-fx-hit">{Array.from({ length: 14 }, (_, spark) => <i key={spark} style={indexedStyle(spark)} />)}</div>}
+  </>;
+
+  return <div
+    key={`${signature}-${activeEffect ?? "session"}`}
+    className="slot-mechanic-fx"
+    data-effect={activeEffect ?? "session"}
+    data-cabinet={cabinet}
+    data-multiplier={hasEvent(events, "multiplier.applied") ? "true" : "false"}
+    data-free-spin-mode={persistentFreeSpin ? "active" : activeEffect === "free-spin" ? freeSpins.mode ?? "none" : undefined}
+    data-sequence-active={activeEffect ? "true" : "false"}
+    data-sequence-step={sequence.length > 0 ? `${Math.min(normalizedStep + 1, sequence.length)}/${sequence.length}` : undefined}
+    aria-hidden="true"
+  >
+    {activeEffect && <div className="slot-fx-vignette" />}
+    {persistentFreeSpin && <FreeSpinFx presentation={freeSpins} />}
+    {activeEffect && <div key={`${activeEffect}-${normalizedStep}`} className="slot-mechanic-sequence-layer" data-effect={activeEffect}>
+      {renderEffect(activeEffect)}
+    </div>}
+    {activeEffect && sequence.length > 1 && <div className="slot-mechanic-sequence-pager">
+      {sequence.map((step, stepIndex) => <i key={`${step.effect}-${stepIndex}`} data-state={stepIndex < normalizedStep ? "done" : stepIndex === normalizedStep ? "active" : "pending"} />)}
+    </div>}
   </div>;
 }
