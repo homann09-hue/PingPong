@@ -107,7 +107,7 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
           {trace.kind === "scatter" && <path className="slot-win-scatter-star" d="M0-26 7-8 26-8 11 4 17 23 0 12-17 23-11 4-26-8-7-8Z" />}
         </g>)}
 
-        <g className="slot-win-label" transform="translate(500 38)">
+        <g className="slot-win-label" transform="translate(500 66)">
           <rect x="-170" y="-18" width="340" height="36" rx="18" />
           <text x="0" y="6">{trace.label}</text>
         </g>
