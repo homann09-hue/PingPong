@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { SlotCabinetMode } from "@/lib/catalog";
 import type { SpinWin } from "@/lib/contracts";
@@ -58,7 +60,7 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
   >
     {traces.map((trace, index) => {
       const polyline = trace.points.map((point) => `${point.x},${point.y}`).join(" ");
-      const selected = reducedMotion || index === activeTraceIndex;
+      const selected = index === activeTraceIndex;
       return <g
         key={`${trace.id}-${selected ? "active" : "idle"}`}
         className="slot-win-trace"
