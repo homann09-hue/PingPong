@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { SlotCabinetMode } from "@/lib/catalog";
 import type { SpinWin } from "@/lib/contracts";
 import { compactNumber } from "@/lib/format";
 import { presentSlotWinOverlay, slotWinOverlayViewBox } from "@/lib/slot-win-overlay-presentation";
-import { buildSlotWinSequence, nextSlotWinStep } from "@/lib/slot-win-sequence";
+import { buildSlotWinSequence, nextSlotWinStep, slotWinTraceCellKeys } from "@/lib/slot-win-sequence";
 
 export interface SlotWinOverlayProps {
   readonly wins: readonly SpinWin[];
@@ -18,11 +18,17 @@ const traceStyle = (index: number) => ({ "--win-index": index } as CSSProperties
 const pointStyle = (index: number) => ({ "--point-index": index } as CSSProperties);
 
 export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWinOverlayProps>) {
+  const overlayRef = useRef<SVGSVGElement>(null);
   const traces = useMemo(() => presentSlotWinOverlay(wins, grid), [grid, wins]);
   const sequence = useMemo(() => buildSlotWinSequence(traces), [traces]);
   const signature = useMemo(() => traces.map((trace) => `${trace.id}:${trace.amount}`).join("|"), [traces]);
   const [activeStep, setActiveStep] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const normalizedStep = sequence.length > 0 ? Math.min(activeStep, sequence.length - 1) : 0;
+  const activeTraceIndex = sequence[normalizedStep]?.traceIndex ?? 0;
+  const activeTrace = active ? traces[activeTraceIndex] : undefined;
+  const activeCellKeys = useMemo(() => slotWinTraceCellKeys(activeTrace), [activeTrace]);
+  const activeCellSignature = activeCellKeys.join("|");
 
   useEffect(() => setActiveStep(0), [signature]);
 
@@ -36,21 +42,60 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
 
   useEffect(() => {
     if (!active || reducedMotion || sequence.length <= 1) return undefined;
-    const normalizedStep = Math.min(activeStep, sequence.length - 1);
     const timer = window.setTimeout(
       () => setActiveStep((current) => nextSlotWinStep(current, sequence.length)),
       sequence[normalizedStep]?.durationMs ?? 1_350,
     );
     return () => window.clearTimeout(timer);
-  }, [active, activeStep, reducedMotion, sequence]);
+  }, [active, normalizedStep, reducedMotion, sequence]);
+
+  useEffect(() => {
+    const frame = overlayRef.current?.closest(".reel-frame");
+    if (!(frame instanceof HTMLElement)) return undefined;
+
+    const clearFocus = () => {
+      frame.removeAttribute("data-win-sequence-focus");
+      frame.querySelectorAll(".symbol.is-active-win-sequence").forEach((element) => {
+        element.classList.remove("is-active-win-sequence");
+        element.removeAttribute("data-active-win-cell");
+      });
+    };
+
+    clearFocus();
+    if (!active || activeCellKeys.length === 0) return clearFocus;
+
+    const reelElements = Array.from(frame.children).filter(
+      (element): element is HTMLElement => element instanceof HTMLElement && element.classList.contains("reel"),
+    );
+
+    for (const key of activeCellKeys) {
+      const [rawReel, rawRow] = key.split(":");
+      const reel = Number(rawReel);
+      const row = Number(rawRow);
+      if (!Number.isInteger(reel) || !Number.isInteger(row) || reel < 0 || row < 0) continue;
+      const reelElement = reelElements[reel];
+      if (!reelElement) continue;
+      const symbolElements = Array.from(reelElement.children).filter(
+        (element): element is HTMLElement => element instanceof HTMLElement
+          && element.classList.contains("symbol")
+          && !element.classList.contains("strip-symbol"),
+      );
+      const symbolElement = symbolElements[row];
+      if (!symbolElement) continue;
+      symbolElement.classList.add("is-active-win-sequence");
+      symbolElement.setAttribute("data-active-win-cell", "true");
+    }
+
+    frame.setAttribute("data-win-sequence-focus", String(activeCellKeys.length));
+    return clearFocus;
+  }, [active, activeCellSignature]);
 
   if (!active || traces.length === 0) return null;
 
-  const normalizedStep = Math.min(activeStep, sequence.length - 1);
-  const activeTraceIndex = sequence[normalizedStep]?.traceIndex ?? 0;
   const pagerStart = 500 - ((sequence.length - 1) * 11);
 
   return <svg
+    ref={overlayRef}
     className="slot-win-overlay"
     data-cabinet={cabinet}
     data-sequence={`${normalizedStep + 1}/${sequence.length}`}
