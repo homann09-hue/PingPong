@@ -194,12 +194,21 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     "--slot-primary": game.primary,
     "--slot-secondary": game.secondary,
     "--slot-cover": `url("${game.cover}")`,
+    "--world-marquee": `"${game.marquee}"`,
+    "--world-mechanic": `"${game.mechanicLabel}"`,
   } as React.CSSProperties;
 
   return <AppShell profile={profile}>
-    <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
+    <section
+      className={`slot-stage slot-world-${game.cabinet}`}
+      data-cabinet={game.cabinet}
+      aria-labelledby="slot-title"
+      aria-describedby="slot-atmosphere"
+      style={themeStyle}
+    >
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
+      <p id="slot-atmosphere" className="slot-atmosphere">{game.atmosphere}</p>
       {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}><span className="slot-intro-emblem" aria-hidden="true" /><p className="slot-intro-name">{game.name}</p><span className="slot-intro-bar" aria-hidden="true"><i /></span></div>}
       <header className="slot-header">
         <Link href="/" className="back-link" aria-label="Zurück zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
