@@ -24,6 +24,7 @@ export interface SlotMechanicFxProps {
   readonly totalWin: number;
   readonly events: readonly SpinEvent[];
   readonly cabinet: SlotCabinetMode;
+  readonly turbo?: boolean;
 }
 
 interface WalkingPath {
@@ -131,7 +132,7 @@ function FreeSpinFx({ presentation }: Readonly<{ presentation: FreeSpinRevealPre
   </div>;
 }
 
-export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Readonly<SlotMechanicFxProps>) {
+export function SlotMechanicFx({ phase, index, totalWin, events, cabinet, turbo = false }: Readonly<SlotMechanicFxProps>) {
   const walking = walkingPath(events);
   const bonus = resolveSlotBonusPresentation(events);
   const mystery = resolveMysteryReveal(events);
@@ -139,12 +140,12 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
   const multiplier = resolveMultiplierReveal(events);
   const upgrade = resolveSymbolUpgradePresentation(events);
   const sequence = useMemo(
-    () => buildSlotMechanicSequence(phase, totalWin, events, freeSpins.mode),
-    [events, freeSpins.mode, phase, totalWin],
+    () => buildSlotMechanicSequence(phase, totalWin, events, freeSpins.mode, turbo),
+    [events, freeSpins.mode, phase, totalWin, turbo],
   );
   const signature = useMemo(
-    () => slotMechanicEventSignature(phase, index, totalWin, events),
-    [events, index, phase, totalWin],
+    () => `${slotMechanicEventSignature(phase, index, totalWin, events)}:${turbo ? "turbo" : "normal"}`,
+    [events, index, phase, totalWin, turbo],
   );
   const [activeStep, setActiveStep] = useState(0);
   const normalizedStep = Math.min(activeStep, sequence.length);
@@ -209,6 +210,7 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
     className="slot-mechanic-fx"
     data-effect={activeEffect ?? "session"}
     data-cabinet={cabinet}
+    data-playback-speed={turbo ? "turbo" : "normal"}
     data-multiplier={hasEvent(events, "multiplier.applied") ? "true" : "false"}
     data-free-spin-mode={persistentFreeSpin ? "active" : activeEffect === "free-spin" ? freeSpins.mode ?? "none" : undefined}
     data-sequence-active={activeEffect ? "true" : "false"}
