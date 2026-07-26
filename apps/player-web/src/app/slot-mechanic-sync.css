@@ -1,0 +1,42 @@
+.slot-mechanic-fx{
+  opacity:1;
+}
+
+/*
+ * Server outcomes are mounted before their grid playback so the HUD and cell
+ * metadata stay available. Pause the cinematic layer until the matching reel
+ * state has actually settled. This prevents feature reveals from firing over
+ * still-spinning symbols or during the destructive/refill half of a cascade.
+ */
+.slot-stage:has(.reel.is-running) .slot-mechanic-fx,
+.slot-stage:has(.symbol[data-cascade-clearing="true"]) .slot-mechanic-fx,
+.slot-stage:has(.reel-frame.is-cascade-refill) .slot-mechanic-fx{
+  opacity:0;
+}
+
+.slot-stage:has(.reel.is-running) .slot-mechanic-fx *,
+.slot-stage:has(.reel.is-running) .slot-mechanic-fx *::before,
+.slot-stage:has(.reel.is-running) .slot-mechanic-fx *::after,
+.slot-stage:has(.symbol[data-cascade-clearing="true"]) .slot-mechanic-fx *,
+.slot-stage:has(.symbol[data-cascade-clearing="true"]) .slot-mechanic-fx *::before,
+.slot-stage:has(.symbol[data-cascade-clearing="true"]) .slot-mechanic-fx *::after,
+.slot-stage:has(.reel-frame.is-cascade-refill) .slot-mechanic-fx *,
+.slot-stage:has(.reel-frame.is-cascade-refill) .slot-mechanic-fx *::before,
+.slot-stage:has(.reel-frame.is-cascade-refill) .slot-mechanic-fx *::after{
+  animation-play-state:paused!important;
+}
+
+/* Keep the server-driven cell states quiet until their reel has stopped. */
+.reel.is-running>.symbol:not(.strip-symbol).slot-cell-feature{
+  opacity:0;
+}
+.reel.is-stopped>.symbol:not(.strip-symbol).slot-cell-feature{
+  opacity:1;
+  transition:opacity 90ms ease-out;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .reel.is-stopped>.symbol:not(.strip-symbol).slot-cell-feature{
+    transition:none;
+  }
+}
