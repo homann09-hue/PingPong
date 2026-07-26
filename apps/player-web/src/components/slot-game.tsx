@@ -19,6 +19,8 @@ import { SlotMechanicFx } from "./slot-mechanic-fx";
 import { SlotWinOverlay } from "./slot-win-overlay";
 import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
+import { resolveFreeSpinReveal } from "@/lib/slot-feature-reveal-presentation";
+import { buildSlotMechanicSequence, slotMechanicSequenceHoldMs } from "@/lib/slot-mechanic-sequence";
 import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
 import { presentSlotCell } from "@/lib/slot-cell-presentation";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
@@ -33,7 +35,7 @@ const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
 const autoSpinOptions = [10, 25, 50, 100] as const;
 const noSpinEvents: readonly SpinEvent[] = [];
 
- type ActiveRoundBanner = RoundPresentation & { readonly key: string };
+type ActiveRoundBanner = RoundPresentation & { readonly key: string };
 interface PlayableSpinRound {
   readonly phase: SpinRoundPhase;
   readonly index: number;
@@ -141,12 +143,14 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [autoRemaining, setAutoRemaining] = useState(0);
   const [roundBanner, setRoundBanner] = useState<ActiveRoundBanner | null>(null);
   const [activeRound, setActiveRound] = useState<PlayableSpinRound | null>(null);
+  const [cellRound, setCellRound] = useState<PlayableSpinRound | null>(null);
   const animatedWin = useAnimatedNumber(win, turbo ? 240 : 780);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
   const grand = jackpots.find((entry) => entry.tier === "GRAND");
   const activeEvents = activeRound?.events ?? noSpinEvents;
+  const cellEvents = cellRound?.events ?? noSpinEvents;
   const winOverlayActive = displayWins.length > 0
     && stoppedReels >= reels.length
     && clearingCells.size === 0
@@ -190,12 +194,14 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       }
 
       setClearingCells(new Set());
+      setCellRound(null);
       setGrid(round.grid);
       setWinCells(new Set());
       setStoppedReels(reelCount);
       setCascadeRefilling(true);
       await wait(turbo ? 55 : 260);
       setCascadeRefilling(false);
+      setCellRound(round);
       setWinCells(targetWinCells);
       setDisplayWins(round.wins);
       return;
@@ -203,6 +209,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
     setClearingCells(new Set());
     setCascadeRefilling(false);
+    setCellRound(null);
     setGrid(round.grid);
     setWinCells(targetWinCells);
     setDisplayWins(round.wins);
@@ -211,6 +218,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     if (!animateReels) {
       await wait(turbo ? 45 : 110);
       setStoppedReels(reelCount);
+      setCellRound(round);
       return;
     }
 
@@ -220,6 +228,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       setStoppedReels(reel);
       if (sound && !turbo) playTones([210 + reel * 35], 0.04, "triangle", 0.025);
     }
+    setCellRound(round);
   }
 
   async function revealResult(body: SpinResult) {
@@ -230,17 +239,20 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
       const round = rounds[roundIndex]!;
       const presentation = presentSpinRound(round, game.mechanicLabel);
-      setActiveRound(round);
+      const freeSpins = resolveFreeSpinReveal(round.phase, round.index, round.events);
+      const mechanicSequence = buildSlotMechanicSequence(round.phase, round.totalWin, round.events, freeSpins.mode, turbo);
+      setActiveRound(null);
       setRoundBanner({ ...presentation, key: `${round.phase}-${round.index}-${roundIndex}` });
       setMessage(presentation.detail);
       await revealRoundGrid(round, roundIndex === 0, previousRound);
+      setActiveRound(round);
       cumulativeWin += round.totalWin;
       setWin(cumulativeWin);
 
       if (sound && round.phase !== "base") {
         playTones(round.totalWin > 0 ? [392, 523, 659] : [294, 392], 0.08, "triangle", 0.035);
       }
-      await wait(turbo ? 120 : round.phase === "base" ? 320 : 1_050);
+      await wait(slotMechanicSequenceHoldMs(mechanicSequence, round.phase, turbo));
       previousRound = round;
     }
 
@@ -248,6 +260,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setClearingCells(new Set());
     setCascadeRefilling(false);
     setActiveRound(null);
+    setCellRound(null);
     setRoundBanner(null);
   }
 
@@ -263,6 +276,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setWin(0);
     setCelebration(null);
     setActiveRound(null);
+    setCellRound(null);
     setRoundBanner(null);
     setMessage(turbo ? "Turbo-Spin läuft …" : "Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
@@ -294,6 +308,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       setClearingCells(new Set());
       setCascadeRefilling(false);
       setActiveRound(null);
+      setCellRound(null);
       setRoundBanner(null);
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
       if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
@@ -330,7 +345,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     <section
       className={`slot-stage slot-world-${game.cabinet}`}
       data-cabinet={game.cabinet}
-      data-spin-phase={activeRound?.phase ?? (spinning ? "base" : "idle")}
+      data-spin-phase={activeRound?.phase ?? cellRound?.phase ?? (spinning ? "base" : "idle")}
+      data-presentation-state={activeRound ? "settled" : spinning ? "transition" : "idle"}
       aria-labelledby="slot-title"
       aria-describedby="slot-atmosphere"
       style={themeStyle}
@@ -338,7 +354,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
       <p id="slot-atmosphere" className="slot-atmosphere">{game.atmosphere}</p>
-      {activeRound && <SlotMechanicFx phase={activeRound.phase} index={activeRound.index} totalWin={activeRound.totalWin} events={activeEvents} cabinet={game.cabinet} />}
+      {activeRound && <SlotMechanicFx phase={activeRound.phase} index={activeRound.index} totalWin={activeRound.totalWin} events={activeEvents} cabinet={game.cabinet} turbo={turbo} />}
       {roundBanner && <div key={roundBanner.key} className="slot-round-banner" data-tone={roundBanner.tone} role="status" aria-live="polite"><strong>{roundBanner.label}</strong><span>{roundBanner.detail}</span></div>}
       {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}><span className="slot-intro-emblem" aria-hidden="true" /><p className="slot-intro-name">{game.name}</p><span className="slot-intro-bar" aria-hidden="true"><i /></span></div>}
       <header className="slot-header">
@@ -362,7 +378,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
             const key = `${reel}:${row}`;
             const winning = winCells.has(key);
             const clearing = clearingCells.has(key);
-            const cell = presentSlotCell(activeEvents, reel, row, symbol);
+            const cell = presentSlotCell(cellEvents, reel, row, symbol);
             const title = [cell.description, clearing ? "Gewinnsymbol löst sich für die nächste Kaskade auf" : undefined].filter(Boolean).join(", ") || undefined;
             return <div className={`symbol ${winning ? "winning" : ""} ${clearing ? "is-cascade-clearing" : ""} ${cell.className}`} key={key} title={title} data-feature-cell={cell.description ? "true" : undefined} data-cascade-clearing={clearing ? "true" : undefined}>
               {hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winning} /> : asset ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} /> : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}
