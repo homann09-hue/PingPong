@@ -1,0 +1,167 @@
+.symbol.is-walking-wild{
+  --walk-origin-x:-112%;
+  --walk-origin-y:0%;
+  --walk-trail-size:190%;
+  animation:none!important;
+  overflow:visible!important;
+}
+
+.symbol.is-walking-wild.walk-distance-2{--walk-trail-size:300%}
+.symbol.is-walking-wild.walk-distance-3{--walk-trail-size:410%}
+.symbol.is-walking-wild.walk-distance-4{--walk-trail-size:520%}
+
+.symbol.is-walking-wild.walk-from-left.walk-distance-1{--walk-origin-x:-112%}
+.symbol.is-walking-wild.walk-from-left.walk-distance-2{--walk-origin-x:-224%}
+.symbol.is-walking-wild.walk-from-left.walk-distance-3{--walk-origin-x:-336%}
+.symbol.is-walking-wild.walk-from-left.walk-distance-4{--walk-origin-x:-448%}
+.symbol.is-walking-wild.walk-from-right.walk-distance-1{--walk-origin-x:112%}
+.symbol.is-walking-wild.walk-from-right.walk-distance-2{--walk-origin-x:224%}
+.symbol.is-walking-wild.walk-from-right.walk-distance-3{--walk-origin-x:336%}
+.symbol.is-walking-wild.walk-from-right.walk-distance-4{--walk-origin-x:448%}
+.symbol.is-walking-wild.walk-from-above{--walk-origin-y:-58%}
+.symbol.is-walking-wild.walk-from-below{--walk-origin-y:58%}
+
+.symbol.is-walking-wild>img,
+.symbol.is-walking-wild>.slot-symbol,
+.symbol.is-walking-wild>.low-symbol{
+  position:relative;
+  z-index:4;
+  animation:slot-walking-wild-arrival .82s cubic-bezier(.12,.82,.18,1.12) both!important;
+  filter:drop-shadow(0 0 14px var(--cell-fx));
+  will-change:transform,filter,opacity;
+}
+
+.symbol.is-walking-wild::after{
+  top:50%;
+  bottom:auto;
+  height:34%;
+  width:var(--walk-trail-size);
+  inset-inline:auto;
+  border-radius:999px;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 12%,color-mix(in srgb,var(--cell-fx) 22%,transparent) 12% 14%,transparent 14% 25%),
+    linear-gradient(90deg,transparent,color-mix(in srgb,var(--cell-fx) 34%,transparent) 22%,color-mix(in srgb,var(--cell-fx) 88%,white) 82%,transparent);
+  box-shadow:0 0 18px color-mix(in srgb,var(--cell-fx) 72%,transparent);
+  filter:blur(4px);
+  opacity:0;
+  transform:translateY(-50%) scaleX(.12);
+  animation:slot-walking-wild-beam .86s ease-out both!important;
+}
+.symbol.is-walking-wild.walk-from-left::after{right:50%;transform-origin:right center}
+.symbol.is-walking-wild.walk-from-right::after{left:50%;transform-origin:left center;background:
+  repeating-linear-gradient(270deg,transparent 0 12%,color-mix(in srgb,var(--cell-fx) 22%,transparent) 12% 14%,transparent 14% 25%),
+  linear-gradient(270deg,transparent,color-mix(in srgb,var(--cell-fx) 34%,transparent) 22%,color-mix(in srgb,var(--cell-fx) 88%,white) 82%,transparent)}
+
+.symbol.is-walking-wild::before{
+  inset:-12%;
+  border:2px solid color-mix(in srgb,var(--cell-fx) 78%,white);
+  border-radius:20%;
+  box-shadow:0 0 24px color-mix(in srgb,var(--cell-fx) 74%,transparent),inset 0 0 20px color-mix(in srgb,var(--cell-fx) 34%,transparent);
+  animation:slot-walking-wild-target .9s ease-out both!important;
+}
+
+.symbol.is-walking-wild .slot-cell-badge{
+  animation:slot-walking-wild-badge .9s cubic-bezier(.15,.86,.2,1) both;
+}
+
+.slot-fx-walking-wild em{
+  position:absolute;
+  left:50%;
+  top:68%;
+  z-index:3;
+  transform:translateX(-50%);
+  padding:.34rem .7rem;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 70%,white);
+  border-radius:999px;
+  background:rgba(5,2,12,.78);
+  color:#fff;
+  font-size:clamp(.7rem,1.5vw,1rem);
+  font-style:normal;
+  font-weight:1000;
+  letter-spacing:.16em;
+  text-shadow:0 0 12px var(--fx-accent);
+  box-shadow:0 0 18px color-mix(in srgb,var(--fx-accent) 48%,transparent);
+  animation:slot-walking-wild-label .95s ease-out both;
+}
+
+.slot-fx-walking-wild[data-direction="left"] i{
+  left:auto;
+  right:calc(7% + var(--fx-index)*21%);
+  animation-name:slot-fx-wild-step-left;
+}
+.slot-fx-walking-wild[data-direction="right"] i{
+  left:calc(7% + var(--fx-index)*21%);
+  right:auto;
+  animation-name:slot-fx-wild-step-right;
+}
+.slot-fx-walking-wild[data-direction="left"] .slot-fx-track{
+  transform-origin:right center;
+  background:linear-gradient(270deg,transparent,var(--fx-accent),var(--fx-secondary),transparent);
+}
+.slot-fx-walking-wild[data-direction="right"] .slot-fx-track{transform-origin:left center}
+.slot-fx-walking-wild[data-distance="2"] .slot-fx-track,
+.slot-fx-walking-wild[data-distance="3"] .slot-fx-track,
+.slot-fx-walking-wild[data-distance="4"] .slot-fx-track{height:6px;box-shadow:0 0 34px var(--fx-accent)}
+
+.slot-world-forge .symbol.is-walking-wild::before{border-radius:2px;border-style:double}
+.slot-world-carnival .symbol.is-walking-wild::before{border-radius:40%}
+.slot-world-ice-palace .symbol.is-walking-wild::before{clip-path:polygon(50% 0,100% 22%,94% 84%,50% 100%,6% 84%,0 22%)}
+.slot-world-saloon .symbol.is-walking-wild::before{border-radius:2px;border-color:#e1ad68}
+.slot-world-starship .symbol.is-walking-wild::after{background:repeating-linear-gradient(90deg,transparent 0 9%,rgba(145,197,255,.85) 9% 10%,transparent 10% 18%)}
+
+@keyframes slot-walking-wild-arrival{
+  0%{opacity:0;transform:translate(var(--walk-origin-x),var(--walk-origin-y)) scale(.62) rotate(-12deg);filter:blur(6px) brightness(2.4) drop-shadow(0 0 24px var(--cell-fx))}
+  52%{opacity:1;transform:translate(7%,0) scale(1.16) rotate(3deg);filter:blur(0) brightness(1.7) drop-shadow(0 0 22px var(--cell-fx))}
+  76%{transform:translate(-3%,0) scale(.96) rotate(-1deg)}
+  100%{opacity:1;transform:translate(0,0) scale(1) rotate(0);filter:brightness(1.08) drop-shadow(0 0 12px var(--cell-fx))}
+}
+@keyframes slot-walking-wild-beam{
+  0%{opacity:0;transform:translateY(-50%) scaleX(.05)}
+  24%{opacity:.95}
+  74%{opacity:.58;transform:translateY(-50%) scaleX(1)}
+  100%{opacity:0;transform:translateY(-50%) scaleX(1.08)}
+}
+@keyframes slot-walking-wild-target{
+  0%{opacity:0;transform:scale(.35) rotate(-18deg)}
+  48%{opacity:1;transform:scale(1.13) rotate(3deg)}
+  100%{opacity:.82;transform:scale(1) rotate(0)}
+}
+@keyframes slot-walking-wild-badge{
+  0%{opacity:0;transform:translateY(-14px) scale(.55)}
+  62%{opacity:1;transform:translateY(2px) scale(1.12)}
+  100%{opacity:1;transform:none}
+}
+@keyframes slot-walking-wild-label{
+  0%{opacity:0;transform:translate(-50%,12px) scale(.75)}
+  42%{opacity:1;transform:translate(-50%,0) scale(1.06)}
+  100%{opacity:0;transform:translate(-50%,-8px) scale(.94)}
+}
+@keyframes slot-fx-wild-step-right{
+  0%{opacity:0;transform:translate(-180%,-50%) scale(.45) rotate(-16deg)}
+  45%{opacity:1;transform:translate(-50%,-50%) scale(1.08) rotate(2deg)}
+  100%{opacity:0;transform:translate(100%,-50%) scale(.82) rotate(9deg)}
+}
+@keyframes slot-fx-wild-step-left{
+  0%{opacity:0;transform:translate(180%,-50%) scale(.45) rotate(16deg)}
+  45%{opacity:1;transform:translate(50%,-50%) scale(1.08) rotate(-2deg)}
+  100%{opacity:0;transform:translate(-100%,-50%) scale(.82) rotate(-9deg)}
+}
+
+@media(max-width:700px){
+  .symbol.is-walking-wild.walk-distance-3{--walk-origin-x:-290%}
+  .symbol.is-walking-wild.walk-from-right.walk-distance-3{--walk-origin-x:290%}
+  .symbol.is-walking-wild.walk-distance-4{--walk-origin-x:-380%}
+  .symbol.is-walking-wild.walk-from-right.walk-distance-4{--walk-origin-x:380%}
+  .slot-fx-walking-wild em{top:72%;font-size:.62rem}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .symbol.is-walking-wild>img,
+  .symbol.is-walking-wild>.slot-symbol,
+  .symbol.is-walking-wild>.low-symbol,
+  .symbol.is-walking-wild::before,
+  .symbol.is-walking-wild::after,
+  .symbol.is-walking-wild .slot-cell-badge,
+  .slot-fx-walking-wild i,
+  .slot-fx-walking-wild em{animation-duration:1ms!important;animation-delay:0ms!important}
+}
