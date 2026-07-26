@@ -14,8 +14,9 @@ import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
-import { initialGrid, type JackpotTier, type SpinResult } from "@/lib/contracts";
+import { initialGrid, type JackpotTier, type SpinResult, type SpinRound } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
+import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
 import { hasSymbolArt, SlotSymbol } from "@/lib/slot-symbols";
 import { coinNumber } from "@/lib/format";
@@ -26,6 +27,8 @@ const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
 const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
 const autoSpinOptions = [10, 25, 50, 100] as const;
+
+type ActiveRoundBanner = RoundPresentation & { readonly key: string };
 
 let audioContext: AudioContext | null = null;
 function playTones(frequencies: readonly number[], step = 0.09, type: OscillatorType = "triangle", volume = 0.05) {
@@ -45,6 +48,10 @@ function playTones(frequencies: readonly number[], step = 0.09, type: Oscillator
       oscillator.stop(now + (index + 1) * step + 0.02);
     });
   } catch { /* Sound ist optional. */ }
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function useAnimatedNumber(target: number, duration = 650) {
@@ -90,6 +97,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
   const [autoRemaining, setAutoRemaining] = useState(0);
+  const [roundBanner, setRoundBanner] = useState<ActiveRoundBanner | null>(null);
   const animatedWin = useAnimatedNumber(win, turbo ? 240 : 780);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
@@ -120,16 +128,54 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     return () => clearTimeout(timer);
   }, [autoRemaining, spinning, turbo]);
 
-  async function revealResult(body: SpinResult) {
-    setGrid(body.spin.grid);
-    const reelCount = body.spin.grid.length;
-    const step = turbo ? 45 : 125;
+  async function revealRoundGrid(round: SpinRound, animateReels: boolean) {
+    setGrid(round.grid);
+    setWinCells(new Set(round.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
+    const reelCount = round.grid.length;
     setStoppedReels(0);
+
+    if (!animateReels) {
+      await wait(turbo ? 45 : 110);
+      setStoppedReels(reelCount);
+      return;
+    }
+
+    const step = turbo ? 45 : 125;
     for (let reel = 1; reel <= reelCount; reel += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, step));
+      await wait(step);
       setStoppedReels(reel);
       if (sound && !turbo) playTones([210 + reel * 35], 0.04, "triangle", 0.025);
     }
+  }
+
+  async function revealResult(body: SpinResult) {
+    const rounds: readonly SpinRound[] = body.spin.rounds.length > 0 ? body.spin.rounds : [{
+      phase: "base",
+      index: 0,
+      grid: body.spin.grid,
+      wins: body.spin.wins,
+      totalWin: body.spin.totalWin,
+      events: [],
+    }];
+
+    let cumulativeWin = 0;
+    for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+      const round = rounds[roundIndex]!;
+      const presentation = presentSpinRound(round, game.mechanicLabel);
+      setRoundBanner({ ...presentation, key: `${round.phase}-${round.index}-${roundIndex}` });
+      setMessage(presentation.detail);
+      await revealRoundGrid(round, roundIndex === 0);
+      cumulativeWin += round.totalWin;
+      setWin(cumulativeWin);
+
+      if (sound && round.phase !== "base") {
+        playTones(round.totalWin > 0 ? [392, 523, 659] : [294, 392], 0.08, "triangle", 0.035);
+      }
+      await wait(turbo ? 90 : round.phase === "base" ? 240 : 620);
+    }
+
+    setWin(body.spin.totalWin);
+    setRoundBanner(null);
   }
 
   async function spin() {
@@ -140,6 +186,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setWinCells(new Set());
     setWin(0);
     setCelebration(null);
+    setRoundBanner(null);
     setMessage(turbo ? "Turbo-Spin läuft …" : "Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
@@ -150,10 +197,9 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       });
       const body = await response.json() as SpinResult & { code?: string };
       if (!response.ok) throw new Error(body.code ?? "SPIN_FAILED");
-      await new Promise((resolve) => window.setTimeout(resolve, turbo ? 80 : 260));
+      await wait(turbo ? 80 : 260);
       await revealResult(body);
       setWin(body.spin.totalWin);
-      setWinCells(new Set(body.spin.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
       if (body.jackpots) setJackpots(body.jackpots);
       if (body.spin.totalWin > 0) {
         setMessage(`${body.spin.winClass ?? "GEWINN"} · ${coinNumber(body.spin.totalWin)} Coins`);
@@ -167,6 +213,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     } catch (cause) {
       setStoppedReels(5);
       setAutoRemaining(0);
+      setRoundBanner(null);
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
       if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
       else if (code === "HIGH_ROLLER_MEMBERSHIP_REQUIRED") setMessage("Dieser Slot ist dem High Roller Club vorbehalten.");
@@ -202,6 +249,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     <section
       className={`slot-stage slot-world-${game.cabinet}`}
       data-cabinet={game.cabinet}
+      data-spin-phase={roundBanner?.phase ?? (spinning ? "base" : "idle")}
       aria-labelledby="slot-title"
       aria-describedby="slot-atmosphere"
       style={themeStyle}
@@ -209,6 +257,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
       <p id="slot-atmosphere" className="slot-atmosphere">{game.atmosphere}</p>
+      {roundBanner && <div key={roundBanner.key} className="slot-round-banner" data-tone={roundBanner.tone} role="status" aria-live="polite"><strong>{roundBanner.label}</strong><span>{roundBanner.detail}</span></div>}
       {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}><span className="slot-intro-emblem" aria-hidden="true" /><p className="slot-intro-name">{game.name}</p><span className="slot-intro-bar" aria-hidden="true"><i /></span></div>}
       <header className="slot-header">
         <Link href="/" className="back-link" aria-label="Zurück zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
