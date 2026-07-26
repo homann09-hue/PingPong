@@ -12,16 +12,20 @@ export interface SlotWinOverlayProps {
   readonly grid: readonly (readonly string[])[];
   readonly active: boolean;
   readonly cabinet: SlotCabinetMode;
+  readonly turbo?: boolean;
 }
 
 const traceStyle = (index: number) => ({ "--win-index": index } as CSSProperties);
 const pointStyle = (index: number) => ({ "--point-index": index } as CSSProperties);
 
-export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWinOverlayProps>) {
+export function SlotWinOverlay({ wins, grid, active, cabinet, turbo = false }: Readonly<SlotWinOverlayProps>) {
   const overlayRef = useRef<SVGSVGElement>(null);
   const traces = useMemo(() => presentSlotWinOverlay(wins, grid), [grid, wins]);
-  const sequence = useMemo(() => buildSlotWinSequence(traces), [traces]);
-  const signature = useMemo(() => traces.map((trace) => `${trace.id}:${trace.amount}`).join("|"), [traces]);
+  const sequence = useMemo(() => buildSlotWinSequence(traces, turbo), [traces, turbo]);
+  const signature = useMemo(
+    () => `${traces.map((trace) => `${trace.id}:${trace.amount}`).join("|")}:${turbo ? "turbo" : "normal"}`,
+    [traces, turbo],
+  );
   const [activeStep, setActiveStep] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const normalizedStep = sequence.length > 0 ? Math.min(activeStep, sequence.length - 1) : 0;
@@ -44,10 +48,10 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
     if (!active || reducedMotion || sequence.length <= 1) return undefined;
     const timer = window.setTimeout(
       () => setActiveStep((current) => nextSlotWinStep(current, sequence.length)),
-      sequence[normalizedStep]?.durationMs ?? 1_350,
+      sequence[normalizedStep]?.durationMs ?? (turbo ? 380 : 1_350),
     );
     return () => window.clearTimeout(timer);
-  }, [active, normalizedStep, reducedMotion, sequence]);
+  }, [active, normalizedStep, reducedMotion, sequence, turbo]);
 
   useEffect(() => {
     const frame = overlayRef.current?.closest(".reel-frame");
@@ -98,6 +102,7 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
     ref={overlayRef}
     className="slot-win-overlay"
     data-cabinet={cabinet}
+    data-playback-speed={turbo ? "turbo" : "normal"}
     data-sequence={`${normalizedStep + 1}/${sequence.length}`}
     viewBox={slotWinOverlayViewBox}
     preserveAspectRatio="none"
