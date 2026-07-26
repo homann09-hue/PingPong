@@ -6,6 +6,7 @@ import {
   resolveFreeSpinReveal,
   resolveMultiplierReveal,
   resolveMysteryReveal,
+  type FreeSpinRevealPresentation,
 } from "@/lib/slot-feature-reveal-presentation";
 import { resolveSymbolUpgradePresentation } from "@/lib/slot-symbol-upgrade-presentation";
 
@@ -109,6 +110,34 @@ function BonusFx({ bonus }: Readonly<{ bonus: SlotBonusPresentation }>) {
   </div>;
 }
 
+function FreeSpinFx({ presentation }: Readonly<{ presentation: FreeSpinRevealPresentation }>) {
+  if (!presentation.mode) return null;
+
+  if (presentation.mode === "active") return <div className="slot-fx-free-spin-active" data-special-reels={presentation.specialReels ? "true" : "false"}>
+    <small>FREISPIEL</small>
+    <strong>{presentation.spin}</strong>
+    <span>
+      {presentation.multiplier > 1 && <em>×{presentation.multiplier}</em>}
+      {presentation.extraWilds > 0 && <em>+{presentation.extraWilds} WILDS</em>}
+      {presentation.specialReels && <em>SPEZIALWALZEN</em>}
+    </span>
+  </div>;
+
+  return <div className="slot-fx-free-spin" data-mode={presentation.mode} data-award="true">
+    <span className="slot-fx-ring ring-one" /><span className="slot-fx-ring ring-two" /><span className="slot-fx-ring ring-three" />
+    <strong>{presentation.primary}</strong>
+    <div className="slot-fx-free-spin-copy">
+      <b>{presentation.label}</b>
+      <span>
+        {presentation.multiplier > 1 && <em>×{presentation.multiplier}</em>}
+        {presentation.extraWilds > 0 && <em>+{presentation.extraWilds} WILDS</em>}
+        {presentation.specialReels && <em>SPEZIALWALZEN</em>}
+      </span>
+    </div>
+    {Array.from({ length: presentation.mode === "retrigger" ? 24 : 18 }, (_, spark) => <i key={spark} style={indexedStyle(spark)} />)}
+  </div>;
+}
+
 export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Readonly<SlotMechanicFxProps>) {
   const effect = effectFor(phase, totalWin, events);
   if (!effect) return null;
@@ -126,6 +155,7 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
     data-effect={effect}
     data-cabinet={cabinet}
     data-multiplier={hasEvent(events, "multiplier.applied") ? "true" : "false"}
+    data-free-spin-mode={effect === "free-spin" ? freeSpins.mode ?? "none" : undefined}
     aria-hidden="true"
   >
     <div className="slot-fx-vignette" />
@@ -141,20 +171,7 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
       <em>{walking.direction === "right" ? "→" : "←"} {walking.distance}</em>
     </div>}
 
-    {effect === "free-spin" && <div className="slot-fx-free-spin" data-award={freeSpins.awarded > 0 ? "true" : "false"}>
-      <span className="slot-fx-ring ring-one" /><span className="slot-fx-ring ring-two" /><span className="slot-fx-ring ring-three" />
-      <strong>{freeSpins.primary}</strong>
-      <div className="slot-fx-free-spin-copy">
-        <b>{freeSpins.label}</b>
-        <span>
-          {freeSpins.multiplier > 1 && <em>×{freeSpins.multiplier}</em>}
-          {freeSpins.extraWilds > 0 && <em>+{freeSpins.extraWilds} WILDS</em>}
-          {freeSpins.specialReels && <em>SPEZIALWALZEN</em>}
-        </span>
-      </div>
-      {Array.from({ length: 18 }, (_, spark) => <i key={spark} style={indexedStyle(spark)} />)}
-    </div>}
-
+    {effect === "free-spin" && <FreeSpinFx presentation={freeSpins} />}
     {effect === "respin" && <div className="slot-fx-respin"><span /><strong>↻</strong><em>RESPIN</em></div>}
     {effect === "bonus" && <BonusFx bonus={bonus} />}
     {effect === "mystery" && <div className="slot-fx-mystery" data-count={mystery.count}>
