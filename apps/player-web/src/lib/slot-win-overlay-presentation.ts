@@ -7,6 +7,8 @@ export interface SlotWinPoint {
   readonly row: number;
   readonly x: number;
   readonly y: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface SlotWinEdge {
@@ -20,6 +22,7 @@ export interface SlotWinTrace {
   readonly amount: number;
   readonly symbol?: string;
   readonly count: number;
+  readonly label: string;
   readonly points: readonly SlotWinPoint[];
   readonly edges: readonly SlotWinEdge[];
   readonly badge: Readonly<{ x: number; y: number }>;
@@ -45,6 +48,8 @@ function pointFor(grid: readonly (readonly string[])[], reel: number, row: numbe
     row,
     x: ((reel + 0.5) / grid.length) * viewBoxWidth,
     y: ((row + 0.5) / rowCount) * viewBoxHeight,
+    width: viewBoxWidth / grid.length,
+    height: viewBoxHeight / rowCount,
   };
 }
 
@@ -91,6 +96,21 @@ function orderedPath(points: readonly SlotWinPoint[], direction: SpinWin["direct
   });
 }
 
+function winLabel(win: SpinWin, kind: SlotWinOverlayKind, count: number): string {
+  const symbol = win.symbol ? ` · ${win.symbol}` : "";
+  if (kind === "path") {
+    const line = typeof win.payline === "number" && Number.isFinite(win.payline) ? `LINIE ${Math.trunc(win.payline) + 1}` : "LINIENGEWINN";
+    return `${line}${symbol} ×${count}`;
+  }
+  if (kind === "ways") {
+    const ways = typeof win.ways === "number" && Number.isFinite(win.ways) ? `${Math.max(1, Math.trunc(win.ways))} WEGE` : "WAYS-GEWINN";
+    return `${ways}${symbol} ×${count}`;
+  }
+  if (kind === "cluster") return `CLUSTER ${count}${symbol}`;
+  if (kind === "scatter") return `SCATTER ${count}${symbol}`;
+  return `GEWINN${symbol} ×${count}`;
+}
+
 export function presentSlotWinOverlay(
   wins: readonly SpinWin[],
   grid: readonly (readonly string[])[],
@@ -103,12 +123,14 @@ export function presentSlotWinOverlay(
     const distinctReels = new Set(points.map((point) => point.reel)).size;
     const kind = normalizedKind(win.kind, distinctReels);
     const ordered = kind === "path" ? orderedPath(points, win.direction) : points;
+    const count = Math.max(ordered.length, win.count ?? 0);
     return [{
       id: `${index}-${win.kind ?? "win"}-${ordered.map((point) => `${point.reel}:${point.row}`).join("-")}`,
       kind,
       amount: Math.round(win.amount),
       symbol: win.symbol,
-      count: Math.max(ordered.length, win.count ?? 0),
+      count,
+      label: winLabel(win, kind, count),
       points: ordered,
       edges: kind === "cluster" ? clusterEdges(ordered) : [],
       badge: badgePosition(kind, ordered, win.direction),
