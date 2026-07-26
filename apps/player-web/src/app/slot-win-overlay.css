@@ -20,8 +20,10 @@
 .slot-win-overlay[data-cabinet="saloon"]{--win-accent:#f2c884;--win-secondary:#9a61b5}
 .slot-win-overlay[data-cabinet="starship"]{--win-accent:#9fd0ff;--win-secondary:#dc77ff}
 
-.slot-win-trace{
-  animation:slot-win-trace-life 1.6s ease-in-out calc(var(--win-index)*90ms) both;
+.slot-win-trace{display:none}
+.slot-win-trace[data-active="true"]{
+  display:block;
+  animation:slot-win-trace-life 1.5s ease-in-out both;
 }
 .slot-win-path-glow,
 .slot-win-path-core,
@@ -42,14 +44,14 @@
   stroke-width:4;
   stroke-dasharray:18 12;
   filter:drop-shadow(0 0 5px var(--win-accent));
-  animation:slot-win-path-draw .82s cubic-bezier(.2,.78,.24,1) calc(var(--win-index)*90ms) both,slot-win-path-flow .75s linear infinite;
+  animation:slot-win-path-draw .82s cubic-bezier(.2,.78,.24,1) both,slot-win-path-flow .75s linear infinite;
 }
 .slot-win-cluster-edge{
   stroke:color-mix(in srgb,var(--win-secondary) 58%,var(--win-accent));
   stroke-width:10;
   opacity:.42;
   filter:drop-shadow(0 0 7px var(--win-secondary));
-  animation:slot-win-cluster-bridge .7s ease-out calc(var(--win-index)*80ms) both;
+  animation:slot-win-cluster-bridge .7s ease-out both;
 }
 .slot-win-node{
   transform-box:fill-box;
@@ -65,14 +67,14 @@
   stroke-width:12;
   opacity:.28;
   filter:blur(4px);
-  animation:slot-win-node-halo 1.05s ease-out calc(var(--win-index)*90ms + var(--point-index,0)*35ms) both;
+  animation:slot-win-node-halo 1.05s ease-out calc(var(--point-index,0)*35ms) both;
 }
 .slot-win-node-ring{
   stroke:color-mix(in srgb,var(--win-accent) 82%,white 18%);
   stroke-width:4;
   fill:color-mix(in srgb,var(--win-secondary) 8%,transparent);
   filter:drop-shadow(0 0 7px var(--win-accent));
-  animation:slot-win-node-ring .82s cubic-bezier(.16,.86,.2,1) calc(var(--win-index)*90ms + var(--point-index,0)*28ms) both;
+  animation:slot-win-node-ring .82s cubic-bezier(.16,.86,.2,1) calc(var(--point-index,0)*28ms) both;
 }
 .slot-win-trace[data-kind="ways"] .slot-win-node-ring{stroke-dasharray:9 7}
 .slot-win-trace[data-kind="cluster"] .slot-win-node-ring{stroke-width:6;fill:color-mix(in srgb,var(--win-secondary) 14%,transparent)}
@@ -81,11 +83,11 @@
   fill:color-mix(in srgb,var(--win-accent) 86%,white 14%);
   opacity:.88;
   filter:drop-shadow(0 0 8px var(--win-accent));
-  animation:slot-win-scatter-star .9s cubic-bezier(.14,.82,.2,1) calc(var(--win-index)*90ms + var(--point-index,0)*28ms) both;
+  animation:slot-win-scatter-star .9s cubic-bezier(.14,.82,.2,1) calc(var(--point-index,0)*28ms) both;
 }
 .slot-win-amount{
   opacity:0;
-  animation:slot-win-amount-pop .82s cubic-bezier(.14,.9,.18,1) calc(220ms + var(--win-index)*90ms) both;
+  animation:slot-win-amount-pop .82s cubic-bezier(.14,.9,.18,1) 220ms both;
 }
 .slot-win-amount rect{
   fill:rgba(4,3,10,.9);
@@ -105,6 +107,17 @@
   stroke-width:4;
   vector-effect:non-scaling-stroke;
 }
+.slot-win-sequence-pager circle{
+  fill:rgba(255,255,255,.34);
+  stroke:rgba(0,0,0,.72);
+  stroke-width:2;
+  vector-effect:non-scaling-stroke;
+  transition:r 160ms ease,fill 160ms ease,filter 160ms ease;
+}
+.slot-win-sequence-pager circle[data-active="true"]{
+  fill:var(--win-accent);
+  filter:drop-shadow(0 0 6px var(--win-accent));
+}
 
 .slot-stage:has(.reel.is-running) .slot-win-overlay,
 .slot-stage:has(.symbol[data-cascade-clearing="true"]) .slot-win-overlay,
@@ -114,8 +127,8 @@
 
 @keyframes slot-win-trace-life{
   0%{opacity:0}
-  14%,78%{opacity:1}
-  100%{opacity:.28}
+  12%,82%{opacity:1}
+  100%{opacity:.32}
 }
 @keyframes slot-win-path-draw{
   0%{stroke-dashoffset:140;opacity:0}
@@ -168,4 +181,5 @@
     animation:none!important;
   }
   .slot-win-amount{opacity:1}
+  .slot-win-sequence-pager{display:none}
 }
