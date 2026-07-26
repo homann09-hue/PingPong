@@ -33,13 +33,19 @@ interface WalkingPath {
   readonly distance: number;
 }
 
+interface ScatterPresentation {
+  readonly count: number;
+  readonly symbol: string;
+}
+
 function hasEvent(events: readonly SpinEvent[], type: string): boolean {
   return events.some((event) => event.type === type);
 }
 
-function eventNumber(events: readonly SpinEvent[], type: string, key: string): number | undefined {
+function eventNumber(events: readonly SpinEvent[], type: string, key: string, maximum = 1_000_000): number | undefined {
   const value = events.find((event) => event.type === type)?.data[key];
-  return typeof value === "number" ? value : undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(maximum, Math.max(0, value));
 }
 
 function eventText(events: readonly SpinEvent[], type: string, key: string): string | undefined {
@@ -49,15 +55,29 @@ function eventText(events: readonly SpinEvent[], type: string, key: string): str
 
 function walkingPath(events: readonly SpinEvent[]): WalkingPath {
   const rawMoves = eventText(events, "wild.walked", "moves") ?? "";
-  const moves = rawMoves.split(",").map((entry) => entry.trim()).filter(Boolean);
+  const moves = rawMoves.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 5);
   const first = moves[0]?.split(">");
   const sourceReel = Number(first?.[0]?.split(":")[0]);
   const targetReel = Number(first?.[1]?.split(":")[0]);
   const valid = Number.isInteger(sourceReel) && Number.isInteger(targetReel);
-  const count = Math.max(1, Math.min(5, moves.length || eventNumber(events, "wild.walked", "count") || 1));
+  const count = Math.max(1, Math.min(5, moves.length || eventNumber(events, "wild.walked", "count", 5) || 1));
   const distance = valid ? Math.max(1, Math.min(4, Math.abs(targetReel - sourceReel))) : 1;
   const direction = valid && targetReel < sourceReel ? "left" : "right";
   return { direction, count, distance };
+}
+
+function scatterPresentation(events: readonly SpinEvent[]): ScatterPresentation {
+  const scatterEvents = events.filter((event) => event.type === "scatter.hit");
+  const strongest = scatterEvents.reduce<SpinEvent | undefined>((current, event) => {
+    const count = typeof event.data.count === "number" && Number.isFinite(event.data.count) ? event.data.count : 0;
+    const currentCount = typeof current?.data.count === "number" && Number.isFinite(current.data.count) ? current.data.count : 0;
+    return count > currentCount ? event : current;
+  }, undefined);
+  const rawSymbol = typeof strongest?.data.symbol === "string" ? strongest.data.symbol.trim() : "SCATTER";
+  return {
+    count: Math.max(2, Math.min(20, typeof strongest?.data.count === "number" && Number.isFinite(strongest.data.count) ? strongest.data.count : 2)),
+    symbol: rawSymbol.slice(0, 12) || "SCATTER",
+  };
 }
 
 const indexedStyle = (index: number) => ({ "--fx-index": index } as CSSProperties);
@@ -134,6 +154,7 @@ function FreeSpinFx({ presentation }: Readonly<{ presentation: FreeSpinRevealPre
 
 export function SlotMechanicFx({ phase, index, totalWin, events, cabinet, turbo = false }: Readonly<SlotMechanicFxProps>) {
   const walking = walkingPath(events);
+  const scatter = scatterPresentation(events);
   const bonus = resolveSlotBonusPresentation(events);
   const mystery = resolveMysteryReveal(events);
   const freeSpins = resolveFreeSpinReveal(phase, index, events);
@@ -176,6 +197,16 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet, turbo 
       <span className="slot-fx-track" />
       {Array.from({ length: walking.count }, (_, step) => <i key={step} style={indexedStyle(step)}>WILD</i>)}
       <em>{walking.direction === "right" ? "→" : "←"} {walking.distance}</em>
+    </div>}
+
+    {effect === "scatter" && <div className="slot-fx-scatter" data-count={scatter.count}>
+      <span className="slot-fx-scatter-orbit" />
+      <div className="slot-fx-scatter-symbols">
+        {Array.from({ length: Math.min(5, scatter.count) }, (_, scatterIndex) => <i key={scatterIndex} style={indexedStyle(scatterIndex)}><b>★</b><em>{scatter.symbol}</em></i>)}
+      </div>
+      <strong>{scatter.count} SCATTER</strong>
+      <small>{scatter.count >= 3 ? "FEATURE TRIGGER" : "EINER FEHLT"}</small>
+      {Array.from({ length: 18 }, (_, spark) => <u key={spark} style={indexedStyle(spark)} />)}
     </div>}
 
     {effect === "free-spin" && <FreeSpinFx presentation={freeSpins} />}
