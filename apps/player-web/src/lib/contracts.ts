@@ -106,6 +106,11 @@ export interface SpinWin {
   readonly kind?: "line" | "ways" | "cluster" | "scatter" | string;
   readonly amount: number;
   readonly cells: readonly [number, number][];
+  readonly symbol?: string;
+  readonly count?: number;
+  readonly payline?: number;
+  readonly direction?: "left" | "right";
+  readonly ways?: number;
 }
 
 export type SpinRoundPhase = "base" | "free_spin" | "respin" | "cascade" | "bonus";
