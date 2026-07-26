@@ -68,6 +68,19 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
         data-kind={trace.kind}
         style={traceStyle(index)}
       >
+        <rect className="slot-win-focus-scrim" x="0" y="0" width="1000" height="600" />
+
+        {trace.points.map((point, pointIndex) => <rect
+          key={`${trace.id}-focus-${point.reel}:${point.row}`}
+          className="slot-win-cell-focus"
+          x={point.x - point.width * 0.42}
+          y={point.y - point.height * 0.39}
+          width={point.width * 0.84}
+          height={point.height * 0.78}
+          rx={Math.min(28, point.width * 0.11)}
+          style={pointStyle(pointIndex)}
+        />)}
+
         {trace.kind === "path" && <>
           <polyline className="slot-win-path-glow" points={polyline} />
           <polyline className="slot-win-path-core" points={polyline} />
@@ -93,6 +106,11 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
           <circle className="slot-win-node-ring" r={trace.kind === "cluster" ? 31 : 26} />
           {trace.kind === "scatter" && <path className="slot-win-scatter-star" d="M0-26 7-8 26-8 11 4 17 23 0 12-17 23-11 4-26-8-7-8Z" />}
         </g>)}
+
+        <g className="slot-win-label" transform="translate(500 38)">
+          <rect x="-170" y="-18" width="340" height="36" rx="18" />
+          <text x="0" y="6">{trace.label}</text>
+        </g>
 
         <g className="slot-win-amount" transform={`translate(${trace.badge.x} ${trace.badge.y})`}>
           <rect x="-58" y="-18" width="116" height="36" rx="18" />
