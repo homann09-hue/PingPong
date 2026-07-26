@@ -23,6 +23,7 @@ import { resolveFreeSpinReveal } from "@/lib/slot-feature-reveal-presentation";
 import { buildSlotMechanicSequence, slotMechanicSequenceHoldMs } from "@/lib/slot-mechanic-sequence";
 import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
 import { presentSlotCell } from "@/lib/slot-cell-presentation";
+import { buildSlotWinSequenceForRound, slotWinSequenceHoldMs } from "@/lib/slot-win-sequence";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
 import { hasSymbolArt, SlotSymbol } from "@/lib/slot-symbols";
 import { coinNumber } from "@/lib/format";
@@ -128,6 +129,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const [grid, setGrid] = useState(initialGrid);
   const [winCells, setWinCells] = useState<Set<string>>(new Set());
   const [displayWins, setDisplayWins] = useState<readonly SpinWin[]>([]);
+  const [winPresentationActive, setWinPresentationActive] = useState(false);
   const [clearingCells, setClearingCells] = useState<Set<string>>(new Set());
   const [cascadeRefilling, setCascadeRefilling] = useState(false);
   const [win, setWin] = useState(0);
@@ -151,7 +153,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const grand = jackpots.find((entry) => entry.tier === "GRAND");
   const activeEvents = activeRound?.events ?? noSpinEvents;
   const cellEvents = cellRound?.events ?? noSpinEvents;
-  const winOverlayActive = displayWins.length > 0
+  const winOverlayActive = winPresentationActive
+    && displayWins.length > 0
     && stoppedReels >= reels.length
     && clearingCells.size === 0
     && !cascadeRefilling;
@@ -181,7 +184,6 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   }, [autoRemaining, spinning, turbo]);
 
   async function revealRoundGrid(round: PlayableSpinRound, animateReels: boolean, previousRound?: PlayableSpinRound) {
-    const targetWinCells = winCellSet(round.wins);
     const reelCount = round.grid.length;
 
     if (round.phase === "cascade" && previousRound) {
@@ -202,7 +204,6 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       await wait(turbo ? 55 : 260);
       setCascadeRefilling(false);
       setCellRound(round);
-      setWinCells(targetWinCells);
       setDisplayWins(round.wins);
       return;
     }
@@ -211,7 +212,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setCascadeRefilling(false);
     setCellRound(null);
     setGrid(round.grid);
-    setWinCells(targetWinCells);
+    setWinCells(new Set());
     setDisplayWins(round.wins);
     setStoppedReels(0);
 
@@ -241,6 +242,9 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       const presentation = presentSpinRound(round, game.mechanicLabel);
       const freeSpins = resolveFreeSpinReveal(round.phase, round.index, round.events);
       const mechanicSequence = buildSlotMechanicSequence(round.phase, round.totalWin, round.events, freeSpins.mode, turbo);
+      const winSequence = buildSlotWinSequenceForRound(round.wins, round.grid, turbo);
+      setWinPresentationActive(false);
+      setWinCells(new Set());
       setActiveRound(null);
       setRoundBanner({ ...presentation, key: `${round.phase}-${round.index}-${roundIndex}` });
       setMessage(presentation.detail);
@@ -252,11 +256,24 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       if (sound && round.phase !== "base") {
         playTones(round.totalWin > 0 ? [392, 523, 659] : [294, 392], 0.08, "triangle", 0.035);
       }
+
       await wait(slotMechanicSequenceHoldMs(mechanicSequence, round.phase, turbo));
+      setActiveRound(null);
+
+      const winHold = slotWinSequenceHoldMs(winSequence, turbo);
+      if (winHold > 0) {
+        setWinCells(winCellSet(round.wins));
+        setWinPresentationActive(true);
+        await wait(winHold);
+        setWinPresentationActive(false);
+        setWinCells(new Set());
+      }
       previousRound = round;
     }
 
     setWin(body.spin.totalWin);
+    setWinPresentationActive(false);
+    setWinCells(new Set());
     setClearingCells(new Set());
     setCascadeRefilling(false);
     setActiveRound(null);
@@ -271,6 +288,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     setStoppedReels(0);
     setWinCells(new Set());
     setDisplayWins([]);
+    setWinPresentationActive(false);
     setClearingCells(new Set());
     setCascadeRefilling(false);
     setWin(0);
@@ -305,6 +323,8 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       setStoppedReels(5);
       setAutoRemaining(0);
       setDisplayWins([]);
+      setWinPresentationActive(false);
+      setWinCells(new Set());
       setClearingCells(new Set());
       setCascadeRefilling(false);
       setActiveRound(null);
@@ -341,12 +361,14 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     "--world-mechanic": `"${game.mechanicLabel}"`,
   } as React.CSSProperties;
 
+  const presentationState = winPresentationActive ? "wins" : activeRound ? "mechanics" : spinning ? "transition" : "idle";
+
   return <AppShell profile={profile}>
     <section
       className={`slot-stage slot-world-${game.cabinet}`}
       data-cabinet={game.cabinet}
       data-spin-phase={activeRound?.phase ?? cellRound?.phase ?? (spinning ? "base" : "idle")}
-      data-presentation-state={activeRound ? "settled" : spinning ? "transition" : "idle"}
+      data-presentation-state={presentationState}
       aria-labelledby="slot-title"
       aria-describedby="slot-atmosphere"
       style={themeStyle}
@@ -368,16 +390,16 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
       <div className="jackpot-strip" aria-label="Progressive Jackpots">{jackpotOrder.map((tier) => { const entry = jackpots.find((jackpot) => jackpot.tier === tier); return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>; })}</div>
       <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeEvents} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
-      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${cascadeRefilling ? "is-cascade-refill" : ""}`} aria-label="Slot-Raster" aria-busy={spinning} data-cascade-refill={cascadeRefilling ? "true" : undefined}>
+      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${cascadeRefilling ? "is-cascade-refill" : ""}`} aria-label="Slot-Raster" aria-busy={spinning} data-cascade-refill={cascadeRefilling ? "true" : undefined} data-presentation-state={presentationState}>
         <div className="spin-status" aria-hidden="true"><span>{turbo ? "TURBO" : "SPIN"}</span><i style={{ width: `${Math.max(0, Math.min(100, (stoppedReels / Math.max(1, reels.length)) * 100))}%` }} /></div>
-        <SlotWinOverlay wins={displayWins} grid={grid} active={winOverlayActive} cabinet={game.cabinet} />
+        <SlotWinOverlay wins={displayWins} grid={grid} active={winOverlayActive} cabinet={game.cabinet} turbo={turbo} />
         {reels.map(({ column, reel }) => <div className={`reel ${reel < stoppedReels ? "is-stopped" : "is-running"}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           <div className="reel-strip" aria-hidden="true">{[...column, ...column, ...column].map((symbol, index) => { const stripAsset = symbolAsset(game.symbolSet, symbol); return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>{stripAsset ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} /> : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}</div>; })}</div>
           {column.map((symbol, row) => {
             const asset = symbolAsset(game.symbolSet, symbol);
             const key = `${reel}:${row}`;
-            const winning = winCells.has(key);
             const clearing = clearingCells.has(key);
+            const winning = (winPresentationActive || clearing) && winCells.has(key);
             const cell = presentSlotCell(cellEvents, reel, row, symbol);
             const title = [cell.description, clearing ? "Gewinnsymbol löst sich für die nächste Kaskade auf" : undefined].filter(Boolean).join(", ") || undefined;
             return <div className={`symbol ${winning ? "winning" : ""} ${clearing ? "is-cascade-clearing" : ""} ${cell.className}`} key={key} title={title} data-feature-cell={cell.description ? "true" : undefined} data-cascade-clearing={clearing ? "true" : undefined}>
