@@ -25,3 +25,8 @@ export function nextSlotWinStep(currentStep: number, sequenceLength: number): nu
   const normalized = Number.isInteger(currentStep) && currentStep >= 0 ? currentStep : 0;
   return (normalized + 1) % sequenceLength;
 }
+
+export function slotWinTraceCellKeys(trace: SlotWinTrace | undefined): readonly string[] {
+  if (!trace) return [];
+  return [...new Set(trace.points.map((point) => `${point.reel}:${point.row}`))];
+}
