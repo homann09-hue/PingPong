@@ -29,7 +29,23 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm run typecheck
+      - name: Typecheck
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          status=$?
+          tail -n 220 typecheck.log
+          exit $status
+      - name: Upload typecheck log
+        if: failure() && steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-log
+          path: typecheck.log
+          if-no-files-found: error
+          retention-days: 3
       - name: Test slot engine
         run: npm run test -w @aurora/slot-engine
       - name: Test API
