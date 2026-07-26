@@ -19,6 +19,7 @@ import { SlotMechanicFx } from "./slot-mechanic-fx";
 import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
 import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
+import { presentSlotCell } from "@/lib/slot-cell-presentation";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
 import { hasSymbolArt, SlotSymbol } from "@/lib/slot-symbols";
 import { coinNumber } from "@/lib/format";
@@ -29,6 +30,7 @@ const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
 const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
 const autoSpinOptions = [10, 25, 50, 100] as const;
+const noSpinEvents: readonly SpinEvent[] = [];
 
 type ActiveRoundBanner = RoundPresentation & { readonly key: string };
 interface PlayableSpinRound {
@@ -134,6 +136,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
   const grand = jackpots.find((entry) => entry.tier === "GRAND");
+  const activeEvents = activeRound?.events ?? noSpinEvents;
 
   useEffect(() => {
     let cancelled = false;
@@ -285,7 +288,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
       <p id="slot-atmosphere" className="slot-atmosphere">{game.atmosphere}</p>
-      {activeRound && <SlotMechanicFx phase={activeRound.phase} index={activeRound.index} totalWin={activeRound.totalWin} events={activeRound.events} cabinet={game.cabinet} />}
+      {activeRound && <SlotMechanicFx phase={activeRound.phase} index={activeRound.index} totalWin={activeRound.totalWin} events={activeEvents} cabinet={game.cabinet} />}
       {roundBanner && <div key={roundBanner.key} className="slot-round-banner" data-tone={roundBanner.tone} role="status" aria-live="polite"><strong>{roundBanner.label}</strong><span>{roundBanner.detail}</span></div>}
       {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}><span className="slot-intro-emblem" aria-hidden="true" /><p className="slot-intro-name">{game.name}</p><span className="slot-intro-bar" aria-hidden="true"><i /></span></div>}
       <header className="slot-header">
@@ -298,12 +301,21 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </header>
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
       <div className="jackpot-strip" aria-label="Progressive Jackpots">{jackpotOrder.map((tier) => { const entry = jackpots.find((jackpot) => jackpot.tier === tier); return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>; })}</div>
-      <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeRound?.events} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
+      <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeEvents} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
       <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
         <div className="spin-status" aria-hidden="true"><span>{turbo ? "TURBO" : "SPIN"}</span><i style={{ width: `${Math.max(0, Math.min(100, (stoppedReels / Math.max(1, reels.length)) * 100))}%` }} /></div>
         {reels.map(({ column, reel }) => <div className={`reel ${reel < stoppedReels ? "is-stopped" : "is-running"}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           <div className="reel-strip" aria-hidden="true">{[...column, ...column, ...column].map((symbol, index) => { const stripAsset = symbolAsset(game.symbolSet, symbol); return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>{stripAsset ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} /> : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}</div>; })}</div>
-          {column.map((symbol, row) => { const asset = symbolAsset(game.symbolSet, symbol); const winning = winCells.has(`${reel}:${row}`); return <div className={`symbol ${winning ? "winning" : ""}`} key={`${reel}-${row}`}>{hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winning} /> : asset ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} /> : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}</div>; })}
+          {column.map((symbol, row) => {
+            const asset = symbolAsset(game.symbolSet, symbol);
+            const winning = winCells.has(`${reel}:${row}`);
+            const cell = presentSlotCell(activeEvents, reel, row, symbol);
+            return <div className={`symbol ${winning ? "winning" : ""} ${cell.className}`} key={`${reel}-${row}`} title={cell.description} data-feature-cell={cell.description ? "true" : undefined}>
+              {hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winning} /> : asset ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} /> : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}
+              {cell.badge && <span className="slot-cell-badge" aria-hidden="true">{cell.badge}</span>}
+              {cell.className && <span className="slot-cell-frame" aria-hidden="true" />}
+            </div>;
+          })}
         </div>)}
       </div>
       <div className={`win-panel ${win > 0 ? "has-win" : ""}`} aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(animatedWin)}</strong>}</div>
