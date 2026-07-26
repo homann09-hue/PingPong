@@ -57,6 +57,7 @@ import "./slot-cascade-sequence.css";
 import "./slot-walking-wild-path.css";
 import "./slot-bonus-presentation.css";
 import "./slot-feature-reveal-sequence.css";
+import "./slot-symbol-upgrade-fx.css";
 import "./slot-mechanic-sync.css";
 import "./slot-win-overlay.css";
 import "./slot-win-focus.css";
