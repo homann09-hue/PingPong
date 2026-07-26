@@ -1,0 +1,211 @@
+.slot-fx-scatter{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-content:center;
+  justify-items:center;
+  gap:clamp(6px,1.2vh,12px);
+  isolation:isolate;
+  pointer-events:none;
+  perspective:900px;
+}
+
+.slot-fx-scatter::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:min(68vw,560px);
+  aspect-ratio:1;
+  border-radius:50%;
+  background:
+    radial-gradient(circle,rgba(255,255,255,.22) 0 3%,transparent 4%),
+    radial-gradient(circle,color-mix(in srgb,var(--fx-accent) 30%,transparent) 0 24%,transparent 62%);
+  filter:blur(1px);
+  transform:translate(-50%,-50%) scale(.5);
+  animation:slot-scatter-bloom 1.15s cubic-bezier(.16,.88,.22,1) both;
+}
+
+.slot-fx-scatter-orbit{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:min(58vw,450px);
+  aspect-ratio:1;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 68%,white 32%);
+  border-radius:50%;
+  box-shadow:
+    0 0 22px color-mix(in srgb,var(--fx-accent) 42%,transparent),
+    inset 0 0 28px color-mix(in srgb,var(--fx-secondary) 22%,transparent);
+  transform:translate(-50%,-50%) rotateX(68deg) scale(.55);
+  opacity:0;
+  animation:slot-scatter-orbit 1.15s cubic-bezier(.2,.82,.2,1) both;
+}
+
+.slot-fx-scatter-symbols{
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(6px,1.3vw,16px);
+  min-height:clamp(82px,18vh,148px);
+}
+
+.slot-fx-scatter-symbols i{
+  --scatter-shift:calc((var(--fx-index) - 2) * 8deg);
+  display:grid;
+  place-items:center;
+  width:clamp(58px,11vw,106px);
+  aspect-ratio:.86;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 72%,white 28%);
+  border-radius:clamp(14px,2.2vw,24px);
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.18),transparent 42%),
+    radial-gradient(circle at 50% 34%,color-mix(in srgb,var(--fx-secondary) 54%,transparent),rgba(7,4,18,.92) 68%);
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.42),
+    inset 0 -18px 30px rgba(0,0,0,.42),
+    0 0 0 2px rgba(0,0,0,.42),
+    0 0 30px color-mix(in srgb,var(--fx-accent) 46%,transparent);
+  color:white;
+  opacity:0;
+  transform:translateY(54px) rotateY(75deg) rotate(var(--scatter-shift)) scale(.54);
+  animation:slot-scatter-card 1.15s cubic-bezier(.16,.9,.2,1) calc(var(--fx-index) * 90ms) both;
+}
+
+.slot-fx-scatter-symbols i b{
+  font-size:clamp(2rem,6vw,4.7rem);
+  line-height:.86;
+  color:color-mix(in srgb,var(--fx-accent) 55%,white 45%);
+  text-shadow:
+    0 0 8px white,
+    0 0 24px var(--fx-accent),
+    0 4px 8px rgba(0,0,0,.6);
+}
+
+.slot-fx-scatter-symbols i em{
+  max-width:90%;
+  overflow:hidden;
+  font-size:clamp(.5rem,1.1vw,.76rem);
+  font-style:normal;
+  font-weight:900;
+  letter-spacing:.14em;
+  text-overflow:ellipsis;
+  text-transform:uppercase;
+  white-space:nowrap;
+  opacity:.8;
+}
+
+.slot-fx-scatter strong,
+.slot-fx-scatter small{
+  position:relative;
+  z-index:3;
+  opacity:0;
+  transform:translateY(12px) scale(.9);
+  animation:slot-scatter-copy .7s ease-out .34s both;
+}
+
+.slot-fx-scatter strong{
+  font-size:clamp(1.5rem,5vw,4rem);
+  line-height:.9;
+  font-weight:1000;
+  letter-spacing:.05em;
+  color:white;
+  text-shadow:
+    0 2px 0 rgba(0,0,0,.7),
+    0 0 10px white,
+    0 0 30px var(--fx-accent),
+    0 0 54px var(--fx-secondary);
+}
+
+.slot-fx-scatter small{
+  padding:6px 14px;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 48%,transparent);
+  border-radius:999px;
+  background:rgba(5,3,16,.62);
+  box-shadow:0 0 18px color-mix(in srgb,var(--fx-accent) 22%,transparent);
+  font-size:clamp(.55rem,1.4vw,.82rem);
+  font-weight:900;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+}
+
+.slot-fx-scatter u{
+  --scatter-angle:calc(var(--fx-index) * 20deg);
+  position:absolute;
+  left:50%;
+  top:50%;
+  z-index:1;
+  width:clamp(3px,.55vw,7px);
+  aspect-ratio:1;
+  border-radius:50%;
+  background:white;
+  box-shadow:0 0 9px var(--fx-accent);
+  opacity:0;
+  transform:rotate(var(--scatter-angle)) translateY(-34px) scale(.2);
+  animation:slot-scatter-spark 1.05s ease-out calc(var(--fx-index) * 24ms) both;
+}
+
+.slot-world-forge .slot-fx-scatter-symbols i,
+.slot-world-saloon .slot-fx-scatter-symbols i{border-radius:4px}
+
+.slot-world-ice-palace .slot-fx-scatter-symbols i{
+  clip-path:polygon(50% 0,94% 15%,100% 78%,50% 100%,0 78%,6% 15%);
+}
+
+.slot-world-starship .slot-fx-scatter-orbit{border-style:dashed}
+.slot-world-starship .slot-fx-scatter-symbols i{clip-path:polygon(12% 0,88% 0,100% 18%,100% 82%,88% 100%,12% 100%,0 82%,0 18%)}
+
+@keyframes slot-scatter-bloom{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+  36%{opacity:1}
+  100%{opacity:.58;transform:translate(-50%,-50%) scale(1.08)}
+}
+
+@keyframes slot-scatter-orbit{
+  0%{opacity:0;transform:translate(-50%,-50%) rotateX(68deg) rotateZ(-45deg) scale(.45)}
+  36%{opacity:.92}
+  100%{opacity:.42;transform:translate(-50%,-50%) rotateX(68deg) rotateZ(70deg) scale(1)}
+}
+
+@keyframes slot-scatter-card{
+  0%{opacity:0;transform:translateY(54px) rotateY(75deg) rotate(var(--scatter-shift)) scale(.54)}
+  58%{opacity:1;transform:translateY(-9px) rotateY(-8deg) rotate(var(--scatter-shift)) scale(1.08)}
+  100%{opacity:1;transform:translateY(0) rotateY(0) rotate(var(--scatter-shift)) scale(1)}
+}
+
+@keyframes slot-scatter-copy{
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+@keyframes slot-scatter-spark{
+  0%{opacity:0;transform:rotate(var(--scatter-angle)) translateY(-34px) scale(.2)}
+  28%{opacity:1}
+  100%{opacity:0;transform:rotate(var(--scatter-angle)) translateY(clamp(-170px,-24vw,-96px)) scale(1.15)}
+}
+
+@media(max-width:700px){
+  .slot-fx-scatter{gap:5px}
+  .slot-fx-scatter-symbols{gap:5px;min-height:96px}
+  .slot-fx-scatter-symbols i{width:clamp(50px,17vw,74px);border-radius:12px}
+  .slot-fx-scatter strong{font-size:clamp(1.4rem,8vw,2.45rem)}
+  .slot-fx-scatter small{font-size:.56rem;padding:5px 10px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .slot-fx-scatter::before,
+  .slot-fx-scatter-orbit,
+  .slot-fx-scatter-symbols i,
+  .slot-fx-scatter strong,
+  .slot-fx-scatter small,
+  .slot-fx-scatter u{
+    animation:none!important;
+  }
+  .slot-fx-scatter::before{opacity:.45;transform:translate(-50%,-50%) scale(1)}
+  .slot-fx-scatter-orbit{opacity:.35;transform:translate(-50%,-50%) rotateX(68deg)}
+  .slot-fx-scatter-symbols i,
+  .slot-fx-scatter strong,
+  .slot-fx-scatter small{opacity:1;transform:none}
+  .slot-fx-scatter u{display:none}
+}
