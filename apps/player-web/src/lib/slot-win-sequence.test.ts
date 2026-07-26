@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { SpinWin } from "./contracts";
 import type { SlotWinTrace } from "./slot-win-overlay-presentation";
-import { buildSlotWinSequence, nextSlotWinStep, slotWinTraceCellKeys } from "./slot-win-sequence";
+import {
+  buildSlotWinSequence,
+  buildSlotWinSequenceForRound,
+  nextSlotWinStep,
+  slotWinSequenceHoldMs,
+  slotWinTraceCellKeys,
+} from "./slot-win-sequence";
 
 const trace = (kind: SlotWinTrace["kind"], pointCount: number): SlotWinTrace => ({
   id: `${kind}-${pointCount}`,
@@ -23,8 +30,36 @@ describe("slot win sequence", () => {
     ]);
   });
 
+  it("shortens every trace in turbo mode without dropping sequence steps", () => {
+    expect(buildSlotWinSequence([trace("path", 3), trace("cluster", 8)], true)).toEqual([
+      { traceIndex: 0, durationMs: 388 },
+      { traceIndex: 1, durationMs: 535 },
+    ]);
+  });
+
   it("caps long traces so malformed payloads cannot stall the presentation", () => {
     expect(buildSlotWinSequence([trace("cluster", 100)])[0]?.durationMs).toBe(1_970);
+  });
+
+  it("derives one authoritative sequence from the settled round grid", () => {
+    const wins: readonly SpinWin[] = [{
+      kind: "line",
+      amount: 500,
+      cells: [[0, 0], [1, 0], [2, 0]],
+      symbol: "A",
+      count: 3,
+      payline: 0,
+    }];
+    const grid = [["A", "K", "Q"], ["A", "Q", "K"], ["A", "J", "Q"]] as const;
+
+    expect(buildSlotWinSequenceForRound(wins, grid)).toEqual([{ traceIndex: 0, durationMs: 1_385 }]);
+  });
+
+  it("holds the round until one complete win cycle has played", () => {
+    const sequence = buildSlotWinSequence([trace("path", 3), trace("cluster", 8)]);
+    expect(slotWinSequenceHoldMs(sequence)).toBe(3_435);
+    expect(slotWinSequenceHoldMs(buildSlotWinSequence([trace("path", 3), trace("cluster", 8)], true), true)).toBe(973);
+    expect(slotWinSequenceHoldMs([])).toBe(0);
   });
 
   it("cycles deterministically and handles empty or malformed lengths", () => {
