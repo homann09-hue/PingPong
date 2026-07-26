@@ -10,7 +10,7 @@ export interface RoundPresentation {
 }
 
 function eventOf(round: SpinRound, type: string): SpinEvent | undefined {
-  return round.events.find((event) => event.type === type);
+  return round.events?.find((event) => event.type === type);
 }
 
 function numeric(event: SpinEvent | undefined, key: string): number | undefined {
@@ -21,6 +21,10 @@ function numeric(event: SpinEvent | undefined, key: string): number | undefined 
 function text(event: SpinEvent | undefined, key: string): string | undefined {
   const value = event?.data[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function roundNumber(round: SpinRound): number {
+  return round.index ?? 0;
 }
 
 export function presentSpinRound(round: SpinRound, mechanicLabel: string): RoundPresentation {
@@ -36,10 +40,11 @@ export function presentSpinRound(round: SpinRound, mechanicLabel: string): Round
 
   const bonus = eventOf(round, "bonus.awarded");
   if (round.phase === "bonus" || bonus) {
+    const bonusType = text(bonus, "type");
     return {
       phase: round.phase,
       label: "BONUSRUNDE",
-      detail: text(bonus, "type")?.replaceAll("_", " ") ?? mechanicLabel,
+      detail: bonusType ? bonusType.split("_").join(" ") : mechanicLabel,
       tone: "bonus",
     };
   }
@@ -49,7 +54,7 @@ export function presentSpinRound(round: SpinRound, mechanicLabel: string): Round
     const multiplier = numeric(eventOf(round, "multiplier.applied"), "multiplier");
     return {
       phase: round.phase,
-      label: `FREISPIEL ${round.index}`,
+      label: `FREISPIEL ${roundNumber(round)}`,
       detail: multiplier && multiplier > 1 ? `${multiplier}× Gewinnmultiplikator` : mechanicLabel,
       tone: "feature",
     };
@@ -67,7 +72,7 @@ export function presentSpinRound(round: SpinRound, mechanicLabel: string): Round
     const multiplier = numeric(eventOf(round, "multiplier.applied"), "multiplier");
     return {
       phase: round.phase,
-      label: `KASKADE ${round.index}`,
+      label: `KASKADE ${roundNumber(round)}`,
       detail: multiplier && multiplier > 1 ? `${multiplier}× Kaskaden-Multiplikator` : "Gewinnsymbole explodieren",
       tone: "feature",
     };
@@ -76,7 +81,7 @@ export function presentSpinRound(round: SpinRound, mechanicLabel: string): Round
   if (round.phase === "respin" || eventOf(round, "respin.started")) {
     return {
       phase: round.phase,
-      label: `RESPIN ${round.index}`,
+      label: `RESPIN ${roundNumber(round)}`,
       detail: "Walzen werden erneut ausgewertet",
       tone: "feature",
     };
@@ -117,7 +122,7 @@ export function presentSpinRound(round: SpinRound, mechanicLabel: string): Round
     return {
       phase: round.phase,
       label: "WALKING WILD",
-      detail: `${text(walkingWild, "direction") ?? "Weiter"} · Schritt ${numeric(walkingWild, "step") ?? round.index}`,
+      detail: `${text(walkingWild, "direction") ?? "Weiter"} · Schritt ${numeric(walkingWild, "step") ?? roundNumber(round)}`,
       tone: "feature",
     };
   }
