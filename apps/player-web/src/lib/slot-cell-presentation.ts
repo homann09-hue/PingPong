@@ -156,8 +156,8 @@ export function presentSlotCell(
     badge ??= "SCATTER";
   }
 
-  const upgraded = events.find((event) => event.type === "symbol.upgraded" && eventText(event, "to") === symbol);
-  if (upgraded) {
+  for (const upgraded of events.filter((event) => event.type === "symbol.upgraded" && eventText(event, "to") === symbol)) {
+    if (!positions(eventText(upgraded, "positions")).has(key)) continue;
     states.push("is-upgraded-symbol");
     descriptions.push(`Upgrade von ${eventText(upgraded, "from") ?? "Symbol"}`);
     badge ??= "UP";
