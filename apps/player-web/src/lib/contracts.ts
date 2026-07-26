@@ -103,6 +103,7 @@ export interface Paytable {
 }
 
 export interface SpinWin {
+  readonly kind?: "line" | "ways" | "cluster" | "scatter" | string;
   readonly amount: number;
   readonly cells: readonly [number, number][];
 }
