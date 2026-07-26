@@ -64,13 +64,23 @@ describe("presentSlotCell", () => {
     expect(presentation.badge).toBe("FULL");
   });
 
-  it("highlights scatter hits and upgraded target symbols", () => {
+  it("highlights scatter hits and only exactly positioned upgraded targets", () => {
     const events = [
       event("scatter.hit", { symbol: "S", count: 3 }),
-      event("symbol.upgraded", { from: "Q", to: "H2", count: 2, triggerCount: 3 }),
+      event("symbol.upgraded", { from: "Q", to: "H2", count: 2, triggerCount: 3, positions: "0:1,3:2" }),
     ];
 
     expect(presentSlotCell(events, 0, 0, "S").className).toContain("is-scatter-hit");
-    expect(presentSlotCell(events, 0, 1, "H2").className).toContain("is-upgraded-symbol");
+    expect(presentSlotCell(events, 0, 1, "H2")).toMatchObject({
+      badge: "UP",
+      description: "Upgrade von Q",
+    });
+    expect(presentSlotCell(events, 2, 1, "H2").className).toBe("");
+  });
+
+  it("does not guess upgrade cells when legacy events have no positions", () => {
+    const events = [event("symbol.upgraded", { from: "Q", to: "H2", count: 2, triggerCount: 3 })];
+
+    expect(presentSlotCell(events, 0, 1, "H2").className).toBe("");
   });
 });
