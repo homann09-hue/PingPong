@@ -1,4 +1,5 @@
-import type { SlotWinTrace } from "./slot-win-overlay-presentation";
+import type { SpinWin } from "./contracts";
+import { presentSlotWinOverlay, type SlotWinTrace } from "./slot-win-overlay-presentation";
 
 export interface SlotWinSequenceStep {
   readonly traceIndex: number;
@@ -13,11 +14,38 @@ const baseDurationByKind: Readonly<Record<SlotWinTrace["kind"], number>> = {
   cells: 1_200,
 };
 
-export function buildSlotWinSequence(traces: readonly SlotWinTrace[]): readonly SlotWinSequenceStep[] {
+function traceDuration(trace: SlotWinTrace, turbo: boolean): number {
+  const normalDuration = Math.min(2_000, baseDurationByKind[trace.kind] + Math.min(420, trace.points.length * 45));
+  return turbo ? Math.max(180, Math.round(normalDuration * 0.28)) : normalDuration;
+}
+
+export function buildSlotWinSequence(
+  traces: readonly SlotWinTrace[],
+  turbo = false,
+): readonly SlotWinSequenceStep[] {
   return traces.map((trace, traceIndex) => ({
     traceIndex,
-    durationMs: Math.min(2_000, baseDurationByKind[trace.kind] + Math.min(420, trace.points.length * 45)),
+    durationMs: traceDuration(trace, turbo),
   }));
+}
+
+export function buildSlotWinSequenceForRound(
+  wins: readonly SpinWin[],
+  grid: readonly (readonly string[])[],
+  turbo = false,
+): readonly SlotWinSequenceStep[] {
+  return buildSlotWinSequence(presentSlotWinOverlay(wins, grid), turbo);
+}
+
+export function slotWinSequenceHoldMs(
+  sequence: readonly SlotWinSequenceStep[],
+  turbo = false,
+): number {
+  if (sequence.length === 0) return 0;
+  const sequenceDuration = sequence.reduce((total, step) => total + Math.max(0, step.durationMs), 0);
+  return turbo
+    ? Math.min(2_000, sequenceDuration + 50)
+    : Math.min(8_000, sequenceDuration + 140);
 }
 
 export function nextSlotWinStep(currentStep: number, sequenceLength: number): number {
