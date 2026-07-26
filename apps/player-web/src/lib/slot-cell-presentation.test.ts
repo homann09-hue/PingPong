@@ -22,18 +22,19 @@ describe("presentSlotCell", () => {
     expect(added.badge).toBe("+LOCK");
   });
 
-  it("reads per-cell multiplier values from engine positions", () => {
+  it("reads bounded per-cell multiplier values from engine positions", () => {
     const events = [event("multiplier.applied", {
       source: "multiplier_symbols",
       multiplier: 6,
-      positions: "0:1=2,4:2=3",
+      positions: "0:1=2,4:2=5000000,-1:0=9,broken=3",
     })];
 
     expect(presentSlotCell(events, 4, 2, "M3")).toMatchObject({
-      badge: "×3",
-      description: "3× Multiplikator-Symbol",
+      badge: "×1000",
+      description: "1000× Multiplikator-Symbol",
     });
     expect(presentSlotCell(events, 2, 2, "A").className).toBe("");
+    expect(presentSlotCell(events, -1, 0, "A").className).toBe("");
   });
 
   it("combines mystery, extra-wild and walking-wild feature states", () => {
@@ -64,13 +65,14 @@ describe("presentSlotCell", () => {
     expect(presentation.badge).toBe("FULL");
   });
 
-  it("highlights scatter hits and only exactly positioned upgraded targets", () => {
+  it("highlights only exactly positioned scatter and upgraded cells", () => {
     const events = [
-      event("scatter.hit", { symbol: "S", count: 3 }),
+      event("scatter.hit", { symbol: "S", count: 3, positions: "0:0,2:1,4:2" }),
       event("symbol.upgraded", { from: "Q", to: "H2", count: 2, triggerCount: 3, positions: "0:1,3:2" }),
     ];
 
     expect(presentSlotCell(events, 0, 0, "S").className).toContain("is-scatter-hit");
+    expect(presentSlotCell(events, 1, 0, "S").className).toBe("");
     expect(presentSlotCell(events, 0, 1, "H2")).toMatchObject({
       badge: "UP",
       description: "Upgrade von Q",
@@ -78,9 +80,24 @@ describe("presentSlotCell", () => {
     expect(presentSlotCell(events, 2, 1, "H2").className).toBe("");
   });
 
-  it("does not guess upgrade cells when legacy events have no positions", () => {
-    const events = [event("symbol.upgraded", { from: "Q", to: "H2", count: 2, triggerCount: 3 })];
+  it("does not guess cells when legacy events have no positions", () => {
+    const events = [
+      event("scatter.hit", { symbol: "S", count: 3 }),
+      event("symbol.upgraded", { from: "Q", to: "H2", count: 2, triggerCount: 3 }),
+    ];
 
+    expect(presentSlotCell(events, 0, 0, "S").className).toBe("");
     expect(presentSlotCell(events, 0, 1, "H2").className).toBe("");
+  });
+
+  it("ignores malformed and negative position evidence", () => {
+    const events = [event("mystery.revealed", {
+      positions: "-1:0,0:-1,1:2:3,foo:bar,2:1",
+      target: "H1",
+      count: Number.POSITIVE_INFINITY,
+    })];
+
+    expect(presentSlotCell(events, 2, 1, "H1").className).toContain("is-mystery-reveal");
+    expect(presentSlotCell(events, 0, 0, "H1").className).toBe("");
   });
 });
