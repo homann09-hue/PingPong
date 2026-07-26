@@ -9,6 +9,7 @@ export type SlotMechanicSequenceEffect =
   | "bonus"
   | "mystery"
   | "upgrade"
+  | "scatter"
   | "multiplier"
   | "jackpot"
   | "hit";
@@ -25,6 +26,7 @@ const durationByEffect: Readonly<Record<SlotMechanicSequenceEffect, number>> = {
   upgrade: 1_450,
   mystery: 1_450,
   "walking-wild": 1_250,
+  scatter: 1_150,
   multiplier: 1_100,
   bonus: 1_850,
   jackpot: 1_900,
@@ -38,6 +40,15 @@ function hasEvent(events: readonly SpinEvent[], type: string): boolean {
 function eventText(event: SpinEvent, key: string): string | undefined {
   const value = event.data[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function eventNumber(event: SpinEvent, key: string): number | undefined {
+  const value = event.data[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function hasPresentableScatter(events: readonly SpinEvent[]): boolean {
+  return events.some((event) => event.type === "scatter.hit" && (eventNumber(event, "count") ?? 0) >= 2);
 }
 
 function durationFor(effect: SlotMechanicSequenceEffect, turbo: boolean): number {
@@ -71,16 +82,17 @@ export function buildSlotMechanicSequence(
   }
 
   const effects: SlotMechanicSequenceEffect[] = [];
-  if (freeSpinMode === "entry" || freeSpinMode === "retrigger") effects.push("free-spin");
   if (phase === "respin" || hasEvent(events, "respin.started")) effects.push("respin");
   if (phase === "cascade" || hasEvent(events, "cascade.started")) effects.push("cascade");
   if (hasEvent(events, "symbol.upgraded")) effects.push("upgrade");
   if (hasEvent(events, "mystery.revealed")) effects.push("mystery");
   if (hasEvent(events, "wild.walked")) effects.push("walking-wild");
+  if (hasPresentableScatter(events)) effects.push("scatter");
   if (shouldPresentMultiplier(phase, freeSpinMode, events)) effects.push("multiplier");
+  if (freeSpinMode === "entry" || freeSpinMode === "retrigger") effects.push("free-spin");
   if (phase === "bonus" || hasEvent(events, "bonus.awarded")) effects.push("bonus");
 
-  const uniqueEffects = [...new Set(effects)].slice(0, 8);
+  const uniqueEffects = [...new Set(effects)].slice(0, 9);
   if (uniqueEffects.length === 0 && Number.isFinite(totalWin) && totalWin > 0) uniqueEffects.push("hit");
   return uniqueEffects.map((effect) => ({ effect, durationMs: durationFor(effect, turbo) }));
 }
