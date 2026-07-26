@@ -60,6 +60,7 @@ import "./slot-feature-reveal-sequence.css";
 import "./slot-mechanic-sync.css";
 import "./slot-win-overlay.css";
 import "./slot-win-focus.css";
+import "./slot-win-symbol-sync.css";
 import "./canva-v2-system.css";
 import "./wow-motion-v3.css";
 import "./lobby-live-service-deck.css";
