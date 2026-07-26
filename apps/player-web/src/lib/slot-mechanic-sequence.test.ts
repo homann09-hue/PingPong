@@ -14,6 +14,7 @@ describe("slot mechanic sequence", () => {
     expect(buildSlotMechanicSequence("cascade", 50_000, [
       event("cascade.started", { step: 4 }),
       event("mystery.revealed", { target: "A" }),
+      event("scatter.hit", { symbol: "S", count: 5 }),
       event("max_win.reached", { multiplier: 10_000 }),
     ], null)).toEqual([{ effect: "jackpot", durationMs: 1_900 }]);
   });
@@ -23,6 +24,7 @@ describe("slot mechanic sequence", () => {
       event("wild.walked", { moves: "0:0>1:0" }),
       event("mystery.revealed", { target: "H1" }),
       event("symbol.upgraded", { from: "J", to: "A" }),
+      event("scatter.hit", { symbol: "S", count: 3 }),
       event("multiplier.applied", { source: "multiplier_symbols", multiplier: 3 }),
       event("bonus.awarded", { mode: "coin_collect" }),
     ], null).map((step) => step.effect)).toEqual([
@@ -30,9 +32,23 @@ describe("slot mechanic sequence", () => {
       "upgrade",
       "mystery",
       "walking-wild",
+      "scatter",
       "multiplier",
       "bonus",
     ]);
+  });
+
+  it("reveals a qualifying scatter before the resulting free-spin award", () => {
+    expect(buildSlotMechanicSequence("base", 1_000, [
+      event("scatter.hit", { symbol: "S", count: 3 }),
+      event("free_spins.awarded", { count: 8 }),
+    ], "entry").map((step) => step.effect)).toEqual(["scatter", "free-spin"]);
+  });
+
+  it("does not use a full-screen reveal for a single scatter", () => {
+    expect(buildSlotMechanicSequence("base", 0, [
+      event("scatter.hit", { symbol: "S", count: 1 }),
+    ], null)).toEqual([]);
   });
 
   it("keeps a normal free-spin HUD persistent without replaying its structural multiplier", () => {
@@ -60,10 +76,12 @@ describe("slot mechanic sequence", () => {
   it("scales every sequence step in turbo mode without dropping the sequence", () => {
     const normal = buildSlotMechanicSequence("respin", 500, [
       event("mystery.revealed", { target: "A" }),
+      event("scatter.hit", { symbol: "S", count: 2 }),
       event("bonus.awarded", { mode: "pick" }),
     ], null);
     const turbo = buildSlotMechanicSequence("respin", 500, [
       event("mystery.revealed", { target: "A" }),
+      event("scatter.hit", { symbol: "S", count: 2 }),
       event("bonus.awarded", { mode: "pick" }),
     ], null, true);
 
