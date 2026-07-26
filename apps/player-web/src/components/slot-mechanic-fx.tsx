@@ -12,6 +12,12 @@ export interface SlotMechanicFxProps {
 
 type MechanicEffect = "cascade" | "walking-wild" | "free-spin" | "respin" | "bonus" | "mystery" | "multiplier" | "jackpot" | "hit";
 
+interface WalkingPath {
+  readonly direction: "left" | "right";
+  readonly count: number;
+  readonly distance: number;
+}
+
 function hasEvent(events: readonly SpinEvent[], type: string): boolean {
   return events.some((event) => event.type === type);
 }
@@ -19,6 +25,24 @@ function hasEvent(events: readonly SpinEvent[], type: string): boolean {
 function eventNumber(events: readonly SpinEvent[], type: string, key: string): number | undefined {
   const value = events.find((event) => event.type === type)?.data[key];
   return typeof value === "number" ? value : undefined;
+}
+
+function eventText(events: readonly SpinEvent[], type: string, key: string): string | undefined {
+  const value = events.find((event) => event.type === type)?.data[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function walkingPath(events: readonly SpinEvent[]): WalkingPath {
+  const rawMoves = eventText(events, "wild.walked", "moves") ?? "";
+  const moves = rawMoves.split(",").map((entry) => entry.trim()).filter(Boolean);
+  const first = moves[0]?.split(">");
+  const sourceReel = Number(first?.[0]?.split(":")[0]);
+  const targetReel = Number(first?.[1]?.split(":")[0]);
+  const valid = Number.isInteger(sourceReel) && Number.isInteger(targetReel);
+  const count = Math.max(1, Math.min(5, moves.length || eventNumber(events, "wild.walked", "count") || 1));
+  const distance = valid ? Math.max(1, Math.min(4, Math.abs(targetReel - sourceReel))) : 1;
+  const direction = valid && targetReel < sourceReel ? "left" : "right";
+  return { direction, count, distance };
 }
 
 function effectFor(phase: SpinRoundPhase, totalWin: number, events: readonly SpinEvent[]): MechanicEffect | null {
@@ -42,6 +66,7 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
   const multiplier = eventNumber(events, "multiplier.applied", "multiplier")
     ?? eventNumber(events, "max_win.reached", "multiplier")
     ?? 2;
+  const walking = walkingPath(events);
 
   return <div
     key={`${effect}-${phase}-${index}`}
@@ -58,9 +83,10 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
       {Array.from({ length: 16 }, (_, particle) => <i key={particle} style={indexedStyle(particle)} />)}
     </div>}
 
-    {effect === "walking-wild" && <div className="slot-fx-walking-wild">
+    {effect === "walking-wild" && <div className="slot-fx-walking-wild" data-direction={walking.direction} data-distance={walking.distance}>
       <span className="slot-fx-track" />
-      {Array.from({ length: 5 }, (_, step) => <i key={step} style={indexedStyle(step)}>WILD</i>)}
+      {Array.from({ length: walking.count }, (_, step) => <i key={step} style={indexedStyle(step)}>WILD</i>)}
+      <em>{walking.direction === "right" ? "→" : "←"} {walking.distance}</em>
     </div>}
 
     {effect === "free-spin" && <div className="slot-fx-free-spin">
