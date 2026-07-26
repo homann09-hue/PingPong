@@ -54,6 +54,7 @@ import "./slot-feature-hud.css";
 import "./slot-cell-feature-fx.css";
 import "./slot-cascade-sequence.css";
 import "./slot-walking-wild-path.css";
+import "./slot-bonus-presentation.css";
 import "./canva-v2-system.css";
 import "./wow-motion-v3.css";
 import "./lobby-live-service-deck.css";
