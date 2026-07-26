@@ -23,7 +23,19 @@ describe("slot feature reveal presentation", () => {
     expect(result.positions).toEqual(["0:1", "2:0", "4:2"]);
   });
 
-  it("combines free-spin awards with ladder, extra-wild and special-reel modifiers", () => {
+  it("models the initial award as a free-spin entry", () => {
+    expect(resolveFreeSpinReveal("base", 0, [
+      event("free_spins.awarded", { count: 8 }),
+    ])).toMatchObject({
+      mode: "entry",
+      primary: "+8",
+      label: "FREISPIELE",
+      awarded: 8,
+      spin: 0,
+    });
+  });
+
+  it("combines retrigger awards with ladder, extra-wild and special-reel modifiers", () => {
     const result = resolveFreeSpinReveal("free_spin", 4, [
       event("free_spins.awarded", { count: 6 }),
       event("free_spins.modified", { mode: "multiplier_ladder", spin: 4, multiplier: 3 }),
@@ -32,13 +44,31 @@ describe("slot feature reveal presentation", () => {
     ]);
 
     expect(result).toEqual({
+      mode: "retrigger",
       primary: "+6",
-      label: "FREISPIELE",
+      label: "RETRIGGER",
       awarded: 6,
+      spin: 4,
       multiplier: 3,
       extraWilds: 2,
       specialReels: true,
       positions: ["1:0", "3:2"],
+    });
+  });
+
+  it("uses a compact active state for an ordinary free spin without inventing remaining spins", () => {
+    expect(resolveFreeSpinReveal("free_spin", 12, [
+      event("free_spins.modified", { mode: "multiplier_ladder", spin: 12, multiplier: 5 }),
+    ])).toEqual({
+      mode: "active",
+      primary: "12",
+      label: "FREISPIEL 12",
+      awarded: 0,
+      spin: 12,
+      multiplier: 5,
+      extraWilds: 0,
+      specialReels: false,
+      positions: [],
     });
   });
 
@@ -67,7 +97,8 @@ describe("slot feature reveal presentation", () => {
       count: 100,
       visibleCards: 12,
     });
-    expect(resolveFreeSpinReveal("base", 0, [])).toMatchObject({ primary: "+", multiplier: 1, extraWilds: 0 });
+    expect(resolveFreeSpinReveal("base", 0, [])).toMatchObject({ mode: null, primary: "", multiplier: 1, extraWilds: 0 });
+    expect(resolveFreeSpinReveal("base", 0, [event("free_spins.awarded", { count: 99_999 })])).toMatchObject({ awarded: 1_000 });
     expect(resolveMultiplierReveal([])).toMatchObject({ multiplier: 1, label: "MULTIPLIKATOR" });
   });
 });
