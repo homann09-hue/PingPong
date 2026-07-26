@@ -2,6 +2,11 @@ import type { CSSProperties } from "react";
 import type { SpinEvent, SpinRoundPhase } from "@/lib/contracts";
 import type { SlotCabinetMode } from "@/lib/catalog";
 import { resolveSlotBonusPresentation, type SlotBonusPresentation } from "@/lib/slot-bonus-presentation";
+import {
+  resolveFreeSpinReveal,
+  resolveMultiplierReveal,
+  resolveMysteryReveal,
+} from "@/lib/slot-feature-reveal-presentation";
 
 export interface SlotMechanicFxProps {
   readonly phase: SpinRoundPhase;
@@ -106,11 +111,11 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
   const effect = effectFor(phase, totalWin, events);
   if (!effect) return null;
 
-  const multiplier = eventNumber(events, "multiplier.applied", "multiplier")
-    ?? eventNumber(events, "max_win.reached", "multiplier")
-    ?? 2;
   const walking = walkingPath(events);
   const bonus = resolveSlotBonusPresentation(events);
+  const mystery = resolveMysteryReveal(events);
+  const freeSpins = resolveFreeSpinReveal(phase, index, events);
+  const multiplier = resolveMultiplierReveal(events);
 
   return <div
     key={`${effect}-${phase}-${index}`}
@@ -133,16 +138,29 @@ export function SlotMechanicFx({ phase, index, totalWin, events, cabinet }: Read
       <em>{walking.direction === "right" ? "→" : "←"} {walking.distance}</em>
     </div>}
 
-    {effect === "free-spin" && <div className="slot-fx-free-spin">
+    {effect === "free-spin" && <div className="slot-fx-free-spin" data-award={freeSpins.awarded > 0 ? "true" : "false"}>
       <span className="slot-fx-ring ring-one" /><span className="slot-fx-ring ring-two" /><span className="slot-fx-ring ring-three" />
-      <strong>{phase === "free_spin" ? index : "+"}</strong>
+      <strong>{freeSpins.primary}</strong>
+      <div className="slot-fx-free-spin-copy">
+        <b>{freeSpins.label}</b>
+        <span>
+          {freeSpins.multiplier > 1 && <em>×{freeSpins.multiplier}</em>}
+          {freeSpins.extraWilds > 0 && <em>+{freeSpins.extraWilds} WILDS</em>}
+          {freeSpins.specialReels && <em>SPEZIALWALZEN</em>}
+        </span>
+      </div>
       {Array.from({ length: 18 }, (_, spark) => <i key={spark} style={indexedStyle(spark)} />)}
     </div>}
 
     {effect === "respin" && <div className="slot-fx-respin"><span /><strong>↻</strong><em>RESPIN</em></div>}
     {effect === "bonus" && <BonusFx bonus={bonus} />}
-    {effect === "mystery" && <div className="slot-fx-mystery">{Array.from({ length: 7 }, (_, card) => <i key={card} style={indexedStyle(card)}>?</i>)}</div>}
-    {effect === "multiplier" && <div className="slot-fx-multiplier"><span>×{multiplier}</span></div>}
+    {effect === "mystery" && <div className="slot-fx-mystery" data-count={mystery.count}>
+      <div className="slot-fx-mystery-cards">
+        {Array.from({ length: mystery.visibleCards }, (_, card) => <i key={card} data-position={mystery.positions[card] ?? undefined} style={indexedStyle(card)}><span>?</span><em>{mystery.target}</em></i>)}
+      </div>
+      <div className="slot-fx-mystery-copy"><strong>{mystery.count} MYSTERY</strong><span>{mystery.source} → {mystery.target}</span></div>
+    </div>}
+    {effect === "multiplier" && <div className="slot-fx-multiplier"><span>×{multiplier.multiplier}</span><small>{multiplier.label}</small></div>}
     {effect === "jackpot" && <div className="slot-fx-jackpot"><span className="slot-fx-jackpot-core">MAX</span>{Array.from({ length: 20 }, (_, ray) => <i key={ray} style={indexedStyle(ray)} />)}</div>}
     {effect === "hit" && <div className="slot-fx-hit">{Array.from({ length: 14 }, (_, spark) => <i key={spark} style={indexedStyle(spark)} />)}</div>}
   </div>;
