@@ -38,7 +38,6 @@
   filter:blur(5px);
 }
 .slot-win-path-core{
-  stroke:url(#slot-win-gradient);
   stroke:var(--win-accent);
   stroke-width:4;
   stroke-dasharray:18 12;
@@ -73,27 +72,19 @@
   stroke-width:4;
   fill:color-mix(in srgb,var(--win-secondary) 8%,transparent);
   filter:drop-shadow(0 0 7px var(--win-accent));
-  animation:slot-win-node-ring .82s cubic-bezier(.16,.86,.2,1) calc(var(--win-index)*90ms) both;
+  animation:slot-win-node-ring .82s cubic-bezier(.16,.86,.2,1) calc(var(--win-index)*90ms + var(--point-index,0)*28ms) both;
 }
-.slot-win-trace[data-kind="ways"] .slot-win-node-ring{
-  stroke-dasharray:9 7;
-}
-.slot-win-trace[data-kind="cluster"] .slot-win-node-ring{
-  stroke-width:6;
-  fill:color-mix(in srgb,var(--win-secondary) 14%,transparent);
-}
-.slot-win-trace[data-kind="scatter"] .slot-win-node-ring{
-  stroke-dasharray:4 6;
-}
+.slot-win-trace[data-kind="ways"] .slot-win-node-ring{stroke-dasharray:9 7}
+.slot-win-trace[data-kind="cluster"] .slot-win-node-ring{stroke-width:6;fill:color-mix(in srgb,var(--win-secondary) 14%,transparent)}
+.slot-win-trace[data-kind="scatter"] .slot-win-node-ring{stroke-dasharray:4 6}
 .slot-win-scatter-star{
   fill:color-mix(in srgb,var(--win-accent) 86%,white 14%);
   opacity:.88;
   filter:drop-shadow(0 0 8px var(--win-accent));
-  animation:slot-win-scatter-star .9s cubic-bezier(.14,.82,.2,1) calc(var(--win-index)*90ms) both;
+  animation:slot-win-scatter-star .9s cubic-bezier(.14,.82,.2,1) calc(var(--win-index)*90ms + var(--point-index,0)*28ms) both;
 }
 .slot-win-amount{
-  transform-box:fill-box;
-  transform-origin:center;
+  opacity:0;
   animation:slot-win-amount-pop .82s cubic-bezier(.14,.9,.18,1) calc(220ms + var(--win-index)*90ms) both;
 }
 .slot-win-amount rect{
@@ -153,9 +144,9 @@
   100%{opacity:.88;transform:none}
 }
 @keyframes slot-win-amount-pop{
-  0%{opacity:0;transform:scale(.35) translateY(12px)}
-  62%{opacity:1;transform:scale(1.12) translateY(0)}
-  100%{opacity:1;transform:none}
+  0%{opacity:0;filter:brightness(2.2) blur(3px)}
+  62%{opacity:1;filter:brightness(1.3) blur(0)}
+  100%{opacity:1;filter:none}
 }
 
 @media(max-width:760px){
@@ -176,4 +167,5 @@
   .slot-win-amount{
     animation:none!important;
   }
+  .slot-win-amount{opacity:1}
 }
