@@ -12,6 +12,7 @@ export interface SlotWinOverlayProps {
 }
 
 const traceStyle = (index: number) => ({ "--win-index": index } as CSSProperties);
+const pointStyle = (index: number) => ({ "--point-index": index } as CSSProperties);
 
 export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWinOverlayProps>) {
   const traces = presentSlotWinOverlay(wins, grid);
@@ -45,6 +46,7 @@ export function SlotWinOverlay({ wins, grid, active, cabinet }: Readonly<SlotWin
           key={`${trace.id}-${point.reel}:${point.row}`}
           className="slot-win-node"
           data-point={pointIndex}
+          style={pointStyle(pointIndex)}
           transform={`translate(${point.x} ${point.y})`}
         >
           <circle className="slot-win-node-halo" r={trace.kind === "cluster" ? 48 : trace.kind === "scatter" ? 44 : 38} />
