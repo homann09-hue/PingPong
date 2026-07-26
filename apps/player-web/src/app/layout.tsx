@@ -56,6 +56,7 @@ import "./slot-cascade-sequence.css";
 import "./slot-walking-wild-path.css";
 import "./slot-bonus-presentation.css";
 import "./slot-feature-reveal-sequence.css";
+import "./slot-mechanic-sync.css";
 import "./canva-v2-system.css";
 import "./wow-motion-v3.css";
 import "./lobby-live-service-deck.css";
