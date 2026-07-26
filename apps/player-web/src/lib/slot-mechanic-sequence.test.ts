@@ -4,6 +4,7 @@ import {
   buildSlotMechanicSequence,
   nextSlotMechanicStep,
   slotMechanicEventSignature,
+  slotMechanicSequenceHoldMs,
 } from "./slot-mechanic-sequence";
 
 const event = (type: string, data: Readonly<Record<string, number | string>> = {}): SpinEvent => ({ type, data });
@@ -54,6 +55,44 @@ describe("slot mechanic sequence", () => {
   it("uses a generic hit only when no specific mechanic exists", () => {
     expect(buildSlotMechanicSequence("base", 250, [], null)).toEqual([{ effect: "hit", durationMs: 820 }]);
     expect(buildSlotMechanicSequence("base", 0, [], null)).toEqual([]);
+  });
+
+  it("scales every sequence step in turbo mode without dropping the sequence", () => {
+    const normal = buildSlotMechanicSequence("respin", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("bonus.awarded", { mode: "pick" }),
+    ], null);
+    const turbo = buildSlotMechanicSequence("respin", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("bonus.awarded", { mode: "pick" }),
+    ], null, true);
+
+    expect(turbo.map((step) => step.effect)).toEqual(normal.map((step) => step.effect));
+    expect(turbo.every((step, index) => step.durationMs < normal[index]!.durationMs)).toBe(true);
+    expect(turbo.every((step) => step.durationMs >= 180)).toBe(true);
+  });
+
+  it("holds a settled round until its complete mechanic sequence has finished", () => {
+    const sequence = buildSlotMechanicSequence("respin", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("bonus.awarded", { mode: "pick" }),
+    ], null);
+    expect(slotMechanicSequenceHoldMs(sequence, "respin")).toBe(
+      sequence.reduce((total, step) => total + step.durationMs, 0) + 160,
+    );
+    expect(slotMechanicSequenceHoldMs([], "base")).toBe(320);
+    expect(slotMechanicSequenceHoldMs([], "free_spin")).toBe(650);
+  });
+
+  it("uses the scaled sequence duration for turbo playback", () => {
+    const sequence = buildSlotMechanicSequence("cascade", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("wild.walked", { moves: "0:0>1:0" }),
+    ], null, true);
+    expect(slotMechanicSequenceHoldMs(sequence, "cascade", true)).toBe(
+      sequence.reduce((total, step) => total + step.durationMs, 0) + 60,
+    );
+    expect(slotMechanicSequenceHoldMs([], "base", true)).toBe(120);
   });
 
   it("advances once and stops after the final mechanic", () => {
