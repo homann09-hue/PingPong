@@ -14,7 +14,7 @@ import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
-import { initialGrid, type JackpotTier, type SpinResult, type SpinRound } from "@/lib/contracts";
+import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
 import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
@@ -29,6 +29,14 @@ const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
 const autoSpinOptions = [10, 25, 50, 100] as const;
 
 type ActiveRoundBanner = RoundPresentation & { readonly key: string };
+interface PlayableSpinRound {
+  readonly phase: SpinRoundPhase;
+  readonly index: number;
+  readonly grid: readonly (readonly string[])[];
+  readonly wins: readonly SpinWin[];
+  readonly totalWin: number;
+  readonly events: readonly SpinEvent[];
+}
 
 let audioContext: AudioContext | null = null;
 function playTones(frequencies: readonly number[], step = 0.09, type: OscillatorType = "triangle", volume = 0.05) {
@@ -52,6 +60,26 @@ function playTones(frequencies: readonly number[], step = 0.09, type: Oscillator
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function normalizeSpinRounds(body: SpinResult): readonly PlayableSpinRound[] {
+  const source: readonly SpinRound[] = body.spin.rounds.length > 0 ? body.spin.rounds : [{
+    phase: "base",
+    index: 0,
+    grid: body.spin.grid,
+    wins: body.spin.wins,
+    totalWin: body.spin.totalWin,
+    events: [],
+  }];
+
+  return source.map((round, roundIndex) => ({
+    phase: round.phase,
+    index: round.index ?? roundIndex,
+    grid: round.grid?.length ? round.grid : body.spin.grid,
+    wins: round.wins ?? (roundIndex === 0 ? body.spin.wins : []),
+    totalWin: round.totalWin,
+    events: round.events ?? [],
+  }));
 }
 
 function useAnimatedNumber(target: number, duration = 650) {
@@ -128,7 +156,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     return () => clearTimeout(timer);
   }, [autoRemaining, spinning, turbo]);
 
-  async function revealRoundGrid(round: SpinRound, animateReels: boolean) {
+  async function revealRoundGrid(round: PlayableSpinRound, animateReels: boolean) {
     setGrid(round.grid);
     setWinCells(new Set(round.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
     const reelCount = round.grid.length;
@@ -149,16 +177,9 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   }
 
   async function revealResult(body: SpinResult) {
-    const rounds: readonly SpinRound[] = body.spin.rounds.length > 0 ? body.spin.rounds : [{
-      phase: "base",
-      index: 0,
-      grid: body.spin.grid,
-      wins: body.spin.wins,
-      totalWin: body.spin.totalWin,
-      events: [],
-    }];
-
+    const rounds = normalizeSpinRounds(body);
     let cumulativeWin = 0;
+
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
       const round = rounds[roundIndex]!;
       const presentation = presentSpinRound(round, game.mechanicLabel);
