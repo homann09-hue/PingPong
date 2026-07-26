@@ -7,7 +7,8 @@ const trace = (kind: SlotWinTrace["kind"], pointCount: number): SlotWinTrace => 
   kind,
   amount: 1_000,
   count: pointCount,
-  points: Array.from({ length: pointCount }, (_, index) => ({ reel: index, row: 0, x: index * 100, y: 100 })),
+  label: `${kind}-${pointCount}`,
+  points: Array.from({ length: pointCount }, (_, index) => ({ reel: index, row: 0, x: index * 100, y: 100, width: 200, height: 200 })),
   edges: [],
   badge: { x: 500, y: 100 },
 });
