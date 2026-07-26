@@ -14,6 +14,7 @@ import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
+import { SlotFeatureHud } from "./slot-feature-hud";
 import { SlotMechanicFx } from "./slot-mechanic-fx";
 import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
@@ -297,6 +298,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       </header>
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
       <div className="jackpot-strip" aria-label="Progressive Jackpots">{jackpotOrder.map((tier) => { const entry = jackpots.find((jackpot) => jackpot.tier === tier); return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>; })}</div>
+      <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeRound?.events} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
       <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
         <div className="spin-status" aria-hidden="true"><span>{turbo ? "TURBO" : "SPIN"}</span><i style={{ width: `${Math.max(0, Math.min(100, (stoppedReels / Math.max(1, reels.length)) * 100))}%` }} /></div>
         {reels.map(({ column, reel }) => <div className={`reel ${reel < stoppedReels ? "is-stopped" : "is-running"}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
