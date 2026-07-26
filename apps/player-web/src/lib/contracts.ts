@@ -114,13 +114,17 @@ export interface SpinEvent {
   readonly data: Readonly<Record<string, number | string>>;
 }
 
+/**
+ * Feature-round payload returned by the API. Legacy fixtures may omit the
+ * presentation-only fields, therefore the player normalizes them at runtime.
+ */
 export interface SpinRound {
   readonly phase: SpinRoundPhase;
-  readonly index: number;
-  readonly grid: readonly (readonly string[])[];
-  readonly wins: readonly SpinWin[];
+  readonly index?: number;
+  readonly grid?: readonly (readonly string[])[];
+  readonly wins?: readonly SpinWin[];
   readonly totalWin: number;
-  readonly events: readonly SpinEvent[];
+  readonly events?: readonly SpinEvent[];
 }
 
 export interface SpinResult {
