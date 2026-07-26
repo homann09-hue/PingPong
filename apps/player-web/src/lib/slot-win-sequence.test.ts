@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SlotWinTrace } from "./slot-win-overlay-presentation";
-import { buildSlotWinSequence, nextSlotWinStep } from "./slot-win-sequence";
+import { buildSlotWinSequence, nextSlotWinStep, slotWinTraceCellKeys } from "./slot-win-sequence";
 
 const trace = (kind: SlotWinTrace["kind"], pointCount: number): SlotWinTrace => ({
   id: `${kind}-${pointCount}`,
@@ -33,5 +33,16 @@ describe("slot win sequence", () => {
     expect(nextSlotWinStep(-4, 3)).toBe(1);
     expect(nextSlotWinStep(4, 1)).toBe(0);
     expect(nextSlotWinStep(4, 0)).toBe(0);
+  });
+
+  it("returns exact unique reel and row keys for the active trace", () => {
+    const active = trace("ways", 3);
+    const duplicate: SlotWinTrace = {
+      ...active,
+      points: [...active.points, active.points[1]!],
+    };
+
+    expect(slotWinTraceCellKeys(duplicate)).toEqual(["0:0", "1:0", "2:0"]);
+    expect(slotWinTraceCellKeys(undefined)).toEqual([]);
   });
 });
