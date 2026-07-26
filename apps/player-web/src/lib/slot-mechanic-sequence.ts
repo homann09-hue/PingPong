@@ -40,6 +40,11 @@ function eventText(event: SpinEvent, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function durationFor(effect: SlotMechanicSequenceEffect, turbo: boolean): number {
+  const normalDuration = durationByEffect[effect];
+  return turbo ? Math.max(180, Math.round(normalDuration * 0.28)) : normalDuration;
+}
+
 function shouldPresentMultiplier(
   phase: SpinRoundPhase,
   freeSpinMode: FreeSpinPresentationMode,
@@ -59,9 +64,10 @@ export function buildSlotMechanicSequence(
   totalWin: number,
   events: readonly SpinEvent[],
   freeSpinMode: FreeSpinPresentationMode,
+  turbo = false,
 ): readonly SlotMechanicSequenceStep[] {
   if (hasEvent(events, "max_win.reached")) {
-    return [{ effect: "jackpot", durationMs: durationByEffect.jackpot }];
+    return [{ effect: "jackpot", durationMs: durationFor("jackpot", turbo) }];
   }
 
   const effects: SlotMechanicSequenceEffect[] = [];
@@ -76,7 +82,19 @@ export function buildSlotMechanicSequence(
 
   const uniqueEffects = [...new Set(effects)].slice(0, 8);
   if (uniqueEffects.length === 0 && Number.isFinite(totalWin) && totalWin > 0) uniqueEffects.push("hit");
-  return uniqueEffects.map((effect) => ({ effect, durationMs: durationByEffect[effect] }));
+  return uniqueEffects.map((effect) => ({ effect, durationMs: durationFor(effect, turbo) }));
+}
+
+export function slotMechanicSequenceHoldMs(
+  sequence: readonly SlotMechanicSequenceStep[],
+  phase: SpinRoundPhase,
+  turbo = false,
+): number {
+  const sequenceDuration = sequence.reduce((total, step) => total + Math.max(0, step.durationMs), 0);
+  if (turbo) return Math.max(120, Math.min(2_600, sequenceDuration + (sequenceDuration > 0 ? 60 : 0)));
+
+  const phaseMinimum = phase === "base" ? 320 : 650;
+  return Math.max(phaseMinimum, Math.min(10_000, sequenceDuration + (sequenceDuration > 0 ? 160 : 0)));
 }
 
 export function nextSlotMechanicStep(currentStep: number, sequenceLength: number): number {
