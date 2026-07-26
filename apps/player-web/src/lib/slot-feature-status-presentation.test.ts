@@ -86,6 +86,46 @@ describe("slot feature status presentation", () => {
     expect(result.tags).toEqual(["3 WILDS LOCKED", "6 UPGRADED"]);
   });
 
+  it("always reserves the final metric for the authoritative payout", () => {
+    const result = resolveSlotFeatureStatus({
+      active: true,
+      phase: "free_spin",
+      index: 7,
+      totalWin: 98765,
+      mechanicLabel: "Free Spins",
+      events: [
+        event("ways.win", { symbol: "H1", count: 5, ways: 4096 }),
+        event("multiplier.applied", { source: "multiplier_symbols", multiplier: 8 }),
+        event("free_spins.awarded", { count: 12 }),
+      ],
+    });
+
+    expect(result.metrics).toHaveLength(4);
+    expect(result.metrics.at(-1)).toEqual({ label: "Rundengewinn", value: "98.765" });
+    expect(result.metrics.some((metric) => metric.label === "Gewonnen")).toBe(false);
+  });
+
+  it("bounds hostile numeric payloads before they reach the HUD", () => {
+    const result = resolveSlotFeatureStatus({
+      active: true,
+      phase: "base",
+      index: Number.MAX_VALUE,
+      totalWin: Number.MAX_VALUE,
+      mechanicLabel: "Max Win",
+      events: [
+        event("max_win.reached", { multiplier: Number.MAX_VALUE }),
+        event("ways.win", { ways: Number.MAX_VALUE, count: Number.MAX_VALUE }),
+        event("wild.stuck", { count: Number.MAX_VALUE }),
+      ],
+    });
+
+    expect(result.headline).toBe("MAX WIN");
+    expect(result.metrics.at(-1)).toEqual({ label: "Limit", value: "1.000.000.000" });
+    expect(result.metrics).toContainEqual({ label: "Ways", value: "10.000.000" });
+    expect(result.tags).toContain("100 WILDS LOCKED");
+    expect(result.tags).toContain("1.000.000× MAX");
+  });
+
   it("returns a stable idle state", () => {
     expect(resolveSlotFeatureStatus({
       active: false,
