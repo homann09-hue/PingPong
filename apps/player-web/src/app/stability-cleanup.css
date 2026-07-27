@@ -1,0 +1,127 @@
+/*
+ * Final stability layer.
+ *
+ * Several experimental presentation systems were mounted at the same time and
+ * each added fixed-position chrome, particles or another complete lobby. This
+ * file deliberately disables those prototype-only layers until they are
+ * integrated as one coherent, tested surface.
+ */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.app-shell,
+.page-content,
+.page-content > *,
+.slot-stage,
+.reel-frame,
+.slot-controls {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Duplicate/prototype surfaces that currently obscure the real application. */
+.premium-live-layer,
+.slot-world-chrome,
+.aurora-motion-layer {
+  display: none !important;
+}
+
+/* Keep the actual game surface above decorative backgrounds and below dialogs. */
+.slot-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+}
+
+.slot-stage .slot-backdrop,
+.slot-stage .slot-overlay {
+  pointer-events: none;
+}
+
+.slot-stage .slot-header,
+.slot-stage .jackpot-strip,
+.slot-stage .reel-frame,
+.slot-stage .win-panel,
+.slot-stage .slot-controls,
+.slot-stage .play-money-notice {
+  position: relative;
+  z-index: 2;
+}
+
+.slot-stage .slot-round-banner,
+.slot-stage .slot-mechanic-fx,
+.slot-stage .slot-feature-hud {
+  pointer-events: none;
+  z-index: 8;
+}
+
+.search-overlay,
+.mobile-casino-overlay,
+.paytable-overlay,
+.celebration-hub {
+  z-index: 1000 !important;
+}
+
+@media (max-width: 760px) {
+  .premium-shell:not(.is-slot-route) {
+    padding-right: 8px !important;
+    padding-left: 8px !important;
+  }
+
+  .casino-lobby-stage {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .activity-dock,
+  .category-row {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .game-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .slot-stage {
+    padding-right: 8px !important;
+    padding-left: 8px !important;
+    padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .slot-header {
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+  }
+
+  .jackpot-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .reel-frame {
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .slot-controls {
+    width: 100% !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .game-grid {
+    gap: 10px !important;
+  }
+
+  .wallet-pill {
+    min-width: 0 !important;
+  }
+
+  .slot-stage .slot-feature-hud {
+    max-width: calc(100vw - 16px) !important;
+  }
+}
