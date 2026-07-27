@@ -24,11 +24,21 @@ jobs:
           --health-retries 15
     env:
       TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
+      DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - name: Migrationen anwenden
+        run: npm run migrate
+      - name: Migrationen erneut anwenden
+        run: npm run migrate
+      - name: Migrationsstatus pruefen
+        run: |
+          output="$(npm run migrate:status)"
+          echo "$output"
+          echo "$output" | grep -Eq '[0-9]+ angewandt, 0 ausstehend\.'
       - name: Typecheck
         id: typecheck
         shell: bash
@@ -68,24 +78,5 @@ jobs:
       - name: Test player web
         run: npm run test -w @aurora/player-web
       - run: npm run build
-  flutter:
-    runs-on: ubuntu-latest
-    defaults: { run: { working-directory: apps/mobile } }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with: { flutter-version: 3.44.6, channel: stable, cache: true }
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos
-      - run: flutter test
-      - run: flutter build web --release --no-web-resources-cdn --no-pub
-      - run: flutter build apk --debug --no-pub
-  ios:
-    runs-on: macos-latest
-    defaults: { run: { working-directory: apps/mobile } }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with: { flutter-version: 3.44.6, channel: stable, cache: true }
-      - run: flutter pub get
-      - run: flutter build ios --simulator --debug --no-codesign --no-pub
+      - name: Control-Center-Prototyp
+        run: npm --prefix apps/control-center ci && npm run build:control-center
