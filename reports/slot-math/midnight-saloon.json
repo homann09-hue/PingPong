@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-27T08:32:00.161Z",
+  "slotId": "midnight-saloon",
+  "slotVersion": 3,
+  "mathModelVersion": "3.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9527270,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.952727,
+  "rtpDeviation": 0.012727000000000044,
+  "rtp95ConfidenceInterval": [
+    0.9255431925164149,
+    0.9799108074835851
+  ],
+  "rtpBreakdown": {
+    "base": 0.803447,
+    "freeSpins": 0.135559,
+    "respins": 0.000971,
+    "cascades": 0,
+    "bonus": 0,
+    "jackpot": 0.01275
+  },
+  "variance": 19.235719213468705,
+  "standardDeviation": 4.385854445084641,
+  "hitFrequency": 0.42374,
+  "lossOrSubBetFrequency": 0.83677,
+  "equalBetFrequency": 0.01625,
+  "profitableSpinFrequency": 0.14698,
+  "freeSpinTriggerFrequency": 0.00915,
+  "bonusTriggerFrequency": 0.00227,
+  "respinTriggerFrequency": 0.00227,
+  "jackpotHitFrequency": 0.00227,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 52140,
+  "maximumObservedWinMultiplier": 521.4,
+  "maximumWinStreak": 14,
+  "maximumLossStreak": 20,
+  "distribution": {
+    "zero": 0.57626,
+    "under1x": 0.26051,
+    "from1xTo5x": 0.11329,
+    "from5xTo15x": 0.03914,
+    "from15xTo50x": 0.00955,
+    "from50xTo100x": 0.0011,
+    "atLeast100x": 0.00015
+  }
+}

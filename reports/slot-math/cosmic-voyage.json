@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-07-27T08:32:00.161Z",
+  "slotId": "cosmic-voyage",
+  "slotVersion": 3,
+  "mathModelVersion": "3.0.0",
+  "samples": 100000,
+  "bet": 100,
+  "totalWagered": 10000000,
+  "totalReturned": 9393970,
+  "configuredTargetRtp": 0.94,
+  "simulatedRtp": 0.939397,
+  "rtpDeviation": -0.0006029999999999092,
+  "rtp95ConfidenceInterval": [
+    0.9227858009641848,
+    0.9560081990358152
+  ],
+  "rtpBreakdown": {
+    "base": 0.30126,
+    "freeSpins": 0.090303,
+    "respins": 0.547834,
+    "cascades": 0,
+    "bonus": 0,
+    "jackpot": 0
+  },
+  "variance": 7.18273462639181,
+  "standardDeviation": 2.680062429569843,
+  "hitFrequency": 0.49578,
+  "lossOrSubBetFrequency": 0.77733,
+  "equalBetFrequency": 0.01485,
+  "profitableSpinFrequency": 0.20782,
+  "freeSpinTriggerFrequency": 0.01624,
+  "bonusTriggerFrequency": 0,
+  "respinTriggerFrequency": 0.41355,
+  "jackpotHitFrequency": 0,
+  "maxWinFrequency": 0,
+  "maximumObservedWin": 12520,
+  "maximumObservedWinMultiplier": 125.2,
+  "maximumWinStreak": 15,
+  "maximumLossStreak": 18,
+  "distribution": {
+    "zero": 0.50422,
+    "under1x": 0.27311,
+    "from1xTo5x": 0.17653,
+    "from5xTo15x": 0.04095,
+    "from15xTo50x": 0.00492,
+    "from50xTo100x": 0.00023,
+    "atLeast100x": 0.00004
+  }
+}

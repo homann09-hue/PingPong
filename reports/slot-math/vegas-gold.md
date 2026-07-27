@@ -1,44 +1,44 @@
 # Slot-Math-Report: vegas-gold
 
-Erzeugt: 2026-07-21T03:56:37.255Z · Version 3 · Math-Modell 3.0.0
-Stichprobe: **1.000.000 Spins** · Einsatz 100 · deterministisch (Seed = Spin-Index)
+Erzeugt: 2026-07-27T08:32:00.161Z · Version 3 · Math-Modell 3.0.0
+Stichprobe: **100.000 Spins** · Einsatz 100 · deterministisch (Seed = Spin-Index)
 
 | Kennzahl | Wert |
 |---|---|
 | Ziel-RTP | 94.000 % |
-| Simulierter RTP | 93.720 % |
-| Abweichung | -0.280 % ✅ innerhalb ±2 pp |
-| 95%-Konfidenzintervall | 92.968 % – 94.472 % |
-| Standardabweichung (Multiplikator) | 3.837 |
-| Hit-Frequenz | 52.323 % |
-| Profitable Spins (> Einsatz) | 26.598 % |
+| Simulierter RTP | 93.455 % |
+| Abweichung | -0.545 % ✅ innerhalb ±2 pp |
+| 95%-Konfidenzintervall | 91.092 % – 95.817 % |
+| Standardabweichung (Multiplikator) | 3.812 |
+| Hit-Frequenz | 52.514 % |
+| Profitable Spins (> Einsatz) | 26.657 % |
 | Free-Spin-Trigger | 0.000 % |
-| Bonus-Trigger | 0.227 % |
+| Bonus-Trigger | 0.234 % |
 | Respin-Trigger | 0.000 % |
-| Jackpot-Frequenz | 0.227 % |
+| Jackpot-Frequenz | 0.234 % |
 | Max-Win-Frequenz | 0.000 % |
-| Groesster beobachteter Gewinn | 182.0x |
-| Laengste Verluststrecke | 17 Spins |
+| Groesster beobachteter Gewinn | 168.0x |
+| Laengste Verluststrecke | 14 Spins |
 
 ## RTP-Beitrag nach Phase
 
 | Phase | Beitrag |
 |---|---|
-| base | 78.463 % |
+| base | 77.965 % |
 | freeSpins | 0.000 % |
 | respins | 0.000 % |
 | cascades | 0.000 % |
-| bonus | 13.939 % |
-| jackpot | 1.318 % |
+| bonus | 14.220 % |
+| jackpot | 1.270 % |
 
 ## Gewinnverteilung
 
 | Klasse | Anteil |
 |---|---|
-| zero | 47.677 % |
-| under1x | 25.725 % |
-| from1xTo5x | 24.313 % |
-| from5xTo15x | 1.880 % |
-| from15xTo50x | 0.233 % |
-| from50xTo100x | 0.149 % |
-| atLeast100x | 0.023 % |
+| zero | 47.486 % |
+| under1x | 25.857 % |
+| from1xTo5x | 24.408 % |
+| from5xTo15x | 1.863 % |
+| from15xTo50x | 0.206 % |
+| from50xTo100x | 0.158 % |
+| atLeast100x | 0.022 % |
