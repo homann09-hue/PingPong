@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import Fastify from "fastify";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildApp, createHttpLoggerOptions } from "./http-app.js";
@@ -33,7 +33,6 @@ import { PostgresDistributedRateLimiter } from "./security/distributed-rate-limi
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
-
 const databaseUrl = process.env.DATABASE_URL;
 const jwtSecret = process.env.JWT_SECRET;
 const adminJwtSecret = process.env.ADMIN_JWT_SECRET;
@@ -53,12 +52,15 @@ if (demoMode && productionRuntime) {
   throw new Error("DEMO_MODE is forbidden in production and hosted deployments");
 }
 
-/**
- * Der Push-Zustellungs-Worker darf nur in genau einer Instanz laufen, sonst wuerden mehrere
- * Repliken dieselben Zustellungen greifen. Standard: an (Einzelinstanz-Betrieb).
- * Bei horizontaler Skalierung: PUSH_WORKER_ENABLED=false auf den HTTP-Repliken setzen und
- * einen dedizierten Worker-Dienst mit PUSH_WORKER_ENABLED=true betreiben.
- */
+function ephemeralDemoSecret(): string {
+  return randomBytes(48).toString("base64url");
+}
+
+const demoJwtSecret = demoMode ? ephemeralDemoSecret() : "";
+const demoMetricsToken = demoMode ? ephemeralDemoSecret() : "";
+const demoStoreWebhookToken = demoMode ? ephemeralDemoSecret() : "";
+if (demoMode) console.warn("[DEMO_MODE] Ephemeral process-local credentials created; values are intentionally not logged.");
+
 const pushWorkerEnabled = process.env.PUSH_WORKER_ENABLED !== "false";
 if (!demoMode && (!databaseUrl || !jwtSecret || !adminJwtSecret || !metricsToken
   || !pushTokenEncryptionKey || !pushGatewayUrl || !pushGatewayToken || !storeVerificationUrl || !storeGatewayToken || !storeWebhookToken
@@ -67,12 +69,13 @@ if (!demoMode && (!databaseUrl || !jwtSecret || !adminJwtSecret || !metricsToken
 }
 if (!demoMode && Buffer.byteLength(metricsToken!) < 32) throw new Error("METRICS_TOKEN must contain at least 32 bytes");
 if (!demoMode && Buffer.byteLength(storeWebhookToken!) < 32) throw new Error("STORE_WEBHOOK_TOKEN must contain at least 32 bytes");
+
 const demoPlayerId = "00000000-0000-4000-8000-000000000001";
 const externalIdentityVerifier = supabaseUrl && supabasePublishableKey
   ? new SupabaseIdentityVerifier(supabaseUrl, supabasePublishableKey)
   : undefined;
 const identityService = demoMode
-  ? new IdentityService(new InMemoryIdentityStore(), "local-demo-jwt-secret-at-least-32-bytes", externalIdentityVerifier)
+  ? new IdentityService(new InMemoryIdentityStore(), demoJwtSecret, externalIdentityVerifier)
   : new IdentityService(PostgresIdentityStore.connect(databaseUrl!), jwtSecret!, externalIdentityVerifier);
 const messagingStore = demoMode
   ? new InMemoryMessagingStore()
@@ -97,7 +100,7 @@ const pushWorker = new PushDeliveryWorker(
   (result) => metrics.recordPush(result),
 );
 
-const fastify = Fastify({ logger: createHttpLoggerOptions() });
+const fastify = Fastify({ logger: createHttpLoggerOptions(), trustProxy: 1 });
 const registrationLimiter = demoMode ? null : PostgresDistributedRateLimiter.connect(databaseUrl!);
 if (registrationLimiter) {
   fastify.addHook("onRequest", async (request, reply) => {
@@ -123,13 +126,13 @@ const app = buildApp({
   adminAuthenticator: demoMode ? new DemoAdminAuthenticator() : new AdminJwtAuthenticator(adminJwtSecret!),
   analyticsStore: demoMode ? new InMemoryAnalyticsStore() : PostgresAnalyticsStore.connect(databaseUrl!),
   metrics,
-  metricsToken: demoMode ? "local-metrics" : metricsToken!,
+  metricsToken: demoMode ? demoMetricsToken : metricsToken!,
   readiness: demoMode ? new AlwaysReadyProbe() : PostgresReadinessProbe.connect(databaseUrl!),
   messagingStore,
   pushWorker,
   identityService,
   monetizationService,
-  storeWebhookToken: demoMode ? "local-store-webhook" : storeWebhookToken!,
+  storeWebhookToken: demoMode ? demoStoreWebhookToken : storeWebhookToken!,
 }, fastify);
 const appReady = app.ready();
 
@@ -148,7 +151,6 @@ if (!process.env.VERCEL) {
   }
 }
 
-/** Vercel Node entrypoint; local processes continue to use Fastify's listener above. */
 export default async function handler(request: IncomingMessage, response: ServerResponse): Promise<void> {
   await appReady;
   app.server.emit("request", request, response);
