@@ -76,11 +76,9 @@ import "./celebration-hub.css";
 import "./canva-slot-cabinet-perfection.css";
 import "./canva-slot-cabinet-final.css";
 import "./canva-symbol-art-perfection.css";
+import "./stability-cleanup.css";
 import { AgeGate } from "@/components/age-gate";
-import { CelebrationHub } from "@/components/celebration-hub";
 import { LegalFooter } from "@/components/legal-footer";
-import { MotionOrchestrator } from "@/components/motion-orchestrator";
-import { SlotWorldChrome } from "@/components/slot-world-chrome";
 
 export const metadata: Metadata = {
   title: { default: "Aurora Casino", template: "%s · Aurora Casino" },
@@ -96,5 +94,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { viewportFit: "cover", width: "device-width", initialScale: 1, themeColor: "#120529", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate /><SlotWorldChrome /><MotionOrchestrator /><CelebrationHub />{children}<LegalFooter /></body></html>;
+  return <html lang="de" data-scroll-behavior="smooth"><body><AgeGate />{children}<LegalFooter /></body></html>;
 }
