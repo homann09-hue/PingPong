@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { decodeJwt, SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../http-app.js";
 import { InMemorySpinStore } from "../spins/in-memory-spin-store.js";
@@ -28,6 +29,27 @@ describe("identity sessions", () => {
 
     expect(await identity.refresh(first.refreshToken)).toBeNull();
     expect(await identity.authenticate(`Bearer ${rotated!.accessToken}`)).toBeNull();
+  });
+
+  it("requires issued-at and expiration claims with at most a 15-minute access-token lifetime", async () => {
+    const identity = new IdentityService(new InMemoryIdentityStore(), secret);
+    const issued = await identity.createGuest(randomUUID(), "web");
+    const sessionId = decodeJwt(issued.accessToken).sid;
+    expect(typeof sessionId).toBe("string");
+    const key = new TextEncoder().encode(secret);
+    const token = () => new SignJWT({ typ: "access", sid: sessionId })
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setSubject(issued.playerId)
+      .setIssuer("aurora-identity")
+      .setAudience("aurora-api");
+    const withoutExpiry = await token().setIssuedAt().sign(key);
+    const withoutIssuedAt = await token().setExpirationTime("5m").sign(key);
+    const overlong = await token().setIssuedAt().setExpirationTime("16m").sign(key);
+
+    expect(await identity.authenticate(`Bearer ${issued.accessToken}`)).toBe(issued.playerId);
+    expect(await identity.authenticate(`Bearer ${withoutExpiry}`)).toBeNull();
+    expect(await identity.authenticate(`Bearer ${withoutIssuedAt}`)).toBeNull();
+    expect(await identity.authenticate(`Bearer ${overlong}`)).toBeNull();
   });
 
   it("reuses the guest account for the same installation and revokes logout", async () => {

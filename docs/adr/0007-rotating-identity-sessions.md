@@ -11,7 +11,7 @@ client-supplied player ID.
 ## Decision
 
 - Access tokens are HS256 JWTs with issuer, audience, player subject, session
-  ID and a 15-minute lifetime.
+  ID, required `iat`/`exp` claims and a maximum issued lifetime of 15 minutes.
 - Authentication requires both a valid signature and an active server session.
 - Refresh tokens are opaque 256-bit random values with a 30-day lifetime.
 - Only SHA-256 refresh-token hashes are persisted.

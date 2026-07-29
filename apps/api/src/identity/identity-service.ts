@@ -6,6 +6,7 @@ import { ExternalIdentityVerificationUnavailableError } from "./external-identit
 import type { AccountSummary, ClientPlatform, CloudSave, DeviceSummary, IdentityStore, SessionRecord, SessionSummary } from "./identity-store.js";
 
 const ACCESS_TOKEN_SECONDS = 15 * 60;
+const ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS = 30;
 const REFRESH_TOKEN_MILLISECONDS = 30 * 24 * 60 * 60 * 1_000;
 
 export interface SessionTokens {
@@ -133,8 +134,12 @@ export class IdentityService implements Authenticator {
     try {
       const { payload } = await jwtVerify(authorization.slice(7), this.key, {
         algorithms: ["HS256"], issuer: "aurora-identity", audience: "aurora-api",
+        maxTokenAge: `${ACCESS_TOKEN_SECONDS}s`,
+        clockTolerance: ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS,
       });
-      if (payload.typ !== "access" || typeof payload.sub !== "string" || typeof payload.sid !== "string") return null;
+      if (payload.typ !== "access" || typeof payload.sub !== "string" || typeof payload.sid !== "string"
+        || typeof payload.iat !== "number" || typeof payload.exp !== "number"
+        || payload.exp <= payload.iat || payload.exp - payload.iat > ACCESS_TOKEN_SECONDS) return null;
       return await this.store.isSessionActive(payload.sid, payload.sub) ? payload.sub : null;
     } catch {
       return null;
