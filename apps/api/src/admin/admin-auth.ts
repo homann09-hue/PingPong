@@ -1,5 +1,8 @@
 import { jwtVerify } from "jose";
 
+const MAX_ADMIN_TOKEN_SECONDS = 15 * 60;
+const CLOCK_TOLERANCE_SECONDS = 30;
+
 export type AdminRole = "liveops_editor" | "liveops_publisher" | "liveops_auditor" | "social_moderator"
   | "economy_support" | "economy_approver" | "economy_auditor" | "operations_viewer";
 export interface AdminPrincipal { readonly subject: string; readonly roles: readonly AdminRole[] }
@@ -17,7 +20,11 @@ export class AdminJwtAuthenticator implements AdminAuthenticator {
     try {
       const { payload } = await jwtVerify(authorization.slice(7), this.key, {
         algorithms: ["HS256"], issuer: "aurora-workforce", audience: "aurora-admin",
+        maxTokenAge: `${MAX_ADMIN_TOKEN_SECONDS}s`,
+        clockTolerance: CLOCK_TOLERANCE_SECONDS,
       });
+      if (typeof payload.iat !== "number" || typeof payload.exp !== "number"
+        || payload.exp <= payload.iat || payload.exp - payload.iat > MAX_ADMIN_TOKEN_SECONDS) return null;
       const allowed = new Set<AdminRole>(["liveops_editor", "liveops_publisher", "liveops_auditor", "social_moderator",
         "economy_support", "economy_approver", "economy_auditor", "operations_viewer"]);
       const roles = Array.isArray(payload.roles) ? payload.roles.filter((role): role is AdminRole =>

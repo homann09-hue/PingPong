@@ -35,4 +35,35 @@ describe("AdminJwtAuthenticator", () => {
 
     await expect(authenticator.authenticate(`Bearer ${token}`)).resolves.toBeNull();
   });
+
+  it("requires issued-at and expiration claims with at most a 15-minute lifetime", async () => {
+    const authenticator = new AdminJwtAuthenticator(secret);
+    const claims = { roles: ["liveops_publisher"] };
+    const tokenWithoutExpiry = await new SignJWT(claims)
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("operator-42")
+      .setIssuer("aurora-workforce")
+      .setAudience("aurora-admin")
+      .setIssuedAt()
+      .sign(key);
+    const tokenWithoutIssuedAt = await new SignJWT(claims)
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("operator-42")
+      .setIssuer("aurora-workforce")
+      .setAudience("aurora-admin")
+      .setExpirationTime("5m")
+      .sign(key);
+    const overlongToken = await new SignJWT(claims)
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("operator-42")
+      .setIssuer("aurora-workforce")
+      .setAudience("aurora-admin")
+      .setIssuedAt()
+      .setExpirationTime("16m")
+      .sign(key);
+
+    await expect(authenticator.authenticate(`Bearer ${tokenWithoutExpiry}`)).resolves.toBeNull();
+    await expect(authenticator.authenticate(`Bearer ${tokenWithoutIssuedAt}`)).resolves.toBeNull();
+    await expect(authenticator.authenticate(`Bearer ${overlongToken}`)).resolves.toBeNull();
+  });
 });

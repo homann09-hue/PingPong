@@ -19,8 +19,9 @@ and never becomes player-visible without approval from a second operator.
 
 Production uses short-lived HS256 workforce JWTs with issuer
 `aurora-workforce`, audience `aurora-admin`, an allow-list of roles and a secret
-that is independent from player authentication. Demo mode exposes explicit
-editor and publisher identities only for local development.
+that is independent from player authentication. Tokens must carry `iat` and
+`exp`; the issued lifetime may not exceed 15 minutes. Demo mode exposes
+explicit editor and publisher identities only for local development.
 
 ## Persistence and security
 

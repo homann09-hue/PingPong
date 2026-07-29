@@ -45,7 +45,8 @@ See ADR 0003.
 
 LiveOps campaign publication is isolated from player authentication. Workforce
 JWTs require the `aurora-workforce` issuer, `aurora-admin` audience and a
-separate secret. Editors can create drafts, publishers can release them, and a
+separate secret. Required `iat`/`exp` claims limit the issued lifetime to 15
+minutes. Editors can create drafts, publishers can release them, and a
 database constraint rejects self-approval. Every mutation appends an audit row;
 PostgreSQL rejects updates and deletes on that audit table. Player reads expose
 only published campaigns whose UTC window and level/VIP audience match the
