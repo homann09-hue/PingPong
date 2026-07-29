@@ -107,7 +107,7 @@ databaseSuite("PostgresSpinStore integration", () => {
       progression: { level: 1, xp: 10, spins: 1, totalWon: 5, freeSpins: 0, vipPoints: 1 },
     });
     expect(replay).toEqual(first);
-    await expect(store.settle({ ...command, effectiveWager: 20 }, () => spin))
+    await expect(store.settle({ ...command, baseBet: 20, effectiveWager: 20 }, () => spin))
       .rejects.toThrow("Idempotency key was already used");
     const wallet = await pool.query<{ balance: string }>("SELECT balance FROM wallets WHERE player_id=$1 AND currency='coin'", [playerId]);
     const ledger = await pool.query<{
