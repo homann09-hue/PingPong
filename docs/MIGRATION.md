@@ -28,19 +28,24 @@ Ziel-Architektur (statt "alles auf Vercel"):
 ## Phase 2 — API zu Railway
 
 1. Railway-Service aus dem Repo erstellen (nutzt `apps/api/Dockerfile`).
-2. Environment-Variablen setzen (siehe Matrix unten). **DEMO_MODE nicht setzen** — Produktion erzwingt damit alle Secrets.
+2. Environment-Variablen setzen (siehe Matrix unten). **DEMO_MODE nicht setzen** — Produktion verweigert den Start damit jetzt auch dann, wenn alle Secrets vorhanden wären.
 3. Deploy abwarten, pruefen: `GET https://<railway-domain>/health/ready` -> ok.
 4. player-web (`AURORA_API_URL`) auf die Railway-URL umstellen — erst im Staging, dann Produktion.
 
 ### Env-Matrix (apps/api)
 | Variable | Quelle |
 |---|---|
+| APP_ENV | `production` (für eine ausdrücklich isolierte Demo-Staging-Umgebung: `staging`) |
 | DATABASE_URL | Supabase Pooler-URL |
 | JWT_SECRET / ADMIN_JWT_SECRET | `openssl rand -base64 48` |
 | METRICS_TOKEN / STORE_WEBHOOK_TOKEN | `openssl rand -base64 48` (min. 32 Bytes erzwungen) |
 | PUSH_TOKEN_ENCRYPTION_KEY | `openssl rand -base64 32` |
 | PUSH_GATEWAY_URL/-TOKEN, STORE_VERIFICATION_URL, STORE_GATEWAY_TOKEN | eure Gateways (bis dahin Staging mit DEMO_MODE) |
 | SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY | Supabase Project Settings |
+
+`VERCEL_ENV` wird auf Vercel automatisch ausgewertet und hat Vorrang vor
+`APP_ENV`/`NODE_ENV`: `production` blockiert `DEMO_MODE`, während
+`preview` eine ausdrücklich nichtproduktive Demo-Bereitstellung zulässt.
 
 ## Phase 3 — Frontend zu Cloudflare Pages
 
