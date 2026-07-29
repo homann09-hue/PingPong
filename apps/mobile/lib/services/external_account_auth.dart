@@ -9,7 +9,10 @@ const supabasePublishableKey = String.fromEnvironment(
 
 Future<void> initializeExternalAccountAuth() async {
   if (supabaseUrl.isEmpty || supabasePublishableKey.isEmpty) return;
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabasePublishableKey);
+  await Supabase.initialize(
+    url: supabaseUrl,
+    publishableKey: supabasePublishableKey,
+  );
 }
 
 /// Obtains provider proof only; Aurora remains the account/session authority.

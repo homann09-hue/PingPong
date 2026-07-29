@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -23,7 +23,6 @@ const files = [
   }).flatMap(([set, names]) => names.map((name) => `symbols/${set}/${name}.png`)),
 ];
 
-await rm(target, { recursive: true, force: true });
 await mkdir(target, { recursive: true });
 const manifest = {};
 for (const relative of files) {

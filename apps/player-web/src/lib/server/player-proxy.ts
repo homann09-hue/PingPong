@@ -81,6 +81,12 @@ export function isAllowedPlayerPath(path: string): boolean {
   return allowedRoutes.some((pattern) => pattern.test(path));
 }
 
+export function playerUpstreamUrl(request: NextRequest, path: string): URL {
+  const url = new URL(`/v1/${path}`, playerApiUrl);
+  url.search = request.nextUrl.search;
+  return url;
+}
+
 export function cookieOptions(maxAge: number) {
   return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge };
 }
@@ -129,7 +135,7 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
   if (needsIdempotencyKey) {
     headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
   }
-  return fetch(`${playerApiUrl}/v1/${path}`, {
+  return fetch(playerUpstreamUrl(request, path), {
     method: request.method,
     headers,
     body,

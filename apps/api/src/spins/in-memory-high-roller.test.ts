@@ -71,7 +71,7 @@ describe("InMemorySpinStore High Roller Club", () => {
       await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "high-roller-test",
         configVersion: 1, baseBet: 10_000, effectiveWager: 10_000, bonusBuy: false, seed }, () => result(10_000, seed));
     }
-    const now = new Date("2026-07-17T12:00:00.000Z");
+    const now = new Date();
     expect(await store.getHighRollerClub(playerId, now)).toMatchObject({ points: 20_900, eligible: true, active: false });
     const key = randomUUID();
     const activation = await store.activateHighRollerClub(playerId, key, now);

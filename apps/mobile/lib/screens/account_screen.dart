@@ -29,8 +29,9 @@ class _AccountScreenState extends State<AccountScreen> {
     super.initState();
     if (external.available) {
       authChanges = external.changes.listen((state) {
-        if (state.event == AuthChangeEvent.signedIn && state.session != null)
+        if (state.event == AuthChangeEvent.signedIn && state.session != null) {
           unawaited(_acceptExternal(state.session!));
+        }
       });
     }
     unawaited(_load());
@@ -51,12 +52,13 @@ class _AccountScreenState extends State<AccountScreen> {
         api.accountSessions(),
         api.cloudSave(),
       ]);
-      if (mounted)
+      if (mounted) {
         setState(() {
           account = values[0] as Map<String, dynamic>;
           sessions = values[1] as List<Map<String, dynamic>>;
           save = values[2] as Map<String, dynamic>;
         });
+      }
     } on StateError catch (error) {
       if (mounted) setState(() => message = error.message);
     }
@@ -80,10 +82,11 @@ class _AccountScreenState extends State<AccountScreen> {
       await operation();
       if (mounted) setState(() => message = success);
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => message = error.toString().replaceFirst('Bad state: ', ''),
         );
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -93,8 +96,9 @@ class _AccountScreenState extends State<AccountScreen> {
     final session = create
         ? await external.createEmailAccount(email.text.trim(), password.text)
         : await external.signInWithEmail(email.text.trim(), password.text);
-    if (session != null)
+    if (session != null) {
       await api.signInWithProvider('email', session.accessToken);
+    }
     await _load();
   }, create ? 'Bestätigungs-E-Mail gesendet.' : 'Angemeldet.');
 
@@ -283,7 +287,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     ? null
                     : () => _run(() async {
                         final data = await api.privacyExport();
-                        if (context.mounted)
+                        if (context.mounted) {
                           await showDialog<void>(
                             context: context,
                             builder: (_) => AlertDialog(
@@ -301,6 +305,7 @@ class _AccountScreenState extends State<AccountScreen> {
                               ],
                             ),
                           );
+                        }
                       }, 'Export erstellt.'),
                 icon: const Icon(Icons.download_rounded),
                 label: const Text('DATENSCHUTZEXPORT'),
@@ -340,12 +345,13 @@ class _AccountScreenState extends State<AccountScreen> {
                             ],
                           ),
                         );
-                        if (confirmed == true)
+                        if (confirmed == true) {
                           await _run(() async {
                             await api.deleteAccount();
                             await external.signOut();
                             if (context.mounted) Navigator.pop(context);
                           }, 'Konto gelöscht.');
+                        }
                       },
                 icon: const Icon(Icons.delete_forever_rounded),
                 label: const Text('KONTO LÖSCHEN'),
