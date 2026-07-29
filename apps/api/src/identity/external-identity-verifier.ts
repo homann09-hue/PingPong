@@ -11,6 +11,10 @@ export interface ExternalIdentityVerifier {
   verify(accessToken: string, expectedProvider: ExternalIdentityProvider): Promise<VerifiedExternalIdentity | null>;
 }
 
+export class ExternalIdentityVerificationUnavailableError extends Error {
+  public constructor() { super("External identity verification is unavailable"); }
+}
+
 interface SupabaseIdentity {
   readonly provider?: string;
 }
@@ -30,12 +34,29 @@ export class SupabaseIdentityVerifier implements ExternalIdentityVerifier {
   }
 
   public async verify(accessToken: string, expectedProvider: ExternalIdentityProvider): Promise<VerifiedExternalIdentity | null> {
-    const response = await fetch(this.userEndpoint, {
-      headers: { authorization: `Bearer ${accessToken}`, apikey: this.publishableKey },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) return null;
-    const user = await response.json() as SupabaseUser;
+    let response: Response;
+    try {
+      response = await fetch(this.userEndpoint, {
+        headers: { authorization: `Bearer ${accessToken}`, apikey: this.publishableKey },
+        signal: AbortSignal.timeout(8_000),
+      });
+    } catch {
+      throw new ExternalIdentityVerificationUnavailableError();
+    }
+    if (response.status === 429 || response.status >= 500) {
+      await response.body?.cancel();
+      throw new ExternalIdentityVerificationUnavailableError();
+    }
+    if (!response.ok) {
+      await response.body?.cancel();
+      return null;
+    }
+    let user: SupabaseUser;
+    try {
+      user = await response.json() as SupabaseUser;
+    } catch {
+      throw new ExternalIdentityVerificationUnavailableError();
+    }
     if (!user.id || !user.identities?.some((identity) => identity.provider === expectedProvider)) return null;
     if (expectedProvider === "email" && !user.email_confirmed_at) return null;
     return { provider: expectedProvider, subject: user.id };

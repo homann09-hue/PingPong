@@ -126,9 +126,10 @@ function Topbar({ title, onMenu, onSearch }) {
 }
 
 function StatusStrip({ health }) {
-  const healthy = health?.status !== "critical";
+  const healthy = health?.status === "healthy";
+  const unavailable = health === null;
   return <section className="status-strip">
-    <div className="platform-state"><span>PLATTFORM-STATUS</span><strong>{healthy ? "Plattform live" : "Eingriff erforderlich"}</strong><small>{healthy ? "Alle Systeme normal" : "Mindestens ein Dienst ist gestört"}</small></div>
+    <div className="platform-state"><span>PLATTFORM-STATUS</span><strong>{unavailable ? "Status wird geladen" : healthy ? "Plattform live" : "Eingriff erforderlich"}</strong><small>{unavailable ? "Betriebsdaten noch nicht verfügbar" : healthy ? "Alle Systeme normal" : "Mindestens ein Dienst ist gestört"}</small></div>
     {[["Pulse", "API", "Alle Systeme normal", "198 ms"], ["Database", "Datenbank", "Gesund", "32 ms"], ["Stack", "Queue", "Gesund", "Lag 120 ms"], ["WarningCircle", "Incidents", "0 aktive", "Letzte 24 h"]].map(([icon, title, state, detail]) => <div className="service" key={title}><Icon name={icon} size={22}/><p><strong>{title}</strong><span>{state}</span><small>{detail}</small></p></div>)}
     <button>Status-Details <Icon name="ArrowRight"/></button>
   </section>;
@@ -228,7 +229,7 @@ export function App() {
   const [campaigns, setCampaigns] = useState([]);
   const [search, setSearch] = useState("");
   useEffect(() => {
-    api("/admin/v1/operations/health", "local-admin-operations").then(setHealth).catch(()=>setHealth({status:"healthy"}));
+    api("/admin/v1/operations/health", "local-admin-operations").then(setHealth).catch(()=>setHealth({status:"critical",issues:["operations_unavailable"]}));
     api("/admin/v1/liveops/campaigns", "local-admin-editor").then((body)=>setCampaigns(body.campaigns)).catch(()=>setCampaigns([]));
   }, []);
   const title = active === "dashboard" ? "Dashboard" : active === "slots" ? "Slots" : active === "remote-config" ? "Remote Config" : moduleCatalog[active]?.title ?? "Control Center";

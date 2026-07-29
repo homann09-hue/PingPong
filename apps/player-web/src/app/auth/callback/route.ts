@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { safeRedirectPath } from "@/lib/server/safe-redirect";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const requestedNext = request.nextUrl.searchParams.get("next");
-  const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/account?connected=1";
+  const next = safeRedirectPath(requestedNext, "/account?connected=1");
   const origin = request.nextUrl.origin;
   if (!code) return NextResponse.redirect(`${origin}/account?error=missing_code`);
   try {

@@ -179,7 +179,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   // Autoplay: dreht bis zu N Runden automatisch. Der "latest ref"-Zeiger haelt
   // stets die aktuelle spin-Funktion, damit kein veralteter Closure-Stand
   // (Einsatz, Kontostand) verwendet wird. Der Effekt startet die naechste Runde
-  // erst, wenn die vorige fertig ist â keine Timer-Kollision, terminiert nach N.
+  // erst, wenn die vorige fertig ist — keine Timer-Kollision, terminiert nach N.
   const [autoRemaining, setAutoRemaining] = useState(0);
   const spinRef = useRef(spin);
   useEffect(() => { spinRef.current = spin; });
@@ -194,7 +194,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
 
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setStoppedReels(0); setWinCells(new Set()); setWinPaths([]); setWin(0); setDisplayedWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen â¦");
+    setSpinning(true); setStoppedReels(0); setWinCells(new Set()); setWinPaths([]); setWin(0); setDisplayedWin(0); setCelebration(null); setFeaturePresentation(null); setMessage("Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -221,7 +221,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         window.setTimeout(() => setFeaturePresentation(feature), turbo ? 260 : 580);
       }
       if (body.spin.totalWin > 0) {
-        setMessage(`${body.spin.winClass ?? "GEWINN"} Â· ${coinNumber(body.spin.totalWin)} Coins`);
+        setMessage(`${body.spin.winClass ?? "GEWINN"} · ${coinNumber(body.spin.totalWin)} Coins`);
         if (sound) playTones([523, 659, 784, 1047], 0.1, "triangle", 0.05);
         const tier = winTierFor(body.spin.winClass, body.spin.totalWin / bet);
         if (tier) setCelebration({ tier, amount: body.spin.totalWin });
@@ -231,7 +231,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       if (profile) setProfile({ ...profile, coinBalance: body.coinBalance });
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
-      if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins fuer diesen Einsatz â hol dir Gratis-Boni im Shop.");
+      if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
       else if (code === "HIGH_ROLLER_MEMBERSHIP_REQUIRED") setMessage("Dieser Slot ist dem High Roller Club vorbehalten.");
       else if (code === "RATE_LIMITED") setMessage("Zu viele Spins in kurzer Zeit. Kurz durchatmen und weiter geht es.");
       else setMessage("Der Spin konnte nicht abgeschlossen werden. Dein Guthaben ist sicher.");
@@ -241,7 +241,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   }
 
   const themeStyle = { "--slot-primary": game.primary, "--slot-secondary": game.secondary,
-    // Die Cover-Kunst des Slots dient als Blickfang am Bildrand â eigene
+    // Die Cover-Kunst des Slots dient als Blickfang am Bildrand — eigene
     // Grafik, kein zusaetzliches Asset noetig.
     "--slot-cover": `url("${game.cover}")` } as React.CSSProperties;
   return <AppShell profile={profile}>
@@ -282,7 +282,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       )}
       <header className="slot-header">
         <Link href="/" className="back-link" aria-label="Zurueck zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
-        <div><span>{game.name}</span><h1 id="slot-title">Grand {grand ? coinNumber(grand.amount) : "â"}</h1></div>
+        <div><span>{game.name}</span><h1 id="slot-title">Grand {grand ? coinNumber(grand.amount) : "—"}</h1></div>
         <div className="slot-actions">
           <button className="icon-button" onClick={() => setInfoOpen(true)} aria-label="Gewinntabelle und Regeln"><Info weight="fill" /></button>
           <button className="icon-button" onClick={() => setSound((value) => !value)} aria-pressed={sound} aria-label={sound ? "Ton aus" : "Ton an"}>{sound ? <SpeakerHigh weight="fill" /> : <SpeakerSlash weight="fill" />}</button>
@@ -297,7 +297,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       <div className="jackpot-strip" aria-label="Progressive Jackpots">
         {jackpotOrder.map((tier) => {
           const entry = jackpots.find((jackpot) => jackpot.tier === tier);
-          return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "â"}</strong></span>;
+          return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>;
         })}
       </div>
       <div className="slot-fx-layer" aria-hidden="true">
@@ -335,7 +335,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         </div>}
         {reels.map(({ column, reel }) => <div className={`reel ${stoppedReels > reel ? "is-stopped" : ""}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
           {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
-              fest, bevor sich hier etwas bewegt â die Drehung erzaehlt es nur nach. */}
+              fest, bevor sich hier etwas bewegt — die Drehung erzählt es nur nach. */}
           <div className="reel-strip" aria-hidden="true">
             {[...column, ...column, ...column].map((symbol, index) => {
               const stripAsset = symbolAsset(game.symbolSet, symbol);
@@ -391,7 +391,7 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
         secondary={game.secondary}
         onDone={() => setFeaturePresentation(null)}
       />}
-      <p className="play-money-notice">Nur zur Unterhaltung Â· Virtuelle Coins haben keinen Geldwert Â· Ergebnisse kommen vom Server</p>
+      <p className="play-money-notice">Nur zur Unterhaltung · Virtuelle Coins haben keinen Geldwert · Ergebnisse kommen vom Server</p>
 
       {infoOpen && <div className="paytable-overlay" role="dialog" aria-modal="true" aria-label="Gewinntabelle" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}>
         <div className="paytable-panel">
@@ -399,23 +399,23 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
           {paytable ? <>
             <dl className="paytable-facts">
               <div><dt>RTP (Ziel)</dt><dd>{(paytable.targetRtp * 100).toFixed(2)} %</dd></div>
-              <div><dt>Volatilitaet</dt><dd>{paytable.volatility ?? "â"}</dd></div>
-              <div><dt>Gewinnlinien</dt><dd>{paytable.paylines ?? "â"}</dd></div>
-              <div><dt>Max. Gewinn</dt><dd>{paytable.maxWinMultiplier ? `${coinNumber(paytable.maxWinMultiplier)}Ã` : "â"}</dd></div>
+              <div><dt>Volatilität</dt><dd>{paytable.volatility ?? "—"}</dd></div>
+              <div><dt>Gewinnlinien</dt><dd>{paytable.paylines ?? "—"}</dd></div>
+              <div><dt>Max. Gewinn</dt><dd>{paytable.maxWinMultiplier ? `${coinNumber(paytable.maxWinMultiplier)}×` : "—"}</dd></div>
             </dl>
             <table className="paytable-table">
-              <thead><tr><th scope="col">Symbol</th><th scope="col">Auszahlung (Ã Einsatz)</th></tr></thead>
+              <thead><tr><th scope="col">Symbol</th><th scope="col">Auszahlung (× Einsatz)</th></tr></thead>
               <tbody>{Object.entries(paytable.symbols ?? {}).map(([symbol, definition]) => {
                 const asset = symbolAsset(game.symbolSet, symbol);
                 const payouts = Object.entries(definition.payouts ?? {}).filter(([, value]) => value > 0);
                 if (payouts.length === 0) return null;
                 return <tr key={symbol}>
                   <th scope="row">{asset ? <Image src={asset} alt="" width={34} height={34} quality={72} /> : <span>{lowSymbolLabels[symbol] ?? symbol}</span>}<em>{definition.kind === "scatter" ? "Scatter" : definition.kind === "wild" ? "Wild" : symbol}</em></th>
-                  <td>{payouts.map(([count, value]) => `${count}Ã = ${value}`).join(" Â· ")}</td>
+                  <td>{payouts.map(([count, value]) => `${count}× = ${value}`).join(" · ")}</td>
                 </tr>;
               })}</tbody>
             </table>
-          </> : <p className="section-empty">Gewinntabelle wird geladen â¦</p>}
+          </> : <p className="section-empty">Gewinntabelle wird geladen …</p>}
           <p className="paytable-note">Alle Ergebnisse werden serverseitig ermittelt. Die veroeffentlichten RTP-Werte werden regelmaessig durch deterministische Simulationen geprueft.</p>
         </div>
       </div>}

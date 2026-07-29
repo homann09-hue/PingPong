@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { isAllowedPlayerPath, playerUpstreamUrl } from "./player-proxy";
+import { isAllowedPlayerPath, playerResponseHeaders, playerUpstreamUrl } from "./player-proxy";
 
 describe("player BFF allowlist", () => {
   it.each(["lobby", "profile", "wallet", "jackpots", "events", "missions", "auth/account", "auth/sessions", "auth/sessions/00000000-0000-4000-8000-000000000001", "auth/devices", "auth/cloud-save", "auth/privacy-export", "slots/pharaoh-oasis/paytable", "slots/pharaoh-oasis/spins"])("allows %s", (path) => {
@@ -16,5 +16,22 @@ describe("player BFF allowlist", () => {
     const upstream = playerUpstreamUrl(request, "wallet/transactions");
     expect(upstream.pathname).toBe("/v1/wallet/transactions");
     expect(upstream.search).toBe("?limit=40");
+  });
+
+  it("forwards only safe response metadata needed by clients", () => {
+    const upstream = new Response("{}", { headers: {
+      "content-type": "application/json",
+      "content-disposition": 'attachment; filename="export.json"',
+      "retry-after": "12",
+      "x-ratelimit-remaining": "0",
+      "set-cookie": "secret=never-forward",
+    } });
+    const headers = playerResponseHeaders(upstream);
+    expect(Object.fromEntries(headers)).toEqual({
+      "content-disposition": 'attachment; filename="export.json"',
+      "content-type": "application/json",
+      "retry-after": "12",
+      "x-ratelimit-remaining": "0",
+    });
   });
 });

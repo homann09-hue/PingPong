@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { jwtVerify, SignJWT } from "jose";
 import type { Authenticator } from "../auth.js";
 import type { ExternalIdentityProvider, ExternalIdentityVerifier } from "./external-identity-verifier.js";
+import { ExternalIdentityVerificationUnavailableError } from "./external-identity-verifier.js";
 import type { AccountSummary, ClientPlatform, CloudSave, DeviceSummary, IdentityStore, SessionRecord, SessionSummary } from "./identity-store.js";
 
 const ACCESS_TOKEN_SECONDS = 15 * 60;
@@ -17,7 +18,7 @@ export interface SessionTokens {
 }
 
 export class ExternalIdentityUnavailableError extends Error {
-  public constructor() { super("External identity provider is not configured"); }
+  public constructor() { super("External identity provider is unavailable"); }
 }
 export class ExternalIdentityInvalidError extends Error {
   public constructor() { super("External identity token is invalid"); }
@@ -44,7 +45,15 @@ export class IdentityService implements Authenticator {
     readonly platform: ClientPlatform;
   }): Promise<SessionTokens> {
     if (!this.externalIdentityVerifier) throw new ExternalIdentityUnavailableError();
-    const identity = await this.externalIdentityVerifier.verify(command.providerAccessToken, command.provider);
+    let identity;
+    try {
+      identity = await this.externalIdentityVerifier.verify(command.providerAccessToken, command.provider);
+    } catch (error) {
+      if (error instanceof ExternalIdentityVerificationUnavailableError) {
+        throw new ExternalIdentityUnavailableError();
+      }
+      throw error;
+    }
     if (!identity) throw new ExternalIdentityInvalidError();
     const refreshToken = this.newRefreshToken();
     const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_MILLISECONDS);

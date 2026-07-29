@@ -87,6 +87,23 @@ export function playerUpstreamUrl(request: NextRequest, path: string): URL {
   return url;
 }
 
+const forwardedResponseHeaders = [
+  "content-type",
+  "content-disposition",
+  "retry-after",
+  "x-ratelimit-remaining",
+] as const;
+
+export function playerResponseHeaders(response: Response): Headers {
+  const headers = new Headers();
+  for (const name of forwardedResponseHeaders) {
+    const value = response.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  return headers;
+}
+
 export function cookieOptions(maxAge: number) {
   return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge };
 }
@@ -162,7 +179,7 @@ export async function proxyPlayerRequest(request: NextRequest, path: string): Pr
     const body = await response.text();
     const outgoing = new NextResponse(body || null, {
       status: response.status,
-      headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
+      headers: playerResponseHeaders(response),
     });
     if (replacement) {
       setTokenCookies(outgoing, replacement.tokens, replacement.installationId);

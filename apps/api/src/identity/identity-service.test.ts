@@ -4,7 +4,7 @@ import { buildApp } from "../http-app.js";
 import { InMemorySpinStore } from "../spins/in-memory-spin-store.js";
 import { IdentityService } from "./identity-service.js";
 import { InMemoryIdentityStore } from "./in-memory-identity-store.js";
-import type { ExternalIdentityVerifier } from "./external-identity-verifier.js";
+import { ExternalIdentityVerificationUnavailableError, type ExternalIdentityVerifier } from "./external-identity-verifier.js";
 
 const secret = "identity-test-secret-with-at-least-32-bytes";
 const verifiedIdentities: ExternalIdentityVerifier = {
@@ -145,5 +145,15 @@ describe("identity sessions", () => {
       provider: "apple", providerAccessToken: "invalid-provider-token-that-is-long-enough",
       currentPlayerId: null, installationId: randomUUID(), platform: "ios",
     })).rejects.toThrow("External identity token is invalid");
+  });
+
+  it("maps external verification outages to the public unavailable error", async () => {
+    const identity = new IdentityService(new InMemoryIdentityStore(), secret, {
+      async verify() { throw new ExternalIdentityVerificationUnavailableError(); },
+    });
+    await expect(identity.signInWithProvider({
+      provider: "google", providerAccessToken: "provider-token-that-is-long-enough",
+      currentPlayerId: null, installationId: randomUUID(), platform: "web",
+    })).rejects.toThrow("External identity provider is unavailable");
   });
 });

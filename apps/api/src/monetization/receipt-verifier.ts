@@ -63,7 +63,13 @@ export class HttpReceiptVerifier implements ReceiptVerifier {
       await response.body?.cancel(); throw new ReceiptInvalidError();
     }
     if (!response.ok) { await response.body?.cancel(); throw new ReceiptGatewayUnavailableError(); }
-    const parsed = gatewayResponse.safeParse(await response.json());
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new ReceiptGatewayUnavailableError();
+    }
+    const parsed = gatewayResponse.safeParse(payload);
     if (!parsed.success) throw new ReceiptGatewayUnavailableError();
     return {
       ...parsed.data, purchasedAt: new Date(parsed.data.purchasedAt),
