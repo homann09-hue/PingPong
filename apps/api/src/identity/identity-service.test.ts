@@ -38,6 +38,42 @@ describe("identity sessions", () => {
     expect(second.playerId).toBe(first.playerId);
     await identity.logout(second.refreshToken);
     expect(await identity.authenticate(`Bearer ${second.accessToken}`)).toBeNull();
+    expect(await identity.refresh(second.refreshToken)).toBeNull();
+    expect(await identity.authenticate(`Bearer ${first.accessToken}`)).toBe(first.playerId);
+  });
+
+  it("rejects an expired refresh token without revoking another active session", async () => {
+    const store = new InMemoryIdentityStore();
+    const installationId = randomUUID();
+    const expiredHash = Buffer.from("expired-refresh-token");
+    const activeHash = Buffer.from("active-refresh-token");
+    const expired = await store.createGuestSession({
+      installationId,
+      platform: "web",
+      refreshTokenHash: expiredHash,
+      expiresAt: new Date(Date.now() - 1_000),
+      initialCoinBalance: 100_000,
+      initialGemBalance: 320,
+    });
+    const active = await store.createGuestSession({
+      installationId,
+      platform: "web",
+      refreshTokenHash: activeHash,
+      expiresAt: new Date(Date.now() + 60_000),
+      initialCoinBalance: 100_000,
+      initialGemBalance: 320,
+    });
+
+    expect(await store.rotateSession({
+      refreshTokenHash: expiredHash,
+      nextRefreshTokenHash: Buffer.from("unused-next-refresh-token"),
+      nextExpiresAt: new Date(Date.now() + 120_000),
+    })).toBeNull();
+    expect(await store.isSessionActive(expired.sessionId, expired.playerId)).toBe(false);
+    expect(await store.isSessionActive(active.sessionId, active.playerId)).toBe(true);
+    expect(await store.listDevices(active.playerId)).toEqual([
+      expect.objectContaining({ activeSessions: 1 }),
+    ]);
   });
 
   it("lists, revokes, logs out all sessions, and deletes an account", async () => {

@@ -6,6 +6,7 @@ interface MemorySession extends SessionRecord {
   readonly expiresAt: Date;
   readonly platform: ClientPlatform;
   readonly deviceId: string;
+  readonly rotatedFromSessionId: string | null;
   readonly createdAt: Date;
   lastUsedAt: Date;
   revoked: boolean;
@@ -55,13 +56,26 @@ export class InMemoryIdentityStore implements IdentityStore {
 
   public async rotateSession(command: RotateSession): Promise<SessionRecord | null> {
     const current = this.sessions.get(command.refreshTokenHash.toString("hex"));
-    if (!current || current.revoked || current.expiresAt <= new Date()) {
-      if (current) this.revokePlayer(current.playerId);
+    if (!current) return null;
+    if (current.revoked) {
+      const wasRotated = [...this.sessions.values()].some(
+        (session) => session.rotatedFromSessionId === current.sessionId,
+      );
+      if (wasRotated) this.revokePlayer(current.playerId);
       return null;
     }
+    if (current.expiresAt <= new Date()) return null;
     current.revoked = true;
     current.lastUsedAt = new Date();
-    return this.insert(current.playerId, current.deviceId, command.nextRefreshTokenHash, command.nextExpiresAt, current.platform, true);
+    return this.insert(
+      current.playerId,
+      current.deviceId,
+      command.nextRefreshTokenHash,
+      command.nextExpiresAt,
+      current.platform,
+      true,
+      current.sessionId,
+    );
   }
 
   public async revokeSession(refreshTokenHash: Buffer): Promise<void> {
@@ -101,7 +115,11 @@ export class InMemoryIdentityStore implements IdentityStore {
   public async listDevices(playerId: string): Promise<readonly DeviceSummary[]> {
     return [...this.devices.values()].filter((device) => device.playerId === playerId).map((device) => ({
       id: device.id, platform: device.platform, createdAt: device.createdAt.toISOString(), lastSeenAt: device.lastSeenAt.toISOString(),
-      activeSessions: [...this.sessions.values()].filter((session) => session.playerId === playerId && session.deviceId === device.id && !session.revoked).length,
+      activeSessions: [...this.sessions.values()].filter((session) =>
+        session.playerId === playerId
+        && session.deviceId === device.id
+        && !session.revoked
+        && session.expiresAt > new Date()).length,
     }));
   }
 
@@ -148,14 +166,22 @@ export class InMemoryIdentityStore implements IdentityStore {
 
   public async close(): Promise<void> {}
 
-  private insert(playerId: string, installationId: string, tokenHash: Buffer, expiresAt: Date, platform: ClientPlatform, existingDevice = false): SessionRecord {
+  private insert(
+    playerId: string,
+    installationId: string,
+    tokenHash: Buffer,
+    expiresAt: Date,
+    platform: ClientPlatform,
+    existingDevice = false,
+    rotatedFromSessionId: string | null = null,
+  ): SessionRecord {
     const now = new Date();
     const deviceId = existingDevice ? installationId : `${playerId}:${installationId}`;
     const previousDevice = this.devices.get(deviceId);
     this.devices.set(deviceId, { id: deviceId, playerId, platform, createdAt: previousDevice?.createdAt ?? now, lastSeenAt: now });
     const session: MemorySession = {
       playerId, sessionId: randomUUID(), tokenHash: tokenHash.toString("hex"), expiresAt,
-      platform, deviceId, createdAt: now, lastUsedAt: now, revoked: false,
+      platform, deviceId, rotatedFromSessionId, createdAt: now, lastUsedAt: now, revoked: false,
     };
     this.sessions.set(session.tokenHash, session);
     return session;
