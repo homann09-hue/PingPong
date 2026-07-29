@@ -6,6 +6,8 @@ export const accessCookie = "aurora_web_access";
 export const refreshCookie = "aurora_web_refresh";
 export const installationCookie = "aurora_web_installation";
 export const playerApiUrl = process.env.AURORA_API_URL ?? "http://127.0.0.1:8080";
+const upstreamTimeoutMilliseconds = 10_000;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export interface Tokens {
   readonly accessToken: string;
@@ -87,6 +89,22 @@ export function playerUpstreamUrl(request: NextRequest, path: string): URL {
   return url;
 }
 
+/** Cookie-authenticated writes must originate from this exact web origin. */
+export function isSameOriginMutation(request: NextRequest): boolean {
+  if (request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS") return true;
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  try {
+    return new URL(origin).origin === request.nextUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function validInstallationId(value: string | undefined): string | undefined {
+  return value && uuidPattern.test(value) ? value : undefined;
+}
+
 const forwardedResponseHeaders = [
   "content-type",
   "content-disposition",
@@ -120,7 +138,7 @@ export function clearTokenCookies(response: NextResponse): void {
 }
 
 export async function issueTokens(request: NextRequest): Promise<{ tokens: Tokens; installationId: string }> {
-  const installationId = request.cookies.get(installationCookie)?.value ?? randomUUID();
+  const installationId = validInstallationId(request.cookies.get(installationCookie)?.value) ?? randomUUID();
   const currentRefresh = request.cookies.get(refreshCookie)?.value;
   if (currentRefresh) {
     const refreshed = await fetch(`${playerApiUrl}/v1/auth/refresh`, {
@@ -128,16 +146,22 @@ export async function issueTokens(request: NextRequest): Promise<{ tokens: Token
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ refreshToken: currentRefresh }),
       cache: "no-store",
+      signal: AbortSignal.timeout(upstreamTimeoutMilliseconds),
     });
     if (refreshed.ok) return { tokens: await refreshed.json() as Tokens, installationId };
+    await refreshed.body?.cancel();
   }
   const created = await fetch(`${playerApiUrl}/v1/auth/guest`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ installationId, platform: "web" }),
     cache: "no-store",
+    signal: AbortSignal.timeout(upstreamTimeoutMilliseconds),
   });
-  if (!created.ok) throw new Error(`Identity service returned ${created.status}`);
+  if (!created.ok) {
+    await created.body?.cancel();
+    throw new Error(`Identity service returned ${created.status}`);
+  }
   return { tokens: await created.json() as Tokens, installationId };
 }
 
@@ -157,12 +181,14 @@ async function upstreamRequest(request: NextRequest, path: string, accessToken: 
     headers,
     body,
     cache: "no-store",
+    signal: AbortSignal.timeout(upstreamTimeoutMilliseconds),
   });
 }
 
 /** Same-origin player BFF. It keeps platform bearer credentials out of browser JavaScript. */
 export async function proxyPlayerRequest(request: NextRequest, path: string): Promise<NextResponse> {
   if (!isAllowedPlayerPath(path)) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
+  if (!isSameOriginMutation(request)) return NextResponse.json({ code: "CROSS_ORIGIN_REQUEST" }, { status: 403 });
   try {
     let accessToken = request.cookies.get(accessCookie)?.value;
     const requestBody = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
@@ -173,6 +199,7 @@ export async function proxyPlayerRequest(request: NextRequest, path: string): Pr
     }
     let response = await upstreamRequest(request, path, accessToken, requestBody);
     if (response.status === 401) {
+      await response.body?.cancel();
       replacement = await issueTokens(request);
       response = await upstreamRequest(request, path, replacement.tokens.accessToken, requestBody);
     }

@@ -18,7 +18,7 @@ databaseSuite("Postgres operations health aggregate", () => {
     await ensure("clan_messages", "020_clan_community.sql");
     await ensure("clan_moderation_cases", "021_clan_moderation.sql");
     await ensure("economy_grant_requests", "023_economy_admin.sql");
-    await pool.query(await readFile(new URL("../../../../infra/postgres/024_operations_health_indexes.sql", import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL("../../../../infra/postgres/035_operations_health_indexes.sql", import.meta.url), "utf8"));
   });
   afterAll(async () => store.close());
 

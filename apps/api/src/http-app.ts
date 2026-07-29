@@ -188,9 +188,11 @@ export function buildApp(
     requestStarted.set(request, process.hrtime.bigint());
     reply.header("x-request-id", request.id);
     reply.header("x-content-type-options", "nosniff");
+    reply.header("x-frame-options", "DENY");
+    reply.header("strict-transport-security", "max-age=63072000; includeSubDomains");
     reply.header("referrer-policy", "no-referrer");
     reply.header("permissions-policy", "camera=(), microphone=(), geolocation=()");
-    reply.header("content-security-policy", "default-src 'self'; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:");
+    reply.header("content-security-policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:");
     if (request.url.startsWith("/v1/auth/")) {
       reply.header("cache-control", "no-store");
       const guest = request.url.startsWith("/v1/auth/guest");
@@ -202,7 +204,7 @@ export function buildApp(
     }
     if (request.url === "/admin" || request.url.startsWith("/admin/")) {
       reply.header("cache-control", "no-store");
-      reply.header("content-security-policy", "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'");
+      reply.header("content-security-policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'");
     }
     if (request.url.startsWith("/admin/v1/")) {
       const rate = authRateLimiter.consume(`admin:${request.ip}`, 120, 60_000);

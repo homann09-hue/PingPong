@@ -30,7 +30,15 @@ export class SupabaseIdentityVerifier implements ExternalIdentityVerifier {
   private readonly userEndpoint: string;
 
   public constructor(supabaseUrl: string, private readonly publishableKey: string) {
-    this.userEndpoint = `${supabaseUrl.replace(/\/$/u, "")}/auth/v1/user`;
+    const endpoint = new URL(supabaseUrl);
+    const loopback = endpoint.hostname === "localhost" || endpoint.hostname === "127.0.0.1" || endpoint.hostname === "[::1]";
+    if (endpoint.protocol !== "https:" && !(endpoint.protocol === "http:" && loopback)) {
+      throw new Error("SUPABASE_URL must use HTTPS outside loopback development");
+    }
+    if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+      throw new Error("SUPABASE_URL must not contain credentials, a query, or a fragment");
+    }
+    this.userEndpoint = `${endpoint.toString().replace(/\/$/u, "")}/auth/v1/user`;
   }
 
   public async verify(accessToken: string, expectedProvider: ExternalIdentityProvider): Promise<VerifiedExternalIdentity | null> {

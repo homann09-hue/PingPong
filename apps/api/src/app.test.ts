@@ -22,6 +22,20 @@ const app = buildApp({
 });
 afterAll(async () => app.close());
 
+describe("HTTP security baseline", () => {
+  it("prevents framing, MIME sniffing, and insecure transport downgrade", async () => {
+    const response = await app.inject({ method: "GET", url: "/health/live" });
+    expect(response.headers).toMatchObject({
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "strict-transport-security": "max-age=63072000; includeSubDomains",
+      "referrer-policy": "no-referrer",
+    });
+    expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(response.headers["content-security-policy"]).toContain("object-src 'none'");
+  });
+});
+
 describe("four-eyes economy administration API", () => {
   const spinStore = new InMemorySpinStore(1_000);
   const economyAdminStore = new InMemoryEconomyAdminStore(spinStore, playerId);

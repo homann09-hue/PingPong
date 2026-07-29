@@ -5,8 +5,10 @@ import {
   clearTokenCookies,
   cookieOptions,
   installationCookie,
+  isSameOriginMutation,
   issueTokens,
   playerApiUrl,
+  playerResponseHeaders,
   refreshCookie,
   setTokenCookies,
   type Tokens,
@@ -22,11 +24,16 @@ function isAccountAction(value: unknown): value is AccountAction {
   if (action === "logout" || action === "logoutAll" || action === "delete") return true;
   const candidate = value as { action?: unknown; provider?: unknown; providerAccessToken?: unknown };
   return action === "exchange" && ["apple", "google", "email"].includes(String(candidate.provider))
-    && typeof candidate.providerAccessToken === "string" && candidate.providerAccessToken.length >= 32;
+    && typeof candidate.providerAccessToken === "string"
+    && candidate.providerAccessToken.length >= 32
+    && candidate.providerAccessToken.length <= 8192;
 }
 
 /** Performs credential-sensitive account actions without exposing Aurora refresh tokens to browser code. */
 export async function POST(request: NextRequest) {
+  if (!isSameOriginMutation(request)) {
+    return NextResponse.json({ code: "CROSS_ORIGIN_REQUEST" }, { status: 403 });
+  }
   const body = await request.json().catch(() => null) as unknown;
   if (!isAccountAction(body)) return NextResponse.json({ code: "INVALID_REQUEST" }, { status: 400 });
   const installationId = request.cookies.get(installationCookie)?.value;
@@ -39,10 +46,12 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ provider: body.provider, providerAccessToken: body.providerAccessToken,
           installationId: current.installationId, platform: "web" }),
         cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       });
       const payload = await response.text();
       const outgoing = new NextResponse(payload || null, { status: response.status,
-        headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+        headers: playerResponseHeaders(response) });
+      outgoing.headers.set("cache-control", "private, no-store");
       if (response.ok) setTokenCookies(outgoing, JSON.parse(payload) as Tokens, current.installationId);
       return outgoing;
     }
@@ -66,6 +75,7 @@ export async function POST(request: NextRequest) {
       headers: { ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}), "content-type": "application/json" },
       body: payload ? JSON.stringify(payload) : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
     const outgoing = response.ok
       ? NextResponse.json({ ok: true })

@@ -6,6 +6,14 @@ afterEach(() => {
 });
 
 describe("SupabaseIdentityVerifier", () => {
+  it("rejects credential endpoints that could expose provider tokens", () => {
+    expect(() => new SupabaseIdentityVerifier("http://project.supabase.co", "publishable-key"))
+      .toThrow("SUPABASE_URL must use HTTPS");
+    expect(() => new SupabaseIdentityVerifier("https://user:secret@project.supabase.co", "publishable-key"))
+      .toThrow("SUPABASE_URL must not contain credentials");
+    expect(() => new SupabaseIdentityVerifier("http://localhost:54321", "publishable-key")).not.toThrow();
+  });
+
   it("accepts a matching verified provider identity", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       id: "provider-user",
