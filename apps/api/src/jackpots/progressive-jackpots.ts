@@ -1,4 +1,4 @@
-import type { SpinResult } from "@aurora/slot-engine";
+import type { SpinResult, Win } from "@aurora/slot-engine";
 
 export type JackpotTier = "MINI" | "MINOR" | "MAJOR" | "GRAND";
 export interface JackpotPoolView { readonly tier: JackpotTier; readonly amount: number; readonly seedAmount: number }
@@ -32,22 +32,79 @@ export function triggeredJackpotTier(spin: SpinResult): JackpotTier | null {
   return null;
 }
 
-/** Replaces the configured placeholder award while preserving the audited engine result. */
-export function applyProgressiveAward(spin: SpinResult, tier: JackpotTier, amount: number): SpinResult {
+function progressiveWin(tier: JackpotTier, amount: number): Win {
+  return {
+    kind: "scatter",
+    symbol: `JACKPOT_${tier}`,
+    count: 1,
+    amount,
+    cells: [],
+  };
+}
+
+function replaceProgressivePlaceholder(
+  wins: readonly Win[],
+  tier: JackpotTier,
+  amount: number,
+): readonly Win[] {
+  const placeholderSymbol = `JACKPOT_${tier}`;
   let replaced = false;
-  let placeholder = 0;
-  const rounds = spin.rounds.map((round) => {
-    const jackpotEvent = round.events.find((event) => event.type === "bonus.awarded" && event.data.mode === "jackpot");
-    if (replaced || !jackpotEvent || jackpotEvent.data.tier !== tier) return round;
+  const updated = wins.map((win) => {
+    if (replaced || win.kind !== "scatter" || win.symbol !== placeholderSymbol) return win;
     replaced = true;
-    placeholder = round.totalWin;
+    return progressiveWin(tier, amount);
+  });
+
+  return replaced ? updated : [...updated, progressiveWin(tier, amount)];
+}
+
+/**
+ * Replaces the matching jackpot placeholder with the authoritative pool award.
+ *
+ * The slot engine currently represents jackpot bonus rounds through an event and
+ * a placeholder total. Settlement requires an explicit win entry, so this
+ * function rebuilds the affected round and all spin-level derived values while
+ * preserving unrelated wins and rounds.
+ */
+export function applyProgressiveAward(spin: SpinResult, tier: JackpotTier, amount: number): SpinResult {
+  if (!Number.isSafeInteger(amount) || amount < 0) {
+    throw new RangeError("progressive jackpot amount must be a non-negative safe integer");
+  }
+
+  let awarded = false;
+  const rounds = spin.rounds.map((round) => {
+    const jackpotEventIndex = round.events.findIndex(
+      (event) => event.type === "bonus.awarded"
+        && event.data.mode === "jackpot"
+        && event.data.tier === tier,
+    );
+
+    if (awarded || jackpotEventIndex < 0) return round;
+    awarded = true;
+
+    const wins = replaceProgressivePlaceholder(round.wins, tier, amount);
+    const totalWin = wins.reduce((sum, win) => sum + win.amount, 0);
+    const events = round.events.map((event, index) => index === jackpotEventIndex
+      ? { ...event, data: { ...event.data, progressiveAmount: amount } }
+      : event);
+
     return {
       ...round,
-      totalWin: amount,
-      events: round.events.map((event) => event === jackpotEvent
-        ? { ...event, data: { ...event.data, progressiveAmount: amount } }
-        : event),
+      wins,
+      totalWin,
+      events,
     };
   });
-  return replaced ? { ...spin, rounds, totalWin: spin.totalWin - placeholder + amount } : spin;
+
+  if (!awarded) return spin;
+
+  const wins = rounds.flatMap((round) => round.wins);
+  const totalWin = rounds.reduce((sum, round) => sum + round.totalWin, 0);
+
+  return {
+    ...spin,
+    rounds,
+    wins,
+    totalWin,
+  };
 }

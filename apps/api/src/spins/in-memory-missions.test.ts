@@ -34,7 +34,7 @@ describe("InMemorySpinStore mission tracks", () => {
     await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "mission-test",
       configVersion: 1, bet: 1_000, seed: 99n }, () => missionSpin(3));
     const superClaim = await store.claimMission(playerId, "super-free-spins-3", new Date());
-    expect(superClaim).toMatchObject({ rewards: { coins: 500_000, missionPoints: 50,
+    expect(superClaim).toMatchObject({ rewards: { coins: 35_000, missionPoints: 50,
       loyaltyPoints: 125, stamps: 1, toolboxes: 0, boosters: 1 } });
     expect(superClaim.balances.booster).toBe(1);
     expect((await store.listWalletTransactions(playerId, 200)).filter((entry) => entry.source === "mission").length)

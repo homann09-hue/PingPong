@@ -21,7 +21,7 @@ databaseSuite("Postgres economy administration", () => {
     }
     await pool.query(await readFile(new URL("../../../../infra/postgres/015_liveops_admin.sql", import.meta.url), "utf8"));
     await pool.query(await readFile(new URL("../../../../infra/postgres/023_economy_admin.sql", import.meta.url), "utf8"));
-    await pool.query("INSERT INTO players (id,level,xp,vip_points) VALUES ($1,7,400,900)", [playerId]);
+    await pool.query("INSERT INTO players (id,level,xp,vip_points) VALUES ($1,7,200,900)", [playerId]);
     await pool.query("INSERT INTO social_profiles (player_id,display_name) VALUES ($1,$2)", [playerId, `TEST-${playerId.slice(0, 6)}`]);
     await pool.query("INSERT INTO wallets (player_id,currency,balance) VALUES ($1,'coin',1000),($1,'gem',25)", [playerId]);
   });
@@ -40,4 +40,3 @@ databaseSuite("Postgres economy administration", () => {
       .rejects.toThrow("admin_audit_log is append-only");
   });
 });
-

@@ -45,6 +45,8 @@ const migrationFiles = [
   "029_mission_tracks.sql",
   "030_high_roller_club.sql",
   "031_store_high_roller_points.sql",
+  "034_mission_catalog_v3.sql",
+  "035_player_progression_curve_v1.sql",
 ];
 
 databaseSuite("PostgresSpinStore integration", () => {
@@ -57,6 +59,7 @@ databaseSuite("PostgresSpinStore integration", () => {
   const checkWinPlayerId = randomUUID();
   const boostPlayerId = randomUUID();
   const loyaltyPlayerId = randomUUID();
+  const legacyProgressionPlayerId = randomUUID();
   const slotId = `integration-${randomUUID()}`;
   const missionId = `integration-mission-${randomUUID()}`;
 
@@ -67,6 +70,12 @@ databaseSuite("PostgresSpinStore integration", () => {
       await pool.query(migration);
     }
     for (const file of migrationFiles) {
+      if (file === "035_player_progression_curve_v1.sql") {
+        await pool.query(
+          "INSERT INTO players (id,level,xp) VALUES ($1,12,625)",
+          [legacyProgressionPlayerId],
+        );
+      }
       const migration = await readFile(new URL(`../../../../infra/postgres/${file}`, import.meta.url), "utf8");
       await pool.query(migration);
     }
@@ -91,6 +100,14 @@ databaseSuite("PostgresSpinStore integration", () => {
   });
 
   afterAll(async () => store.close());
+
+  it("migrates legacy flat XP remainder to deterministic curve v1", async () => {
+    const player = await pool.query<{ level: number; xp: string }>(
+      "SELECT level,xp FROM players WHERE id=$1",
+      [legacyProgressionPlayerId],
+    );
+    expect(player.rows[0]).toEqual({ level: 12, xp: "260" });
+  });
 
   it("atomically settles and persistently replays a spin", async () => {
     const idempotencyKey = randomUUID();

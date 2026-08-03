@@ -71,10 +71,10 @@ describe("InMemorySpinStore High Roller Club", () => {
         configVersion: 1, bet: 10_000, seed: BigInt(index) }, () => result(10_000));
     }
     const now = new Date("2026-07-17T12:00:00.000Z");
-    expect(await store.getHighRollerClub(playerId, now)).toMatchObject({ points: 20_900, eligible: true, active: false });
+    expect(await store.getHighRollerClub(playerId, now)).toMatchObject({ points: 23_900, eligible: true, active: false });
     const key = randomUUID();
     const activation = await store.activateHighRollerClub(playerId, key, now);
-    expect(activation).toMatchObject({ pointsSpent: 20_000, points: 900, stampsGranted: 1,
+    expect(activation).toMatchObject({ pointsSpent: 20_000, points: 3_900, stampsGranted: 1,
       stampBalance: 1, active: true, remainingSeconds: 604_800, replayed: false });
     expect(await store.activateHighRollerClub(playerId, key, now)).toEqual({ ...activation, replayed: true });
     await expect(store.activateHighRollerClub(playerId, randomUUID(), now)).rejects.toBeInstanceOf(HighRollerAlreadyActiveError);
