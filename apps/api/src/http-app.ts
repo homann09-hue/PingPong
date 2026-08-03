@@ -10,7 +10,7 @@ import type { Authenticator } from "./auth.js";
 import type { IdentityService } from "./identity/identity-service.js";
 import { ExternalIdentityInvalidError, ExternalIdentityUnavailableError } from "./identity/identity-service.js";
 import type { SpinStore } from "./spins/spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, WheelNotAvailableError } from "./spins/spin-store.js";
+import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, SpinIdempotencyConflictError, WheelNotAvailableError } from "./spins/spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spins/spin-store.js";
 import { FixedWindowRateLimiter } from "./security/fixed-window-rate-limiter.js";
 import type { SlotAvailabilityStore, SlotStatus } from "./liveops/slot-availability-store.js";
@@ -188,9 +188,11 @@ export function buildApp(
     requestStarted.set(request, process.hrtime.bigint());
     reply.header("x-request-id", request.id);
     reply.header("x-content-type-options", "nosniff");
+    reply.header("x-frame-options", "DENY");
+    reply.header("strict-transport-security", "max-age=63072000; includeSubDomains");
     reply.header("referrer-policy", "no-referrer");
     reply.header("permissions-policy", "camera=(), microphone=(), geolocation=()");
-    reply.header("content-security-policy", "default-src 'self'; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:");
+    reply.header("content-security-policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:");
     if (request.url.startsWith("/v1/auth/")) {
       reply.header("cache-control", "no-store");
       const guest = request.url.startsWith("/v1/auth/guest");
@@ -202,7 +204,7 @@ export function buildApp(
     }
     if (request.url === "/admin" || request.url.startsWith("/admin/")) {
       reply.header("cache-control", "no-store");
-      reply.header("content-security-policy", "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'");
+      reply.header("content-security-policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'");
     }
     if (request.url.startsWith("/admin/v1/")) {
       const rate = authRateLimiter.consume(`admin:${request.ip}`, 120, 60_000);
@@ -1198,14 +1200,17 @@ export function buildApp(
       return reply.code(400).send({ code: "BONUS_BUY_NOT_AVAILABLE" });
     }
     const engine = new SlotEngine(config);
-    const wager = body.data.bet * (body.data.bonusBuy ? config.features!.bonusBuy!.costMultiplier : 1);
+    const effectiveWager = body.data.bet * (body.data.bonusBuy ? config.features!.bonusBuy!.costMultiplier : 1);
+    if (!Number.isSafeInteger(effectiveWager)) {
+      return reply.code(400).send({ code: "INVALID_WAGER" });
+    }
 
     // Production seeds come from a server secret/nonce derivation and are persisted for audit/replay.
     const seed = randomBytes(8).readBigUInt64LE();
     try {
       const settled = await dependencies.spinStore.settle({
         playerId, idempotencyKey: keyResult.data, slotId, configVersion: config.version,
-        bet: wager, seed,
+        baseBet: body.data.bet, effectiveWager, bonusBuy: body.data.bonusBuy, seed,
       }, () => engine.spin({ bet: body.data.bet, seed, bonusBuy: body.data.bonusBuy }));
       dependencies.metrics?.recordSpin(slotId, "returned");
       const { seed: _privateSeed, ...publicSpin } = settled.spin;
@@ -1213,6 +1218,7 @@ export function buildApp(
     } catch (error) {
       dependencies.metrics?.recordSpin(slotId, "rejected");
       if (error instanceof InsufficientFundsError) return reply.code(409).send({ code: "INSUFFICIENT_FUNDS" });
+      if (error instanceof SpinIdempotencyConflictError) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT" });
       throw error;
     }
   });

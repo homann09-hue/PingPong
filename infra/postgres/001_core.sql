@@ -88,6 +88,9 @@ CREATE TABLE spins (
   slot_id text NOT NULL,
   config_version integer NOT NULL,
   bet bigint NOT NULL CHECK (bet > 0),
+  base_bet bigint NOT NULL CHECK (base_bet > 0),
+  effective_wager bigint NOT NULL CHECK (effective_wager >= base_bet),
+  bonus_buy boolean NOT NULL DEFAULT false,
   win bigint NOT NULL CHECK (win >= 0),
   rng_seed numeric(20,0) NOT NULL,
   result jsonb NOT NULL,
@@ -98,6 +101,7 @@ CREATE TABLE spins (
   progression_after jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (player_id, idempotency_key),
+  CHECK (bonus_buy OR effective_wager = base_bet),
   FOREIGN KEY (slot_id, config_version) REFERENCES slot_config_versions(slot_id, version)
 );
 

@@ -22,6 +22,20 @@ const app = buildApp({
 });
 afterAll(async () => app.close());
 
+describe("HTTP security baseline", () => {
+  it("prevents framing, MIME sniffing, and insecure transport downgrade", async () => {
+    const response = await app.inject({ method: "GET", url: "/health/live" });
+    expect(response.headers).toMatchObject({
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "strict-transport-security": "max-age=63072000; includeSubDomains",
+      "referrer-policy": "no-referrer",
+    });
+    expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(response.headers["content-security-policy"]).toContain("object-src 'none'");
+  });
+});
+
 describe("four-eyes economy administration API", () => {
   const spinStore = new InMemorySpinStore(1_000);
   const economyAdminStore = new InMemoryEconomyAdminStore(spinStore, playerId);
@@ -349,6 +363,24 @@ describe("spin API", () => {
     expect(second.json()).toEqual(first.json());
     expect(first.json().spin.seed).toBeUndefined();
     expect(first.headers["x-request-id"]).toBeTruthy();
+  });
+  it("rejects reusing an idempotency key for a different wager", async () => {
+    const conflictApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(10_000),
+    });
+    const key = randomUUID();
+    const headers = { "idempotency-key": key, authorization: "Bearer valid" };
+    const first = await conflictApp.inject({
+      method: "POST", url: "/v1/slots/classic-3x3/spins", headers, payload: { bet: 10 },
+    });
+    const conflict = await conflictApp.inject({
+      method: "POST", url: "/v1/slots/classic-3x3/spins", headers, payload: { bet: 20 },
+    });
+    expect(first.statusCode).toBe(200);
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json()).toEqual({ code: "IDEMPOTENCY_CONFLICT" });
+    await conflictApp.close();
   });
   it("rejects unauthenticated spins", async () => {
     const response = await app.inject({ method: "POST", url: "/v1/slots/classic-3x3/spins", headers: { "idempotency-key": randomUUID() }, payload: { bet: 10 } });
@@ -742,6 +774,25 @@ describe("spin API", () => {
     expect(response.json().spin).toMatchObject({ baseBet: 100, wager: 5_000, bonusBuy: true });
     expect(response.json().spin.rounds.some((round: { phase: string }) => round.phase === "bonus")).toBe(true);
     expect(response.json().coinBalance).toBe(10_000 - 5_000 + response.json().spin.totalWin);
+    await bonusApp.close();
+  });
+  it("checks bonus-buy funds against the full server-side multiplier", async () => {
+    const bonusApp = buildApp({
+      authenticator: { authenticate: async () => playerId },
+      spinStore: new InMemorySpinStore(4_999),
+    });
+    const response = await bonusApp.inject({
+      method: "POST",
+      url: "/v1/slots/jungle-temple/spins",
+      headers: { "idempotency-key": randomUUID(), authorization: "Bearer valid" },
+      payload: { bet: 100, bonusBuy: true },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ code: "INSUFFICIENT_FUNDS" });
+    const wallet = (await bonusApp.inject({
+      method: "GET", url: "/v1/wallet", headers: { authorization: "Bearer valid" },
+    })).json();
+    expect(wallet.balances.find((balance: { currency: string }) => balance.currency === "coin").balance).toBe(4_999);
     await bonusApp.close();
   });
   it("rejects bonus buy for games without a configured bonus", async () => {

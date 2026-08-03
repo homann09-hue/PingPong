@@ -15,7 +15,11 @@ export interface SettleSpinCommand {
   readonly idempotencyKey: string;
   readonly slotId: string;
   readonly configVersion: number;
-  readonly bet: number;
+  /** Player-selected stake before server-side feature multipliers. */
+  readonly baseBet: number;
+  /** Authoritative wallet debit, including feature costs such as bonus buy. */
+  readonly effectiveWager: number;
+  readonly bonusBuy: boolean;
   readonly seed: bigint;
 }
 
@@ -182,6 +186,12 @@ export interface SpinStore {
 }
 
 export class InsufficientFundsError extends Error {}
+export class SpinSettlementInvariantError extends Error {
+  public constructor() { super("Calculated spin does not match the authoritative settlement command"); }
+}
+export class SpinIdempotencyConflictError extends Error {
+  public constructor() { super("Idempotency key was already used for a different spin request"); }
+}
 export class RewardAlreadyClaimedError extends Error {}
 export class RewardNotAvailableError extends Error {
   public constructor(public readonly availableAt: Date) { super("Timed reward is not available"); }
@@ -204,3 +214,27 @@ export class StoreTransactionConflictError extends Error {}
 export class StoreProductLimitReachedError extends Error {}
 export class StorePurchaseRevokedError extends Error {}
 export class StorePurchaseDebtError extends Error {}
+
+export function assertValidSettleSpinCommand(command: SettleSpinCommand): void {
+  if (!Number.isSafeInteger(command.baseBet) || command.baseBet <= 0
+    || !Number.isSafeInteger(command.effectiveWager) || command.effectiveWager <= 0
+    || command.effectiveWager < command.baseBet
+    || (!command.bonusBuy && command.effectiveWager !== command.baseBet)
+    || !Number.isSafeInteger(command.configVersion) || command.configVersion <= 0) {
+    throw new SpinSettlementInvariantError();
+  }
+}
+
+export function isSameSpinRequest(command: SettleSpinCommand, spin: SpinResult): boolean {
+  return spin.configId === command.slotId
+    && spin.configVersion === command.configVersion
+    && spin.baseBet === command.baseBet
+    && spin.wager === command.effectiveWager
+    && spin.bonusBuy === command.bonusBuy;
+}
+
+export function assertSpinSettlementMatches(command: SettleSpinCommand, spin: SpinResult): void {
+  if (!isSameSpinRequest(command, spin) || spin.seed !== command.seed.toString()) {
+    throw new SpinSettlementInvariantError();
+  }
+}

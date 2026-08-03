@@ -111,13 +111,25 @@ export class PostgresIdentityStore implements IdentityStore {
         [command.refreshTokenHash],
       );
       const current = result.rows[0];
-      if (!current || current.revoked_at || current.expires_at <= new Date()) {
-        if (current) {
+      if (!current) {
+        await client.query("COMMIT");
+        return null;
+      }
+      if (current.revoked_at) {
+        const rotated = await client.query(
+          "SELECT 1 FROM sessions WHERE rotated_from=$1 LIMIT 1",
+          [current.id],
+        );
+        if (rotated.rowCount) {
           await client.query(
             "UPDATE sessions SET revoked_at=COALESCE(revoked_at, now()) WHERE player_id=$1 AND revoked_at IS NULL",
             [current.player_id],
           );
         }
+        await client.query("COMMIT");
+        return null;
+      }
+      if (current.expires_at <= new Date()) {
         await client.query("COMMIT");
         return null;
       }

@@ -4,19 +4,22 @@ import type { SpinResult } from "@aurora/slot-engine";
 import { InMemorySpinStore } from "./in-memory-spin-store.js";
 import { BoosterActionConflictError, CheckWinNotClaimableError, LoyaltyRedemptionConflictError } from "./spin-store.js";
 
-const winningSpin: SpinResult = {
-  configId: "check-win-test", configVersion: 1, mathModelVersion: "test",
-  seed: "42", baseBet: 10, wager: 10, bonusBuy: false,
-  stops: [0, 0, 0], grid: [["A"], ["A"], ["A"]],
-  wins: [{ kind: "line", payline: 0, symbol: "A", count: 3, amount: 5, cells: [[0, 0], [1, 0], [2, 0]] }],
-  rounds: [{ phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin: 5, events: [] }],
-  freeSpinsPlayed: 0, totalWin: 5, maxWinReached: false, maxWinMultiplier: 1_000,
-};
+function winningSpin(bet: number, seed: bigint): SpinResult {
+  return {
+    configId: "check-win-test", configVersion: 1, mathModelVersion: "test",
+    seed: seed.toString(), baseBet: bet, wager: bet, bonusBuy: false,
+    stops: [0, 0, 0], grid: [["A"], ["A"], ["A"]],
+    wins: [{ kind: "line", payline: 0, symbol: "A", count: 3, amount: 5, cells: [[0, 0], [1, 0], [2, 0]] }],
+    rounds: [{ phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin: 5, events: [] }],
+    freeSpinsPlayed: 0, totalWin: 5, maxWinReached: false, maxWinMultiplier: 1_000,
+  };
+}
 
 async function awardWins(store: InMemorySpinStore, playerId: string, count: number): Promise<void> {
   for (let index = 0; index < count; index += 1) {
+    const seed = BigInt(index);
     await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "check-win-test",
-      configVersion: 1, bet: 10, seed: BigInt(index) }, () => winningSpin);
+      configVersion: 1, baseBet: 10, effectiveWager: 10, bonusBuy: false, seed }, () => winningSpin(10, seed));
   }
 }
 
@@ -66,8 +69,10 @@ describe("InMemorySpinStore Check-&-Win", () => {
   it("atomically exchanges earned loyalty points and replays without duplicate value", async () => {
     const store = new InMemorySpinStore(50_000);
     const playerId = randomUUID();
+    const seed = 1n;
     await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "check-win-test",
-      configVersion: 1, bet: 10_000, seed: 1n }, () => winningSpin);
+      configVersion: 1, baseBet: 10_000, effectiveWager: 10_000, bonusBuy: false, seed },
+    () => winningSpin(10_000, seed));
     const status = await store.getLoyaltyRewards(playerId);
     expect(status).toMatchObject({ version: 1, loyaltyPoints: 100 });
     expect(status.offers).toEqual(expect.arrayContaining([

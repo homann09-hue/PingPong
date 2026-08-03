@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, ShopPurchase, SpinStore, SettleSpinCommand, SettledSpin, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { assertSpinSettlementMatches, assertValidSettleSpinCommand, BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, isSameSpinRequest, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, SpinIdempotencyConflictError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
 import { eventIncrement, eventWindow, liveEventDefinitions } from "../events/live-events.js";
@@ -55,16 +55,21 @@ export class InMemorySpinStore implements SpinStore {
   private readonly defaultBalance: number;
 
   public async settle(command: SettleSpinCommand, calculate: () => SettledSpin["spin"]): Promise<SettledSpin> {
+    assertValidSettleSpinCommand(command);
     const key = `${command.playerId}:${command.idempotencyKey}`;
     const existing = this.replay.get(key);
-    if (existing) return existing;
+    if (existing) {
+      if (!isSameSpinRequest(command, existing.spin)) throw new SpinIdempotencyConflictError();
+      return existing;
+    }
     const current = this.balances.get(command.playerId) ?? this.defaultBalance;
-    if (current < command.bet) throw new InsufficientFundsError();
+    if (current < command.effectiveWager) throw new InsufficientFundsError();
     let spin = calculate();
+    assertSpinSettlementMatches(command, spin);
     for (const definition of jackpotDefinitions) {
       this.jackpotPools.set(
         definition.tier,
-        (this.jackpotPools.get(definition.tier) ?? definition.seedAmount) + jackpotContribution(definition.tier, command.bet),
+        (this.jackpotPools.get(definition.tier) ?? definition.seedAmount) + jackpotContribution(definition.tier, command.effectiveWager),
       );
     }
     const triggeredTier = triggeredJackpotTier(spin);
@@ -79,7 +84,7 @@ export class InMemorySpinStore implements SpinStore {
     };
     const activeBoostSpins = this.activeBoostSpins.get(command.playerId) ?? 0;
     const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
-    const earnedXp = Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
+    const earnedXp = Math.max(10, Math.floor(command.effectiveWager / 10)) * xpMultiplier;
     const accumulatedXp = previous.xp + earnedXp;
     const progression = {
       level: previous.level + Math.floor(accumulatedXp / 1_000),
@@ -87,18 +92,18 @@ export class InMemorySpinStore implements SpinStore {
       spins: previous.spins + 1,
       totalWon: previous.totalWon + spin.totalWin,
       freeSpins: previous.freeSpins + spin.freeSpinsPlayed,
-      vipPoints: previous.vipPoints + Math.max(1, Math.floor(command.bet / 100)),
+      vipPoints: previous.vipPoints + Math.max(1, Math.floor(command.effectiveWager / 100)),
     };
     const highRollerActive = (this.highRollerActiveUntil.get(command.playerId)?.getTime() ?? 0) > Date.now();
-    const cashback = highRollerCashback(command.bet, spin.totalWin, highRollerActive);
-    const winBalance = current - command.bet + spin.totalWin;
+    const cashback = highRollerCashback(command.effectiveWager, spin.totalWin, highRollerActive);
+    const winBalance = current - command.effectiveWager + spin.totalWin;
     const settled = {
       spin,
       coinBalance: winBalance + cashback,
       progression,
     };
-    const afterWager = current - command.bet;
-    this.record(command.playerId, -command.bet, "slot_wager", "slot", command.idempotencyKey, current, afterWager);
+    const afterWager = current - command.effectiveWager;
+    this.record(command.playerId, -command.effectiveWager, "slot_wager", "slot", command.idempotencyKey, current, afterWager);
     if (spin.totalWin > 0) {
       this.record(command.playerId, spin.totalWin, "slot_win", "slot", `${command.idempotencyKey}:win`, afterWager, winBalance);
     }
@@ -108,7 +113,7 @@ export class InMemorySpinStore implements SpinStore {
     if (activeBoostSpins > 0) this.activeBoostSpins.set(command.playerId, activeBoostSpins - 1);
     const economy = this.economy.get(command.playerId) ?? {};
     for (const [currency, amount] of Object.entries(spinEconomyDeltas({
-      bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
+      bet: command.effectiveWager, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
       levelsGained: progression.level - previous.level, highRollerActive,
     })) as [SpinEconomyCurrency, number][]) {
       if (amount <= 0) continue;
@@ -118,14 +123,14 @@ export class InMemorySpinStore implements SpinStore {
     }
     this.economy.set(command.playerId, economy);
     this.replay.set(key, settled);
-    this.advanceMissions(command.playerId, command.bet, spin.totalWin, spin.freeSpinsPlayed, new Date());
-    this.advanceEvents(command.playerId, command.bet, spin.totalWin, spin.freeSpinsPlayed, new Date());
+    this.advanceMissions(command.playerId, command.effectiveWager, spin.totalWin, spin.freeSpinsPlayed, new Date());
+    this.advanceEvents(command.playerId, command.effectiveWager, spin.totalWin, spin.freeSpinsPlayed, new Date());
     const tournamentNow = new Date();
     const tournamentPeriod = tournamentWindow(tournamentNow).periodKey;
     const tournamentKey = `${command.playerId}:${activeTournamentDefinition.id}:${tournamentPeriod}`;
     this.tournamentScores.set(
       tournamentKey,
-      (this.tournamentScores.get(tournamentKey) ?? 0) + tournamentPoints(command.bet, spin.totalWin),
+      (this.tournamentScores.get(tournamentKey) ?? 0) + tournamentPoints(command.effectiveWager, spin.totalWin),
     );
     return settled;
   }

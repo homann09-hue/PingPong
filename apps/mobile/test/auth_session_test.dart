@@ -304,8 +304,9 @@ void main() {
   test('logout all revokes server sessions and clears this device', () async {
     final storage = MemorySessionStorage();
     final client = MockClient((request) async {
-      if (request.url.path == '/v1/auth/guest')
+      if (request.url.path == '/v1/auth/guest') {
         return _tokens(201, access: 'access', refresh: _token('r'));
+      }
       expect(request.url.path, '/v1/auth/logout-all');
       expect(request.headers['authorization'], 'Bearer access');
       return http.Response('{"revokedSessions":2}', 200);

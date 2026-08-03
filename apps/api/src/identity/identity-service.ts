@@ -2,9 +2,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { jwtVerify, SignJWT } from "jose";
 import type { Authenticator } from "../auth.js";
 import type { ExternalIdentityProvider, ExternalIdentityVerifier } from "./external-identity-verifier.js";
+import { ExternalIdentityVerificationUnavailableError } from "./external-identity-verifier.js";
 import type { AccountSummary, ClientPlatform, CloudSave, DeviceSummary, IdentityStore, SessionRecord, SessionSummary } from "./identity-store.js";
 
 const ACCESS_TOKEN_SECONDS = 15 * 60;
+const ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS = 30;
 const REFRESH_TOKEN_MILLISECONDS = 30 * 24 * 60 * 60 * 1_000;
 
 export interface SessionTokens {
@@ -17,7 +19,7 @@ export interface SessionTokens {
 }
 
 export class ExternalIdentityUnavailableError extends Error {
-  public constructor() { super("External identity provider is not configured"); }
+  public constructor() { super("External identity provider is unavailable"); }
 }
 export class ExternalIdentityInvalidError extends Error {
   public constructor() { super("External identity token is invalid"); }
@@ -44,7 +46,15 @@ export class IdentityService implements Authenticator {
     readonly platform: ClientPlatform;
   }): Promise<SessionTokens> {
     if (!this.externalIdentityVerifier) throw new ExternalIdentityUnavailableError();
-    const identity = await this.externalIdentityVerifier.verify(command.providerAccessToken, command.provider);
+    let identity;
+    try {
+      identity = await this.externalIdentityVerifier.verify(command.providerAccessToken, command.provider);
+    } catch (error) {
+      if (error instanceof ExternalIdentityVerificationUnavailableError) {
+        throw new ExternalIdentityUnavailableError();
+      }
+      throw error;
+    }
     if (!identity) throw new ExternalIdentityInvalidError();
     const refreshToken = this.newRefreshToken();
     const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_MILLISECONDS);
@@ -124,8 +134,12 @@ export class IdentityService implements Authenticator {
     try {
       const { payload } = await jwtVerify(authorization.slice(7), this.key, {
         algorithms: ["HS256"], issuer: "aurora-identity", audience: "aurora-api",
+        maxTokenAge: `${ACCESS_TOKEN_SECONDS}s`,
+        clockTolerance: ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS,
       });
-      if (payload.typ !== "access" || typeof payload.sub !== "string" || typeof payload.sid !== "string") return null;
+      if (payload.typ !== "access" || typeof payload.sub !== "string" || typeof payload.sid !== "string"
+        || typeof payload.iat !== "number" || typeof payload.exp !== "number"
+        || payload.exp <= payload.iat || payload.exp - payload.iat > ACCESS_TOKEN_SECONDS) return null;
       return await this.store.isSessionActive(payload.sid, payload.sub) ? payload.sub : null;
     } catch {
       return null;

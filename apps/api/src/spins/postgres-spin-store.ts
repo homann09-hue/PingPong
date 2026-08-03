@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { SpinResult } from "@aurora/slot-engine";
 import type { EventMilestoneClaim, GrantStorePurchaseCommand, LiveEventView, MissionClaim, MissionView, PlayerProfile, PlayerProgression, RewardClaim, SettleSpinCommand, SettledSpin, ShopPurchase, SpinStore, StorePurchaseSettlement, StoreRefundCommand, TimedRewardClaim, TimedRewardStatus, TimedRewardType, TournamentView, WalletTransaction, WheelSpinResult, WheelStatus } from "./spin-store.js";
-import { BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
+import { assertSpinSettlementMatches, assertValidSettleSpinCommand, BoosterActionConflictError, BoosterNotAvailableError, BoosterNotCraftableError, CheckWinNotClaimableError, EventMilestoneNotClaimableError, HighRollerAlreadyActiveError, HighRollerNotEligibleError, InsufficientFundsError, InsufficientGemsError, MissionNotClaimableError, RewardAlreadyClaimedError, RewardNotAvailableError, ShopOfferLimitReachedError, SpinIdempotencyConflictError, StoreProductLimitReachedError, StorePurchaseDebtError, StorePurchaseRevokedError, StoreTransactionConflictError, WheelNotAvailableError } from "./spin-store.js";
 import { InsufficientLoyaltyPointsError, LoyaltyRedemptionConflictError, LoyaltyRewardNotFoundError } from "./spin-store.js";
 import { nextRewardState, rewardStatus, type TimedRewardState } from "../rewards/timed-rewards.js";
 import { selectWheelSegment, standardWheel } from "../rewards/bonus-wheel.js";
@@ -17,7 +17,16 @@ import { loyaltyRewardOffer, loyaltyRewardsCatalog, loyaltyRewardsStatus, type L
 import { type MissionCadence, type MissionRewards } from "../missions/mission-system.js";
 import { highRollerCashback, highRollerClubRules, highRollerSourcePoints, highRollerStatus, type HighRollerActivation, type HighRollerClubStatus, type HighRollerFixedSource } from "../economy/high-roller-club.js";
 
-interface ReplayRow { result: SpinResult; balance_after: string; progression_after: PlayerProgression }
+interface ReplayRow {
+  result: SpinResult;
+  balance_after: string;
+  progression_after: PlayerProgression;
+  slot_id: string;
+  config_version: number;
+  base_bet: string;
+  effective_wager: string;
+  bonus_buy: boolean;
+}
 interface WalletRow { balance: string }
 interface PlayerRow { level: number; xp: string; vip_points: string }
 interface CheckWinClaimRow {
@@ -56,6 +65,7 @@ export class PostgresSpinStore implements SpinStore {
   }
 
   public async settle(command: SettleSpinCommand, calculate: () => SpinResult): Promise<SettledSpin> {
+    assertValidSettleSpinCommand(command);
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -68,7 +78,7 @@ export class PostgresSpinStore implements SpinStore {
       if (replay) { await client.query("COMMIT"); return replay; }
       const balance = Number(wallet.rows[0].balance);
       if (!Number.isSafeInteger(balance)) throw new Error("Wallet balance exceeds API safe integer range");
-      if (balance < command.bet) throw new InsufficientFundsError();
+      if (balance < command.effectiveWager) throw new InsufficientFundsError();
       const boostState = await client.query<{ remaining_spins: number }>(
         "SELECT remaining_spins FROM player_boost_states WHERE player_id=$1 FOR UPDATE",
         [command.playerId],
@@ -76,13 +86,14 @@ export class PostgresSpinStore implements SpinStore {
       const activeBoostSpins = boostState.rows[0]?.remaining_spins ?? 0;
 
       let spin = calculate();
+      assertSpinSettlementMatches(command, spin);
       const pools = await client.query<{ tier: JackpotTier; pool_amount: string; seed_amount: string }>(
         "SELECT tier, pool_amount, seed_amount FROM progressive_jackpots ORDER BY tier FOR UPDATE",
       );
       if (pools.rows.length !== jackpotDefinitions.length) throw new Error("Progressive jackpot pools are not initialized");
       const updatedPools = new Map<JackpotTier, { amount: number; seedAmount: number }>();
       for (const pool of pools.rows) {
-        const contribution = jackpotContribution(pool.tier, command.bet);
+        const contribution = jackpotContribution(pool.tier, command.effectiveWager);
         const updated = await client.query<{ pool_amount: string }>(
           `UPDATE progressive_jackpots
               SET pool_amount=pool_amount+$1, version=version+1, updated_at=now()
@@ -110,7 +121,7 @@ export class PostgresSpinStore implements SpinStore {
       if (!playerResult.rows[0]) throw new Error("Player does not exist");
       const previousXp = Number(playerResult.rows[0].xp);
       const xpMultiplier = activeBoostSpins > 0 ? xpBoosterRules.xpMultiplier : 1;
-      const accumulatedXp = previousXp + Math.max(10, Math.floor(command.bet / 10)) * xpMultiplier;
+      const accumulatedXp = previousXp + Math.max(10, Math.floor(command.effectiveWager / 10)) * xpMultiplier;
       const activity = await client.query<{ spins: string; total_won: string; free_spins: string }>(
         `SELECT COUNT(*) AS spins, COALESCE(SUM(win), 0) AS total_won,
                 COALESCE(SUM((result->>'freeSpinsPlayed')::integer), 0) AS free_spins
@@ -122,23 +133,25 @@ export class PostgresSpinStore implements SpinStore {
         spins: Number(activity.rows[0]?.spins ?? 0) + 1,
         totalWon: Number(activity.rows[0]?.total_won ?? 0) + spin.totalWin,
         freeSpins: Number(activity.rows[0]?.free_spins ?? 0) + spin.freeSpinsPlayed,
-        vipPoints: Number(playerResult.rows[0].vip_points) + Math.max(1, Math.floor(command.bet / 100)),
+        vipPoints: Number(playerResult.rows[0].vip_points) + Math.max(1, Math.floor(command.effectiveWager / 100)),
       };
       const membership = await client.query<{ active_until: Date }>(
         "SELECT active_until FROM high_roller_memberships WHERE player_id=$1", [command.playerId],
       );
       const highRollerActive = (membership.rows[0]?.active_until.getTime() ?? 0) > Date.now();
-      const winBalance = balance - command.bet + spin.totalWin;
-      const cashback = highRollerCashback(command.bet, spin.totalWin, highRollerActive);
+      const winBalance = balance - command.effectiveWager + spin.totalWin;
+      const cashback = highRollerCashback(command.effectiveWager, spin.totalWin, highRollerActive);
       const balanceAfter = winBalance + cashback;
       const spinId = randomUUID();
       await client.query(
         `INSERT INTO spins (
-           id, player_id, idempotency_key, slot_id, config_version, bet, win,
+           id, player_id, idempotency_key, slot_id, config_version, bet, base_bet,
+           effective_wager, bonus_buy, win,
            rng_seed, result, balance_before, balance_after, server_version,
            math_model_version, progression_after
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-        [spinId, command.playerId, command.idempotencyKey, command.slotId, command.configVersion, command.bet,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        [spinId, command.playerId, command.idempotencyKey, command.slotId, command.configVersion,
+          command.effectiveWager, command.baseBet, command.effectiveWager, command.bonusBuy,
           spin.totalWin, command.seed.toString(), JSON.stringify(spin), balance, balanceAfter,
           process.env.SERVER_VERSION ?? "dev", spin.mathModelVersion, JSON.stringify(progression)],
       );
@@ -166,7 +179,7 @@ export class PostgresSpinStore implements SpinStore {
         );
       }
       for (const [currency, amount] of Object.entries(spinEconomyDeltas({
-        bet: command.bet, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
+        bet: command.effectiveWager, totalWin: spin.totalWin, freeSpins: spin.freeSpinsPlayed,
         levelsGained: progression.level - playerResult.rows[0].level, highRollerActive,
       })) as [SpinEconomyCurrency, number][]) {
         if (amount <= 0) continue;
@@ -209,12 +222,12 @@ export class PostgresSpinStore implements SpinStore {
                  (SELECT target FROM mission_definitions WHERE id=EXCLUDED.mission_id)
                  THEN COALESCE(mission_progress.completed_at, now()) ELSE mission_progress.completed_at END,
                version=mission_progress.version+1`,
-        [command.playerId, command.bet, spin.totalWin, spin.freeSpinsPlayed],
+        [command.playerId, command.effectiveWager, spin.totalWin, spin.freeSpinsPlayed],
       );
       const eventNow = new Date();
       for (const event of liveEventDefinitions) {
         const window = eventWindow(event.cadence, eventNow);
-        const increment = eventIncrement(event.metric, command.bet, spin.totalWin, spin.freeSpinsPlayed);
+        const increment = eventIncrement(event.metric, command.effectiveWager, spin.totalWin, spin.freeSpinsPlayed);
         const maximum = event.milestones[event.milestones.length - 1]!.target;
         await client.query(
           `INSERT INTO live_event_progress (player_id, event_id, period_key, progress)
@@ -232,12 +245,12 @@ export class PostgresSpinStore implements SpinStore {
          ON CONFLICT (player_id, tournament_id, period_key) DO UPDATE
            SET score=tournament_scores.score+EXCLUDED.score,
                version=tournament_scores.version+1, updated_at=now()`,
-        [command.playerId, activeTournamentDefinition.id, tournamentPeriod, tournamentPoints(command.bet, spin.totalWin)],
+        [command.playerId, activeTournamentDefinition.id, tournamentPeriod, tournamentPoints(command.effectiveWager, spin.totalWin)],
       );
-      const balanceAfterWager = balance - command.bet;
+      const balanceAfterWager = balance - command.effectiveWager;
       await this.ledger(client, {
         playerId: command.playerId,
-        amount: -command.bet,
+        amount: -command.effectiveWager,
         reason: "slot_wager",
         source: "slot",
         referenceId: spinId,
@@ -268,7 +281,10 @@ export class PostgresSpinStore implements SpinStore {
       }
       await client.query(
         "INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload) VALUES ($1,'spin',$2,'spin.settled',$3)",
-        [randomUUID(), spinId, JSON.stringify({ playerId: command.playerId, slotId: command.slotId, bet: command.bet, win: spin.totalWin })],
+        [randomUUID(), spinId, JSON.stringify({
+          playerId: command.playerId, slotId: command.slotId, baseBet: command.baseBet,
+          effectiveWager: command.effectiveWager, bonusBuy: command.bonusBuy, win: spin.totalWin,
+        })],
       );
       await client.query("COMMIT");
       return { spin, coinBalance: balanceAfter, progression };
@@ -1336,7 +1352,19 @@ export class PostgresSpinStore implements SpinStore {
   }
 
   private async findReplay(client: PoolClient, command: SettleSpinCommand): Promise<SettledSpin | null> {
-    const result = await client.query<ReplayRow>("SELECT result, balance_after, progression_after FROM spins WHERE player_id=$1 AND idempotency_key=$2", [command.playerId, command.idempotencyKey]);
+    const result = await client.query<ReplayRow>(
+      `SELECT result, balance_after, progression_after, slot_id, config_version,
+              base_bet, effective_wager, bonus_buy
+         FROM spins WHERE player_id=$1 AND idempotency_key=$2`,
+      [command.playerId, command.idempotencyKey],
+    );
+    if (result.rows[0] && (result.rows[0].slot_id !== command.slotId
+      || result.rows[0].config_version !== command.configVersion
+      || this.safeInteger(result.rows[0].base_bet, "Replay base bet") !== command.baseBet
+      || this.safeInteger(result.rows[0].effective_wager, "Replay effective wager") !== command.effectiveWager
+      || result.rows[0].bonus_buy !== command.bonusBuy)) {
+      throw new SpinIdempotencyConflictError();
+    }
     return result.rows[0] ? {
       spin: result.rows[0].result,
       coinBalance: Number(result.rows[0].balance_after),

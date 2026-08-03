@@ -28,6 +28,7 @@ import { InMemoryEconomyAdminStore } from "./admin/in-memory-economy-admin-store
 import { PostgresEconomyAdminStore } from "./admin/postgres-economy-admin-store.js";
 import { InMemoryOperationsStore } from "./operations/in-memory-operations-store.js";
 import { PostgresOperationsStore } from "./operations/postgres-operations-store.js";
+import { assertDemoModeAllowed } from "./runtime-environment.js";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -45,6 +46,7 @@ const storeWebhookToken = process.env.STORE_WEBHOOK_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const demoMode = process.env.DEMO_MODE === "true";
+assertDemoModeAllowed(demoMode);
 /**
  * Der Push-Zustellungs-Worker darf nur in genau einer Instanz laufen, sonst wuerden mehrere
  * Repliken dieselben Zustellungen greifen. Standard: an (Einzelinstanz-Betrieb).

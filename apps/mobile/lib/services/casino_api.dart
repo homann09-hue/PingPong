@@ -759,13 +759,13 @@ class CasinoApi {
     'APP_VERSION',
     defaultValue: '0.1.0',
   );
-  static final base = _configuredBase.isNotEmpty
-      ? _configuredBase
-      : kIsWeb
-      ? Uri.base.origin
-      : defaultTargetPlatform == TargetPlatform.android
-      ? 'http://10.0.2.2:8080'
-      : 'http://localhost:8080';
+  static final base = resolveCasinoApiBase(
+    configuredBase: _configuredBase,
+    isWeb: kIsWeb,
+    platform: defaultTargetPlatform,
+    isDebug: kDebugMode,
+    webOrigin: kIsWeb ? Uri.base.origin : '',
+  );
   static final _sharedSession = AuthSessionManager(
     baseUrl: base,
     client: http.Client(),
@@ -2321,4 +2321,38 @@ class CasinoApi {
             })
             .toList(growable: false),
       );
+}
+
+/// Resolves the API endpoint without allowing native release builds to silently
+/// connect to localhost or send credentials over cleartext HTTP.
+String resolveCasinoApiBase({
+  required String configuredBase,
+  required bool isWeb,
+  required TargetPlatform platform,
+  required bool isDebug,
+  required String webOrigin,
+}) {
+  final configured = configuredBase.trim();
+  if (configured.isNotEmpty) {
+    final uri = Uri.tryParse(configured);
+    if (uri == null ||
+        !uri.hasScheme ||
+        !uri.hasAuthority ||
+        !const {'http', 'https'}.contains(uri.scheme) ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw StateError('API_URL muss eine gültige HTTP(S)-Basis-URL sein');
+    }
+    if (!isDebug && uri.scheme != 'https') {
+      throw StateError('API_URL muss in Release-Builds HTTPS verwenden');
+    }
+    return configured.replaceFirst(RegExp(r'/+$'), '');
+  }
+  if (isWeb) return webOrigin;
+  if (!isDebug) {
+    throw StateError('API_URL muss für native Release-Builds gesetzt sein');
+  }
+  return platform == TargetPlatform.android
+      ? 'http://10.0.2.2:8080'
+      : 'http://localhost:8080';
 }

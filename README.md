@@ -340,7 +340,10 @@ player web app; the API accepts the corresponding `SUPABASE_*` names and uses
 them only to verify provider tokens. See `docs/adr/0031-federated-player-accounts.md`.
 Native builds receive the same public values through
 `--dart-define=SUPABASE_URL=...` and
-`--dart-define=SUPABASE_PUBLISHABLE_KEY=...`. Supabase must allow
+`--dart-define=SUPABASE_PUBLISHABLE_KEY=...`. Native release builds must also
+set the production endpoint with `--dart-define=API_URL=https://api.example`;
+release startup rejects missing or cleartext API URLs instead of silently
+connecting to localhost. Supabase must allow
 `com.aurora.socialcasino://login-callback` for iOS/Android and the web
 `/auth/callback` URL. No service-role credential belongs in either client.
 

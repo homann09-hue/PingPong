@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { SpinResult } from "@aurora/slot-engine";
 import { InMemorySpinStore } from "./in-memory-spin-store.js";
 
-function missionSpin(freeSpinsPlayed = 0): SpinResult {
+function missionSpin(seed: bigint, freeSpinsPlayed = 0): SpinResult {
   return {
-    configId: "mission-test", configVersion: 1, mathModelVersion: "test", seed: "1",
+    configId: "mission-test", configVersion: 1, mathModelVersion: "test", seed: seed.toString(),
     baseBet: 1_000, wager: 1_000, bonusBuy: false, stops: [0, 0, 0], grid: [["A"], ["A"], ["A"]],
     wins: [], rounds: [{ phase: "base", index: 0, grid: [["A"], ["A"], ["A"]], wins: [], totalWin: 50_000, events: [] }],
     freeSpinsPlayed, totalWin: 50_000, maxWinReached: false, maxWinMultiplier: 1_000,
@@ -17,8 +17,9 @@ describe("InMemorySpinStore mission tracks", () => {
     const store = new InMemorySpinStore(1_000_000);
     const playerId = randomUUID();
     for (let index = 0; index < 10; index += 1) {
+      const seed = BigInt(index);
       await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "mission-test",
-        configVersion: 1, bet: 1_000, seed: BigInt(index) }, () => missionSpin());
+        configVersion: 1, baseBet: 1_000, effectiveWager: 1_000, bonusBuy: false, seed }, () => missionSpin(seed));
     }
     let missions = await store.getMissions(playerId, new Date());
     expect(missions.filter((mission) => mission.cadence === "daily" && mission.tier === "standard" && mission.completed)).toHaveLength(3);
@@ -31,8 +32,9 @@ describe("InMemorySpinStore mission tracks", () => {
     expect(missions.find((mission) => mission.id === "super-free-spins-3")).toMatchObject({ unlocked: true, progress: 0 });
     expect(missions.find((mission) => mission.id === "weekly-bar-3")).toMatchObject({ progress: 3, completed: true });
 
+    const seed = 99n;
     await store.settle({ playerId, idempotencyKey: randomUUID(), slotId: "mission-test",
-      configVersion: 1, bet: 1_000, seed: 99n }, () => missionSpin(3));
+      configVersion: 1, baseBet: 1_000, effectiveWager: 1_000, bonusBuy: false, seed }, () => missionSpin(seed, 3));
     const superClaim = await store.claimMission(playerId, "super-free-spins-3", new Date());
     expect(superClaim).toMatchObject({ rewards: { coins: 500_000, missionPoints: 50,
       loyaltyPoints: 125, stamps: 1, toolboxes: 0, boosters: 1 } });

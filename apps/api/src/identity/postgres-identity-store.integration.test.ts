@@ -63,8 +63,14 @@ databaseSuite("Postgres identity sessions", () => {
     expect(await identity.authenticate(`Bearer ${replacement.accessToken}`)).toBeNull();
 
     const finalSession = await identity.createGuest(installationId, "android");
+    const parallelSession = await identity.createGuest(installationId, "web");
+    await identity.logout(finalSession.refreshToken);
+    expect(await identity.refresh(finalSession.refreshToken)).toBeNull();
+    expect(await identity.authenticate(`Bearer ${parallelSession.accessToken}`)).toBe(first.playerId);
+
     expect(await identity.logoutAll(first.playerId)).toBe(1);
     expect(await identity.authenticate(`Bearer ${finalSession.accessToken}`)).toBeNull();
+    expect(await identity.authenticate(`Bearer ${parallelSession.accessToken}`)).toBeNull();
     const deletable = await identity.createGuest(installationId, "ios");
     expect(await identity.deleteAccount(first.playerId)).toBe(true);
     expect(await identity.authenticate(`Bearer ${deletable.accessToken}`)).toBeNull();
