@@ -1,6 +1,6 @@
 # Slot-Math-Report: candy-carnival
 
-Erzeugt: 2026-07-27T08:32:00.161Z · Version 5 · Math-Modell 5.0.0
+Erzeugt: 2026-08-03T08:31:03.120Z · Version 5 · Math-Modell 5.0.0
 Stichprobe: **100.000 Spins** · Einsatz 100 · deterministisch (Seed = Spin-Index)
 
 | Kennzahl | Wert |

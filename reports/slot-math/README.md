@@ -1,6 +1,6 @@
 # Slot-Math-Reports
 
-Erzeugt: 2026-07-27T08:32:00.161Z · 100.000 Spins pro Slot · deterministisch reproduzierbar
+Erzeugt: 2026-08-03T08:31:03.120Z · 100.000 Spins pro Slot · deterministisch reproduzierbar
 
 | Slot | Ziel-RTP | Simuliert | Abweichung | Hit-Freq | Max-Win |
 |---|---|---|---|---|---|
