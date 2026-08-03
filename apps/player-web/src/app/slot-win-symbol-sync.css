@@ -1,0 +1,83 @@
+.reel-frame[data-win-sequence-focus] .symbol.winning:not(.is-active-win-sequence){
+  z-index:1;
+  animation:none!important;
+  opacity:.56;
+  filter:saturate(.48) brightness(.66);
+  transform:scale(.97);
+  border-color:rgba(255,255,255,.12);
+  box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -10px 18px rgba(0,0,0,.58),0 2px 5px rgba(0,0,0,.5);
+}
+
+.reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence{
+  z-index:5;
+  opacity:1;
+  filter:saturate(1.18) brightness(1.15);
+  border-color:color-mix(in srgb,var(--slot-primary) 78%,white 22%);
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.46),
+    inset 0 0 24px color-mix(in srgb,var(--slot-secondary) 24%,transparent),
+    0 0 0 2px color-mix(in srgb,var(--slot-primary) 76%,transparent),
+    0 0 34px color-mix(in srgb,var(--slot-primary) 68%,transparent);
+  animation:slot-active-win-symbol 1.05s cubic-bezier(.16,.88,.2,1) infinite!important;
+}
+
+.reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after{
+  content:"";
+  position:absolute;
+  z-index:7;
+  inset:-8%;
+  border:2px solid color-mix(in srgb,var(--slot-primary) 70%,white 30%);
+  border-radius:inherit;
+  pointer-events:none;
+  opacity:.8;
+  animation:slot-active-win-wave 1.05s ease-out infinite;
+}
+
+.reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence .slot-symbol-art,
+.reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence img,
+.reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence .low-symbol{
+  filter:drop-shadow(0 0 9px color-mix(in srgb,var(--slot-primary) 78%,transparent)) brightness(1.08);
+}
+
+.slot-world-forge .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after,
+.slot-world-saloon .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after{border-radius:3px}
+
+.slot-world-ice-palace .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after{
+  clip-path:polygon(50% 0,96% 16%,100% 78%,50% 100%,0 78%,4% 16%);
+}
+
+.slot-world-starship .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after{
+  border-style:dashed;
+  animation-name:slot-active-win-wave,slot-active-win-scan;
+  animation-duration:1.05s,1.8s;
+  animation-timing-function:ease-out,linear;
+  animation-iteration-count:infinite;
+}
+
+@keyframes slot-active-win-symbol{
+  0%,100%{transform:scale(1);filter:saturate(1.12) brightness(1.08)}
+  48%{transform:scale(1.065);filter:saturate(1.35) brightness(1.42)}
+}
+
+@keyframes slot-active-win-wave{
+  0%{opacity:.95;transform:scale(.82)}
+  72%,100%{opacity:0;transform:scale(1.18)}
+}
+
+@keyframes slot-active-win-scan{
+  to{transform:rotate(360deg)}
+}
+
+@media(max-width:760px){
+  .reel-frame[data-win-sequence-focus] .symbol.winning:not(.is-active-win-sequence){opacity:.5}
+  .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence{animation-duration:.92s!important}
+  .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after{inset:-5%}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence,
+  .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence::after{
+    animation:none!important;
+  }
+  .reel-frame[data-win-sequence-focus] .symbol.is-active-win-sequence{transform:none}
+}

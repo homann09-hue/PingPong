@@ -1,0 +1,84 @@
+.slot-win-focus-scrim{
+  fill:rgba(2,2,8,.17);
+  animation:slot-win-focus-scrim .28s ease-out both;
+}
+
+.slot-win-cell-focus{
+  fill:color-mix(in srgb,var(--win-secondary) 9%,transparent);
+  stroke:color-mix(in srgb,var(--win-accent) 84%,white 12%);
+  stroke-width:3;
+  vector-effect:non-scaling-stroke;
+  filter:drop-shadow(0 0 8px var(--win-accent));
+  animation:slot-win-cell-focus .62s cubic-bezier(.16,.88,.2,1) calc(var(--point-index,0)*34ms) both;
+}
+
+.slot-win-trace[data-kind="ways"] .slot-win-cell-focus{
+  stroke-dasharray:10 7;
+  fill:color-mix(in srgb,var(--win-secondary) 12%,transparent);
+}
+
+.slot-win-trace[data-kind="cluster"] .slot-win-cell-focus{
+  stroke-width:5;
+  fill:color-mix(in srgb,var(--win-secondary) 17%,transparent);
+}
+
+.slot-win-trace[data-kind="scatter"] .slot-win-cell-focus{
+  stroke-dasharray:5 6;
+  fill:color-mix(in srgb,var(--win-accent) 10%,transparent);
+}
+
+.slot-win-label{
+  opacity:0;
+  animation:slot-win-label-arrive .72s cubic-bezier(.16,.9,.2,1) 90ms both;
+}
+
+.slot-win-label rect{
+  fill:rgba(4,3,12,.9);
+  stroke:color-mix(in srgb,var(--win-secondary) 46%,var(--win-accent));
+  stroke-width:2;
+  vector-effect:non-scaling-stroke;
+  filter:drop-shadow(0 0 8px color-mix(in srgb,var(--win-secondary) 58%,transparent));
+}
+
+.slot-win-label text{
+  fill:#fff;
+  font-size:18px;
+  font-weight:1000;
+  letter-spacing:.09em;
+  text-anchor:middle;
+  paint-order:stroke fill;
+  stroke:rgba(0,0,0,.9);
+  stroke-width:3;
+  vector-effect:non-scaling-stroke;
+}
+
+.slot-win-overlay[data-cabinet="starship"] .slot-win-cell-focus,
+.slot-win-overlay[data-cabinet="nightclub"] .slot-win-cell-focus{stroke-width:2}
+
+@keyframes slot-win-focus-scrim{
+  from{opacity:0}
+  to{opacity:1}
+}
+
+@keyframes slot-win-cell-focus{
+  0%{opacity:0;stroke-width:11;filter:brightness(2.2) blur(3px)}
+  58%{opacity:1;stroke-width:4;filter:brightness(1.35) blur(0)}
+  100%{opacity:.92;filter:drop-shadow(0 0 8px var(--win-accent))}
+}
+
+@keyframes slot-win-label-arrive{
+  0%{opacity:0;filter:blur(4px) brightness(2.2)}
+  62%{opacity:1;filter:blur(0) brightness(1.25)}
+  100%{opacity:1;filter:none}
+}
+
+@media(max-width:760px){
+  .slot-win-label text{font-size:15px;letter-spacing:.06em}
+  .slot-win-cell-focus{stroke-width:2}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .slot-win-focus-scrim,
+  .slot-win-cell-focus,
+  .slot-win-label{animation:none!important;opacity:1}
+}

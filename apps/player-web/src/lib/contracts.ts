@@ -103,8 +103,34 @@ export interface Paytable {
 }
 
 export interface SpinWin {
+  readonly kind?: "line" | "ways" | "cluster" | "scatter" | string;
   readonly amount: number;
   readonly cells: readonly [number, number][];
+  readonly symbol?: string;
+  readonly count?: number;
+  readonly payline?: number;
+  readonly direction?: "left" | "right";
+  readonly ways?: number;
+}
+
+export type SpinRoundPhase = "base" | "free_spin" | "respin" | "cascade" | "bonus";
+
+export interface SpinEvent {
+  readonly type: string;
+  readonly data: Readonly<Record<string, number | string>>;
+}
+
+/**
+ * Feature-round payload returned by the API. Legacy fixtures may omit the
+ * presentation-only fields, therefore the player normalizes them at runtime.
+ */
+export interface SpinRound {
+  readonly phase: SpinRoundPhase;
+  readonly index?: number;
+  readonly grid?: readonly (readonly string[])[];
+  readonly wins?: readonly SpinWin[];
+  readonly totalWin: number;
+  readonly events?: readonly SpinEvent[];
 }
 
 export interface SpinResult {
@@ -115,7 +141,7 @@ export interface SpinResult {
     readonly totalWin: number;
     readonly freeSpinsPlayed: number;
     readonly winClass?: string;
-    readonly rounds: readonly { readonly phase: string; readonly totalWin: number }[];
+    readonly rounds: readonly SpinRound[];
   };
   readonly jackpots?: readonly { readonly tier: string; readonly amount: number }[];
 }

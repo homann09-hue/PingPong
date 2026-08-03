@@ -15,70 +15,62 @@ export interface Tokens {
 }
 
 const allowedRoutes = [
-  /^lobby$/,
-  /^profile$/,
-  /^wallet$/,
-  /^jackpots$/,
-  /^events$/,
-  /^missions$/,
+  /^lobby$/, /^profile$/, /^wallet$/, /^jackpots$/, /^events$/, /^missions$/,
   /^missions\/[a-z0-9-]+\/claim$/,
-  /^rewards\/(hourly|daily)$/,
-  /^rewards\/(hourly|daily)\/claim$/,
-  /^rewards\/[a-z0-9-]+\/claims$/,
-  // Glucksrad: Status und Dreh. Das Segment bestimmt ausschliesslich der Server.
-  /^rewards\/wheels\/standard$/,
-  /^rewards\/wheels\/standard\/spin$/,
-  // Boost-Center: Sammelmarken, Booster, Loyalitaetstausch und High Roller Club.
-  /^economy\/check-win$/,
-  /^economy\/check-win\/claim$/,
-  /^economy\/boosters$/,
-  /^economy\/boosters\/(craft|activate)$/,
-  /^economy\/loyalty-rewards$/,
-  /^economy\/loyalty-rewards\/[a-z0-9-]+\/redeem$/,
-  /^economy\/high-roller-club$/,
+  /^rewards\/(hourly|daily)$/, /^rewards\/(hourly|daily)\/claim$/,
+  /^rewards\/[a-z0-9-]+\/claims$/, /^rewards\/wheels\/standard$/, /^rewards\/wheels\/standard\/spin$/,
+  /^economy\/check-win$/, /^economy\/check-win\/claim$/, /^economy\/boosters$/,
+  /^economy\/boosters\/(craft|activate)$/, /^economy\/loyalty-rewards$/,
+  /^economy\/loyalty-rewards\/[a-z0-9-]+\/redeem$/, /^economy\/high-roller-club$/,
   /^economy\/high-roller-club\/activate$/,
   /^auth\/(account|sessions|devices|cloud-save|privacy-export|logout-all)$/,
-  /^auth\/sessions\/[0-9a-f-]{36}$/,
-  /^slots\/availability$/,
-  /^slots\/[a-z0-9-]+\/paytable$/,
-  /^slots\/[a-z0-9-]+\/spins$/,
-
-  // Shop, Store und Belegpruefung.
-  /^shop\/offers$/,
-  /^shop\/offers\/[A-Za-z0-9_-]{1,64}\/purchase$/,
-  /^store\/products$/,
-  /^store\/purchases\/verify$/,
-
-  // Wallet-Historie und Event-Meilensteine.
-  /^wallet\/transactions$/,
+  /^auth\/sessions\/[0-9a-f-]{36}$/, /^slots\/availability$/,
+  /^slots\/[a-z0-9-]+\/paytable$/, /^slots\/[a-z0-9-]+\/spins$/,
+  /^shop\/offers$/, /^shop\/offers\/[A-Za-z0-9_-]{1,64}\/purchase$/,
+  /^store\/products$/, /^store\/purchases\/verify$/, /^wallet\/transactions$/,
   /^events\/[A-Za-z0-9_-]{1,64}\/milestones\/[A-Za-z0-9_-]{1,64}\/claim$/,
-
-  // Turniere und LiveOps-Konfiguration.
-  /^tournaments\/active$/,
-  /^liveops$/,
-
-  // Soziales: Freunde und Clans.
-  /^social\/overview$/,
-  /^social\/friend-requests$/,
-  /^social\/friend-requests\/[A-Za-z0-9_-]{1,64}\/accept$/,
-  /^clans$/,
+  /^tournaments\/active$/, /^liveops$/, /^social\/overview$/, /^social\/friend-requests$/,
+  /^social\/friend-requests\/[A-Za-z0-9_-]{1,64}\/accept$/, /^clans$/,
   /^clans\/(leave|invitations|members|feed|ownership-transfer)$/,
-  /^clans\/[A-Za-z0-9_-]{1,64}\/join$/,
-  /^clans\/invitations\/[A-Za-z0-9_-]{1,64}\/accept$/,
+  /^clans\/[A-Za-z0-9_-]{1,64}\/join$/, /^clans\/invitations\/[A-Za-z0-9_-]{1,64}\/accept$/,
   /^clans\/members\/[A-Za-z0-9_-]{1,64}(\/role)?$/,
   /^clans\/feed\/[A-Za-z0-9_-]{1,64}(\/reports)?$/,
-
-  // Push-Einstellungen und Geraeteregistrierung.
-  /^messaging\/preferences$/,
-  /^messaging\/installations$/,
-  /^messaging\/installations\/[A-Za-z0-9_-]{1,64}$/,
-
-  // Telemetrie.
-  /^analytics\/events$/,
+  /^messaging\/preferences$/, /^messaging\/installations$/,
+  /^messaging\/installations\/[A-Za-z0-9_-]{1,64}$/, /^analytics\/events$/,
 ];
+
+const idempotentMutationRoutes = [
+  /^slots\/[a-z0-9-]+\/spins$/,
+  /^missions\/[a-z0-9-]+\/claim$/,
+  /^rewards\/(hourly|daily)\/claim$/,
+  /^rewards\/[a-z0-9-]+\/claims$/,
+  /^rewards\/wheels\/standard\/spin$/,
+  /^economy\/check-win\/claim$/,
+  /^economy\/boosters\/(craft|activate)$/,
+  /^economy\/loyalty-rewards\/[a-z0-9-]+\/redeem$/,
+  /^economy\/high-roller-club\/activate$/,
+  /^shop\/offers\/[A-Za-z0-9_-]{1,64}\/purchase$/,
+  /^events\/[A-Za-z0-9_-]{1,64}\/milestones\/[A-Za-z0-9_-]{1,64}\/claim$/,
+  /^store\/purchases\/verify$/,
+];
+
+const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export function isAllowedPlayerPath(path: string): boolean {
   return allowedRoutes.some((pattern) => pattern.test(path));
+}
+
+export function requiresIdempotencyKey(method: string, path: string): boolean {
+  return method === "POST" && idempotentMutationRoutes.some((pattern) => pattern.test(path));
+}
+
+export function isTrustedMutationRequest(request: NextRequest): boolean {
+  if (safeMethods.has(request.method)) return true;
+  const expectedOrigin = process.env.AURORA_WEB_ORIGIN ?? request.nextUrl.origin;
+  const origin = request.headers.get("origin");
+  if (!origin || origin !== expectedOrigin) return false;
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return fetchSite === null || fetchSite === "same-origin" || fetchSite === "none";
 }
 
 export function cookieOptions(maxAge: number) {
@@ -101,45 +93,44 @@ export async function issueTokens(request: NextRequest): Promise<{ tokens: Token
   const currentRefresh = request.cookies.get(refreshCookie)?.value;
   if (currentRefresh) {
     const refreshed = await fetch(`${playerApiUrl}/v1/auth/refresh`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ refreshToken: currentRefresh }),
-      cache: "no-store",
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken: currentRefresh }), cache: "no-store",
     });
     if (refreshed.ok) return { tokens: await refreshed.json() as Tokens, installationId };
   }
   const created = await fetch(`${playerApiUrl}/v1/auth/guest`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ installationId, platform: "web" }),
-    cache: "no-store",
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ installationId, platform: "web" }), cache: "no-store",
   });
   if (!created.ok) throw new Error(`Identity service returned ${created.status}`);
   return { tokens: await created.json() as Tokens, installationId };
 }
 
-async function upstreamRequest(request: NextRequest, path: string, accessToken: string, body: string | undefined): Promise<Response> {
+async function upstreamRequest(
+  request: NextRequest,
+  path: string,
+  accessToken: string,
+  body: string | undefined,
+): Promise<Response | null> {
   const headers = new Headers({ authorization: `Bearer ${accessToken}` });
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
-  const needsIdempotencyKey = request.method === "POST"
-    && (path.endsWith("/spins") || path.endsWith("/claim") || path.endsWith("/claims")
-      || path.endsWith("/craft") || path.endsWith("/activate") || path.endsWith("/redeem")
-      || path.endsWith("/spin") || path.endsWith("/purchase"));
-  if (needsIdempotencyKey) {
-    headers.set("idempotency-key", request.headers.get("idempotency-key") ?? randomUUID());
+  if (requiresIdempotencyKey(request.method, path)) {
+    const key = request.headers.get("idempotency-key");
+    if (!key) return null;
+    headers.set("idempotency-key", key);
   }
   return fetch(`${playerApiUrl}/v1/${path}`, {
-    method: request.method,
-    headers,
-    body,
-    cache: "no-store",
+    method: request.method, headers, body, cache: "no-store",
   });
 }
 
 /** Same-origin player BFF. It keeps platform bearer credentials out of browser JavaScript. */
 export async function proxyPlayerRequest(request: NextRequest, path: string): Promise<NextResponse> {
   if (!isAllowedPlayerPath(path)) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ code: "CSRF_BLOCKED" }, { status: 403, headers: { "cache-control": "private, no-store" } });
+  }
   try {
     let accessToken = request.cookies.get(accessCookie)?.value;
     const requestBody = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
@@ -149,18 +140,18 @@ export async function proxyPlayerRequest(request: NextRequest, path: string): Pr
       accessToken = replacement.tokens.accessToken;
     }
     let response = await upstreamRequest(request, path, accessToken, requestBody);
+    if (!response) return NextResponse.json({ code: "IDEMPOTENCY_KEY_REQUIRED" }, { status: 400 });
     if (response.status === 401) {
       replacement = await issueTokens(request);
       response = await upstreamRequest(request, path, replacement.tokens.accessToken, requestBody);
+      if (!response) return NextResponse.json({ code: "IDEMPOTENCY_KEY_REQUIRED" }, { status: 400 });
     }
     const body = await response.text();
     const outgoing = new NextResponse(body || null, {
       status: response.status,
       headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
     });
-    if (replacement) {
-      setTokenCookies(outgoing, replacement.tokens, replacement.installationId);
-    }
+    if (replacement) setTokenCookies(outgoing, replacement.tokens, replacement.installationId);
     outgoing.headers.set("cache-control", "private, no-store");
     return outgoing;
   } catch (error) {

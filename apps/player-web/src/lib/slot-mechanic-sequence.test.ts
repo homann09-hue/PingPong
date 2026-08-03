@@ -1,0 +1,129 @@
+import { describe, expect, it } from "vitest";
+import type { SpinEvent } from "./contracts";
+import {
+  buildSlotMechanicSequence,
+  nextSlotMechanicStep,
+  slotMechanicEventSignature,
+  slotMechanicSequenceHoldMs,
+} from "./slot-mechanic-sequence";
+
+const event = (type: string, data: Readonly<Record<string, number | string>> = {}): SpinEvent => ({ type, data });
+
+describe("slot mechanic sequence", () => {
+  it("keeps max win exclusive so no lower-priority effect obscures it", () => {
+    expect(buildSlotMechanicSequence("cascade", 50_000, [
+      event("cascade.started", { step: 4 }),
+      event("mystery.revealed", { target: "A" }),
+      event("scatter.hit", { symbol: "S", count: 5 }),
+      event("max_win.reached", { multiplier: 10_000 }),
+    ], null)).toEqual([{ effect: "jackpot", durationMs: 1_900 }]);
+  });
+
+  it("presents simultaneous mechanics once in deterministic engine order", () => {
+    expect(buildSlotMechanicSequence("respin", 2_500, [
+      event("wild.walked", { moves: "0:0>1:0" }),
+      event("mystery.revealed", { target: "H1" }),
+      event("symbol.upgraded", { from: "J", to: "A" }),
+      event("scatter.hit", { symbol: "S", count: 3 }),
+      event("multiplier.applied", { source: "multiplier_symbols", multiplier: 3 }),
+      event("bonus.awarded", { mode: "coin_collect" }),
+    ], null).map((step) => step.effect)).toEqual([
+      "respin",
+      "upgrade",
+      "mystery",
+      "walking-wild",
+      "scatter",
+      "multiplier",
+      "bonus",
+    ]);
+  });
+
+  it("reveals a qualifying scatter before the resulting free-spin award", () => {
+    expect(buildSlotMechanicSequence("base", 1_000, [
+      event("scatter.hit", { symbol: "S", count: 3 }),
+      event("free_spins.awarded", { count: 8 }),
+    ], "entry").map((step) => step.effect)).toEqual(["scatter", "free-spin"]);
+  });
+
+  it("does not use a full-screen reveal for a single scatter", () => {
+    expect(buildSlotMechanicSequence("base", 0, [
+      event("scatter.hit", { symbol: "S", count: 1 }),
+    ], null)).toEqual([]);
+  });
+
+  it("keeps a normal free-spin HUD persistent without replaying its structural multiplier", () => {
+    expect(buildSlotMechanicSequence("free_spin", 1_000, [
+      event("multiplier.applied", { source: "free_spin", multiplier: 4 }),
+    ], "active").map((step) => step.effect)).toEqual(["hit"]);
+
+    expect(buildSlotMechanicSequence("free_spin", 1_000, [
+      event("multiplier.applied", { source: "free_spin", multiplier: 4 }),
+      event("multiplier.applied", { source: "multiplier_symbols", multiplier: 2 }),
+    ], "active").map((step) => step.effect)).toEqual(["multiplier"]);
+  });
+
+  it("queues entry and retrigger reveals but not an ordinary free spin", () => {
+    expect(buildSlotMechanicSequence("base", 0, [event("free_spins.awarded", { count: 8 })], "entry")[0]?.effect).toBe("free-spin");
+    expect(buildSlotMechanicSequence("free_spin", 0, [event("free_spins.awarded", { count: 4 })], "retrigger")[0]?.effect).toBe("free-spin");
+    expect(buildSlotMechanicSequence("free_spin", 0, [], "active")).toEqual([]);
+  });
+
+  it("uses a generic hit only when no specific mechanic exists", () => {
+    expect(buildSlotMechanicSequence("base", 250, [], null)).toEqual([{ effect: "hit", durationMs: 820 }]);
+    expect(buildSlotMechanicSequence("base", 0, [], null)).toEqual([]);
+  });
+
+  it("scales every sequence step in turbo mode without dropping the sequence", () => {
+    const normal = buildSlotMechanicSequence("respin", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("scatter.hit", { symbol: "S", count: 2 }),
+      event("bonus.awarded", { mode: "pick" }),
+    ], null);
+    const turbo = buildSlotMechanicSequence("respin", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("scatter.hit", { symbol: "S", count: 2 }),
+      event("bonus.awarded", { mode: "pick" }),
+    ], null, true);
+
+    expect(turbo.map((step) => step.effect)).toEqual(normal.map((step) => step.effect));
+    expect(turbo.every((step, index) => step.durationMs < normal[index]!.durationMs)).toBe(true);
+    expect(turbo.every((step) => step.durationMs >= 180)).toBe(true);
+  });
+
+  it("holds a settled round until its complete mechanic sequence has finished", () => {
+    const sequence = buildSlotMechanicSequence("respin", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("bonus.awarded", { mode: "pick" }),
+    ], null);
+    expect(slotMechanicSequenceHoldMs(sequence, "respin")).toBe(
+      sequence.reduce((total, step) => total + step.durationMs, 0) + 160,
+    );
+    expect(slotMechanicSequenceHoldMs([], "base")).toBe(320);
+    expect(slotMechanicSequenceHoldMs([], "free_spin")).toBe(650);
+  });
+
+  it("uses the scaled sequence duration for turbo playback", () => {
+    const sequence = buildSlotMechanicSequence("cascade", 500, [
+      event("mystery.revealed", { target: "A" }),
+      event("wild.walked", { moves: "0:0>1:0" }),
+    ], null, true);
+    expect(slotMechanicSequenceHoldMs(sequence, "cascade", true)).toBe(
+      sequence.reduce((total, step) => total + step.durationMs, 0) + 60,
+    );
+    expect(slotMechanicSequenceHoldMs([], "base", true)).toBe(120);
+  });
+
+  it("advances once and stops after the final mechanic", () => {
+    expect(nextSlotMechanicStep(0, 3)).toBe(1);
+    expect(nextSlotMechanicStep(2, 3)).toBe(3);
+    expect(nextSlotMechanicStep(3, 3)).toBe(3);
+    expect(nextSlotMechanicStep(-4, 3)).toBe(1);
+    expect(nextSlotMechanicStep(4, 0)).toBe(0);
+  });
+
+  it("creates a stable signature independent of event data key order", () => {
+    const left = slotMechanicEventSignature("base", 0, 100, [event("mystery.revealed", { target: "A", count: 2 })]);
+    const right = slotMechanicEventSignature("base", 0, 100, [event("mystery.revealed", { count: 2, target: "A" })]);
+    expect(left).toBe(right);
+  });
+});

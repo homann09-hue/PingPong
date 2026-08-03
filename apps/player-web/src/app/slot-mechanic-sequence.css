@@ -1,0 +1,80 @@
+.slot-mechanic-sequence-layer{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  isolation:isolate;
+}
+
+.slot-mechanic-fx[data-free-spin-mode="active"][data-sequence-active="true"] .slot-fx-vignette{
+  display:block;
+}
+
+.slot-mechanic-fx[data-sequence-active="true"] .slot-fx-free-spin-active{
+  z-index:8;
+  opacity:.9;
+  transform:scale(.92);
+}
+
+.slot-mechanic-sequence-pager{
+  position:absolute;
+  left:50%;
+  bottom:calc(env(safe-area-inset-bottom,0px) + clamp(74px,10vh,118px));
+  z-index:12;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:7px 10px;
+  border:1px solid color-mix(in srgb,var(--fx-accent) 30%,transparent);
+  border-radius:999px;
+  background:rgba(3,2,10,.58);
+  box-shadow:0 5px 18px rgba(0,0,0,.38),0 0 16px color-mix(in srgb,var(--fx-accent) 18%,transparent);
+  transform:translateX(-50%);
+  backdrop-filter:blur(8px);
+}
+
+.slot-mechanic-sequence-pager i{
+  display:block;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:rgba(255,255,255,.25);
+  box-shadow:0 0 0 1px rgba(0,0,0,.52);
+  transition:width .24s ease,background .24s ease,box-shadow .24s ease,transform .24s ease;
+}
+
+.slot-mechanic-sequence-pager i[data-state="done"]{
+  background:color-mix(in srgb,var(--fx-secondary) 72%,white 28%);
+}
+
+.slot-mechanic-sequence-pager i[data-state="active"]{
+  width:22px;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--fx-secondary),var(--fx-accent),#fff);
+  box-shadow:0 0 12px var(--fx-accent);
+  animation:slot-mechanic-sequence-progress .9s ease-in-out infinite;
+}
+
+@keyframes slot-mechanic-sequence-progress{
+  0%,100%{filter:brightness(.92);transform:scaleX(.94)}
+  50%{filter:brightness(1.45);transform:scaleX(1.06)}
+}
+
+@media(max-width:700px){
+  .slot-mechanic-sequence-pager{
+    bottom:calc(env(safe-area-inset-bottom,0px) + 70px);
+    gap:5px;
+    padding:5px 8px;
+  }
+  .slot-mechanic-sequence-pager i{width:5px;height:5px}
+  .slot-mechanic-sequence-pager i[data-state="active"]{width:16px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .slot-mechanic-sequence-pager i,
+  .slot-mechanic-sequence-pager i[data-state="active"]{
+    animation:none!important;
+    transition:none!important;
+  }
+}

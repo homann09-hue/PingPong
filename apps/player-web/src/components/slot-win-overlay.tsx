@@ -1,0 +1,182 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { SlotCabinetMode } from "@/lib/catalog";
+import type { SpinWin } from "@/lib/contracts";
+import { compactNumber } from "@/lib/format";
+import { presentSlotWinOverlay, slotWinOverlayViewBox } from "@/lib/slot-win-overlay-presentation";
+import { buildSlotWinSequence, nextSlotWinStep, slotWinTraceCellKeys } from "@/lib/slot-win-sequence";
+
+export interface SlotWinOverlayProps {
+  readonly wins: readonly SpinWin[];
+  readonly grid: readonly (readonly string[])[];
+  readonly active: boolean;
+  readonly cabinet: SlotCabinetMode;
+  readonly turbo?: boolean;
+}
+
+const traceStyle = (index: number) => ({ "--win-index": index } as CSSProperties);
+const pointStyle = (index: number) => ({ "--point-index": index } as CSSProperties);
+
+export function SlotWinOverlay({ wins, grid, active, cabinet, turbo = false }: Readonly<SlotWinOverlayProps>) {
+  const overlayRef = useRef<SVGSVGElement>(null);
+  const traces = useMemo(() => presentSlotWinOverlay(wins, grid), [grid, wins]);
+  const sequence = useMemo(() => buildSlotWinSequence(traces, turbo), [traces, turbo]);
+  const signature = useMemo(
+    () => `${traces.map((trace) => `${trace.id}:${trace.amount}`).join("|")}:${turbo ? "turbo" : "normal"}`,
+    [traces, turbo],
+  );
+  const [activeStep, setActiveStep] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const normalizedStep = sequence.length > 0 ? Math.min(activeStep, sequence.length - 1) : 0;
+  const activeTraceIndex = sequence[normalizedStep]?.traceIndex ?? 0;
+  const activeTrace = active ? traces[activeTraceIndex] : undefined;
+  const activeCellKeys = useMemo(() => slotWinTraceCellKeys(activeTrace), [activeTrace]);
+  const activeCellSignature = activeCellKeys.join("|");
+
+  useEffect(() => setActiveStep(0), [signature]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!active || reducedMotion || sequence.length <= 1) return undefined;
+    const timer = window.setTimeout(
+      () => setActiveStep((current) => nextSlotWinStep(current, sequence.length)),
+      sequence[normalizedStep]?.durationMs ?? (turbo ? 380 : 1_350),
+    );
+    return () => window.clearTimeout(timer);
+  }, [active, normalizedStep, reducedMotion, sequence, turbo]);
+
+  useEffect(() => {
+    const frame = overlayRef.current?.closest(".reel-frame");
+    if (!(frame instanceof HTMLElement)) return undefined;
+
+    const clearFocus = () => {
+      frame.removeAttribute("data-win-sequence-focus");
+      frame.querySelectorAll(".symbol.is-active-win-sequence").forEach((element) => {
+        element.classList.remove("is-active-win-sequence");
+        element.removeAttribute("data-active-win-cell");
+      });
+    };
+
+    clearFocus();
+    if (!active || activeCellKeys.length === 0) return clearFocus;
+
+    const reelElements = Array.from(frame.children).filter(
+      (element): element is HTMLElement => element instanceof HTMLElement && element.classList.contains("reel"),
+    );
+
+    for (const key of activeCellKeys) {
+      const [rawReel, rawRow] = key.split(":");
+      const reel = Number(rawReel);
+      const row = Number(rawRow);
+      if (!Number.isInteger(reel) || !Number.isInteger(row) || reel < 0 || row < 0) continue;
+      const reelElement = reelElements[reel];
+      if (!reelElement) continue;
+      const symbolElements = Array.from(reelElement.children).filter(
+        (element): element is HTMLElement => element instanceof HTMLElement
+          && element.classList.contains("symbol")
+          && !element.classList.contains("strip-symbol"),
+      );
+      const symbolElement = symbolElements[row];
+      if (!symbolElement) continue;
+      symbolElement.classList.add("is-active-win-sequence");
+      symbolElement.setAttribute("data-active-win-cell", "true");
+    }
+
+    frame.setAttribute("data-win-sequence-focus", String(activeCellKeys.length));
+    return clearFocus;
+  }, [active, activeCellSignature]);
+
+  if (!active || traces.length === 0) return null;
+
+  const pagerStart = 500 - ((sequence.length - 1) * 11);
+
+  return <svg
+    ref={overlayRef}
+    className="slot-win-overlay"
+    data-cabinet={cabinet}
+    data-playback-speed={turbo ? "turbo" : "normal"}
+    data-sequence={`${normalizedStep + 1}/${sequence.length}`}
+    viewBox={slotWinOverlayViewBox}
+    preserveAspectRatio="none"
+    aria-hidden="true"
+  >
+    {traces.map((trace, index) => {
+      const polyline = trace.points.map((point) => `${point.x},${point.y}`).join(" ");
+      const selected = index === activeTraceIndex;
+      return <g
+        key={`${trace.id}-${selected ? "active" : "idle"}`}
+        className="slot-win-trace"
+        data-active={selected ? "true" : "false"}
+        data-kind={trace.kind}
+        style={traceStyle(index)}
+      >
+        <rect className="slot-win-focus-scrim" x="0" y="0" width="1000" height="600" />
+
+        {trace.points.map((point, pointIndex) => <rect
+          key={`${trace.id}-focus-${point.reel}:${point.row}`}
+          className="slot-win-cell-focus"
+          x={point.x - point.width * 0.42}
+          y={point.y - point.height * 0.39}
+          width={point.width * 0.84}
+          height={point.height * 0.78}
+          rx={Math.min(28, point.width * 0.11)}
+          style={pointStyle(pointIndex)}
+        />)}
+
+        {trace.kind === "path" && <>
+          <polyline className="slot-win-path-glow" points={polyline} />
+          <polyline className="slot-win-path-core" points={polyline} />
+        </>}
+
+        {trace.edges.map((edge, edgeIndex) => <line
+          key={`${trace.id}-edge-${edgeIndex}`}
+          className="slot-win-cluster-edge"
+          x1={edge.from.x}
+          y1={edge.from.y}
+          x2={edge.to.x}
+          y2={edge.to.y}
+        />)}
+
+        {trace.points.map((point, pointIndex) => <g
+          key={`${trace.id}-${point.reel}:${point.row}`}
+          className="slot-win-node"
+          data-point={pointIndex}
+          style={pointStyle(pointIndex)}
+          transform={`translate(${point.x} ${point.y})`}
+        >
+          <circle className="slot-win-node-halo" r={trace.kind === "cluster" ? 48 : trace.kind === "scatter" ? 44 : 38} />
+          <circle className="slot-win-node-ring" r={trace.kind === "cluster" ? 31 : 26} />
+          {trace.kind === "scatter" && <path className="slot-win-scatter-star" d="M0-26 7-8 26-8 11 4 17 23 0 12-17 23-11 4-26-8-7-8Z" />}
+        </g>)}
+
+        <g className="slot-win-label" transform="translate(500 66)">
+          <rect x="-170" y="-18" width="340" height="36" rx="18" />
+          <text x="0" y="6">{trace.label}</text>
+        </g>
+
+        <g className="slot-win-amount" transform={`translate(${trace.badge.x} ${trace.badge.y})`}>
+          <rect x="-58" y="-18" width="116" height="36" rx="18" />
+          <text x="0" y="6">+{compactNumber(trace.amount)}</text>
+        </g>
+      </g>;
+    })}
+
+    {!reducedMotion && sequence.length > 1 && <g className="slot-win-sequence-pager" transform={`translate(${pagerStart} 570)`}>
+      {sequence.map((step, index) => <circle
+        key={`win-step-${step.traceIndex}`}
+        cx={index * 22}
+        cy="0"
+        r={index === normalizedStep ? 5 : 3}
+        data-active={index === normalizedStep ? "true" : "false"}
+      />)}
+    </g>}
+  </svg>;
+}

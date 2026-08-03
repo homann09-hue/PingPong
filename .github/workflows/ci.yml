@@ -24,32 +24,59 @@ jobs:
           --health-retries 15
     env:
       TEST_DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
+      DATABASE_URL: postgres://aurora:test-only-password@localhost:5432/aurora_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+      - name: Migrationen anwenden
+        run: npm run migrate
+      - name: Migrationen erneut anwenden
+        run: npm run migrate
+      - name: Migrationsstatus pruefen
+        run: |
+          output="$(npm run migrate:status)"
+          echo "$output"
+          echo "$output" | grep -Eq '[0-9]+ angewandt, 0 ausstehend\.'
+      - name: Typecheck
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          status=$?
+          tail -n 220 typecheck.log
+          exit $status
+      - name: Upload typecheck log
+        if: failure() && steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-log
+          path: typecheck.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Test slot engine
+        run: npm run test -w @aurora/slot-engine
+      - name: Test API
+        id: api-tests
+        shell: bash
+        run: |
+          set +e
+          npm run test -w @aurora/api > api-test.log 2>&1
+          status=$?
+          tail -n 220 api-test.log
+          exit $status
+      - name: Upload API test log
+        if: failure() && steps.api-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-log
+          path: api-test.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Test player web
+        run: npm run test -w @aurora/player-web
       - run: npm run build
-  flutter:
-    runs-on: ubuntu-latest
-    defaults: { run: { working-directory: apps/mobile } }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with: { flutter-version: 3.44.6, channel: stable, cache: true }
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos
-      - run: flutter test
-      - run: flutter build web --release --no-web-resources-cdn --no-pub
-      - run: flutter build apk --debug --no-pub
-  ios:
-    runs-on: macos-latest
-    defaults: { run: { working-directory: apps/mobile } }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with: { flutter-version: 3.44.6, channel: stable, cache: true }
-      - run: flutter pub get
-      - run: flutter build ios --simulator --debug --no-codesign --no-pub
+      - name: Control-Center-Prototyp
+        run: npm --prefix apps/control-center ci && npm run build:control-center

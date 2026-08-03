@@ -1,0 +1,3 @@
+.premium-live-layer{width:100%;margin:0 0 38px}
+@media(min-width:1481px){.premium-live-layer{max-width:1480px;margin-right:auto;margin-left:auto}}
+@media(max-width:760px){.premium-live-layer{margin:0 0 22px;padding:0}.premium-season-copy h1{font-size:52px}.premium-live-strip{position:relative;z-index:2}}

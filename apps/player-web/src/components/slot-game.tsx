@@ -14,8 +14,16 @@ import { SpeakerSlash } from "@phosphor-icons/react/dist/csr/SpeakerSlash";
 import { X } from "@phosphor-icons/react/dist/csr/X";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
-import { initialGrid, type JackpotTier, type SpinResult } from "@/lib/contracts";
+import { SlotFeatureHud } from "./slot-feature-hud";
+import { SlotMechanicFx } from "./slot-mechanic-fx";
+import { SlotWinOverlay } from "./slot-win-overlay";
+import { initialGrid, type JackpotTier, type SpinEvent, type SpinResult, type SpinRound, type SpinRoundPhase, type SpinWin } from "@/lib/contracts";
 import type { Paytable } from "@/lib/paytable";
+import { resolveFreeSpinReveal } from "@/lib/slot-feature-reveal-presentation";
+import { buildSlotMechanicSequence, slotMechanicSequenceHoldMs } from "@/lib/slot-mechanic-sequence";
+import { presentSpinRound, type RoundPresentation } from "@/lib/slot-round-presentation";
+import { presentSlotCell } from "@/lib/slot-cell-presentation";
+import { buildSlotWinSequenceForRound, slotWinSequenceHoldMs } from "@/lib/slot-win-sequence";
 import { lowSymbolLabels, symbolAsset, type GameCard } from "@/lib/catalog";
 import { hasSymbolArt, SlotSymbol } from "@/lib/slot-symbols";
 import { coinNumber } from "@/lib/format";
@@ -25,9 +33,20 @@ import { WinCelebration, winTierFor } from "./win-celebration";
 const jackpotOrder = ["MINI", "MINOR", "MAJOR", "GRAND"] as const;
 const jackpotLabels: Readonly<Record<string, string>> = { MINI: "Mini", MINOR: "Minor", MAJOR: "Major", GRAND: "Grand" };
 const fallbackBets = [100, 200, 500, 1_000, 2_000, 5_000];
+const autoSpinOptions = [10, 25, 50, 100] as const;
+const noSpinEvents: readonly SpinEvent[] = [];
+
+type ActiveRoundBanner = RoundPresentation & { readonly key: string };
+interface PlayableSpinRound {
+  readonly phase: SpinRoundPhase;
+  readonly index: number;
+  readonly grid: readonly (readonly string[])[];
+  readonly wins: readonly SpinWin[];
+  readonly totalWin: number;
+  readonly events: readonly SpinEvent[];
+}
 
 let audioContext: AudioContext | null = null;
-/** Kleine synthetische Spielgeraeusche; laeuft nur nach einer Nutzer-Geste. */
 function playTones(frequencies: readonly number[], step = 0.09, type: OscillatorType = "triangle", volume = 0.05) {
   try {
     audioContext ??= new AudioContext();
@@ -44,28 +63,101 @@ function playTones(frequencies: readonly number[], step = 0.09, type: Oscillator
       oscillator.start(now + index * step);
       oscillator.stop(now + (index + 1) * step + 0.02);
     });
-  } catch { /* Sound ist optional */ }
+  } catch { /* Sound ist optional. */ }
 }
 
-/** Server-authoritative Slot-Oberflaeche fuer jedes konfigurierte Theme. */
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function winCellSet(wins: readonly SpinWin[], includeScatter = true): Set<string> {
+  return new Set(wins
+    .filter((win) => includeScatter || win.kind !== "scatter")
+    .flatMap((win) => win.cells.map(([reel, row]) => `${reel}:${row}`)));
+}
+
+function normalizeSpinRounds(body: SpinResult): readonly PlayableSpinRound[] {
+  const source: readonly SpinRound[] = body.spin.rounds.length > 0 ? body.spin.rounds : [{
+    phase: "base",
+    index: 0,
+    grid: body.spin.grid,
+    wins: body.spin.wins,
+    totalWin: body.spin.totalWin,
+    events: [],
+  }];
+
+  return source.map((round, roundIndex) => ({
+    phase: round.phase,
+    index: round.index ?? roundIndex,
+    grid: round.grid?.length ? round.grid : body.spin.grid,
+    wins: round.wins ?? (roundIndex === 0 ? body.spin.wins : []),
+    totalWin: round.totalWin,
+    events: round.events ?? [],
+  }));
+}
+
+function useAnimatedNumber(target: number, duration = 650) {
+  const [display, setDisplay] = useState(target);
+  const previous = useRef(target);
+
+  useEffect(() => {
+    const start = previous.current;
+    previous.current = target;
+    if (target === start || typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDisplay(target);
+      return undefined;
+    }
+    const startedAt = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(start + (target - start) * eased));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [duration, target]);
+
+  return display;
+}
+
 export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
   const { profile, setProfile, error, refresh } = usePlayer();
   const [paytable, setPaytable] = useState<Paytable | null>(null);
   const [betIndex, setBetIndex] = useState(0);
   const [grid, setGrid] = useState(initialGrid);
   const [winCells, setWinCells] = useState<Set<string>>(new Set());
+  const [displayWins, setDisplayWins] = useState<readonly SpinWin[]>([]);
+  const [winPresentationActive, setWinPresentationActive] = useState(false);
+  const [clearingCells, setClearingCells] = useState<Set<string>>(new Set());
+  const [cascadeRefilling, setCascadeRefilling] = useState(false);
   const [win, setWin] = useState(0);
   const [message, setMessage] = useState("Setz deinen Einsatz und dreh los");
   const [spinning, setSpinning] = useState(false);
+  const [stoppedReels, setStoppedReels] = useState(5);
   const [turbo, setTurbo] = useState(false);
   const [sound, setSound] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [autoMenuOpen, setAutoMenuOpen] = useState(false);
   const [jackpots, setJackpots] = useState<readonly JackpotTier[]>([]);
   const [celebration, setCelebration] = useState<{ tier: ReturnType<typeof winTierFor>; amount: number } | null>(null);
+  const [autoRemaining, setAutoRemaining] = useState(0);
+  const [roundBanner, setRoundBanner] = useState<ActiveRoundBanner | null>(null);
+  const [activeRound, setActiveRound] = useState<PlayableSpinRound | null>(null);
+  const [cellRound, setCellRound] = useState<PlayableSpinRound | null>(null);
+  const animatedWin = useAnimatedNumber(win, turbo ? 240 : 780);
   const bets = paytable?.betSteps?.length ? paytable.betSteps : fallbackBets;
   const bet = bets[Math.min(betIndex, bets.length - 1)] ?? bets[0]!;
   const reels = useMemo(() => grid.map((column, reel) => ({ column, reel })), [grid]);
   const grand = jackpots.find((entry) => entry.tier === "GRAND");
+  const activeEvents = activeRound?.events ?? noSpinEvents;
+  const cellEvents = cellRound?.events ?? noSpinEvents;
+  const winOverlayActive = winPresentationActive
+    && displayWins.length > 0
+    && stoppedReels >= reels.length
+    && clearingCells.size === 0
+    && !cascadeRefilling;
 
   useEffect(() => {
     let cancelled = false;
@@ -80,25 +172,131 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
     return () => { cancelled = true; };
   }, [game.id]);
 
-  // Autoplay: dreht bis zu N Runden automatisch. Der "latest ref"-Zeiger haelt
-  // stets die aktuelle spin-Funktion, damit kein veralteter Closure-Stand
-  // (Einsatz, Kontostand) verwendet wird. Der Effekt startet die naechste Runde
-  // erst, wenn die vorige fertig ist â keine Timer-Kollision, terminiert nach N.
-  const [autoRemaining, setAutoRemaining] = useState(0);
   const spinRef = useRef(spin);
   useEffect(() => { spinRef.current = spin; });
   useEffect(() => {
     if (autoRemaining <= 0 || spinning) return undefined;
     const timer = setTimeout(() => {
       void spinRef.current();
-      setAutoRemaining((remaining) => remaining - 1);
+      setAutoRemaining((remaining) => Math.max(0, remaining - 1));
     }, turbo ? 320 : 780);
     return () => clearTimeout(timer);
   }, [autoRemaining, spinning, turbo]);
 
+  async function revealRoundGrid(round: PlayableSpinRound, animateReels: boolean, previousRound?: PlayableSpinRound) {
+    const reelCount = round.grid.length;
+
+    if (round.phase === "cascade" && previousRound) {
+      const removalCells = winCellSet(previousRound.wins, false);
+      if (removalCells.size > 0) {
+        setClearingCells(removalCells);
+        setWinCells(removalCells);
+        if (sound && !turbo) playTones([210, 165, 118], 0.05, "sawtooth", 0.024);
+        await wait(turbo ? 55 : 310);
+      }
+
+      setClearingCells(new Set());
+      setCellRound(null);
+      setGrid(round.grid);
+      setWinCells(new Set());
+      setStoppedReels(reelCount);
+      setCascadeRefilling(true);
+      await wait(turbo ? 55 : 260);
+      setCascadeRefilling(false);
+      setCellRound(round);
+      setDisplayWins(round.wins);
+      return;
+    }
+
+    setClearingCells(new Set());
+    setCascadeRefilling(false);
+    setCellRound(null);
+    setGrid(round.grid);
+    setWinCells(new Set());
+    setDisplayWins(round.wins);
+    setStoppedReels(0);
+
+    if (!animateReels) {
+      await wait(turbo ? 45 : 110);
+      setStoppedReels(reelCount);
+      setCellRound(round);
+      return;
+    }
+
+    const step = turbo ? 45 : 125;
+    for (let reel = 1; reel <= reelCount; reel += 1) {
+      await wait(step);
+      setStoppedReels(reel);
+      if (sound && !turbo) playTones([210 + reel * 35], 0.04, "triangle", 0.025);
+    }
+    setCellRound(round);
+  }
+
+  async function revealResult(body: SpinResult) {
+    const rounds = normalizeSpinRounds(body);
+    let cumulativeWin = 0;
+    let previousRound: PlayableSpinRound | undefined;
+
+    for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+      const round = rounds[roundIndex]!;
+      const presentation = presentSpinRound(round, game.mechanicLabel);
+      const freeSpins = resolveFreeSpinReveal(round.phase, round.index, round.events);
+      const mechanicSequence = buildSlotMechanicSequence(round.phase, round.totalWin, round.events, freeSpins.mode, turbo);
+      const winSequence = buildSlotWinSequenceForRound(round.wins, round.grid, turbo);
+      setWinPresentationActive(false);
+      setWinCells(new Set());
+      setActiveRound(null);
+      setRoundBanner({ ...presentation, key: `${round.phase}-${round.index}-${roundIndex}` });
+      setMessage(presentation.detail);
+      await revealRoundGrid(round, roundIndex === 0, previousRound);
+      setActiveRound(round);
+      cumulativeWin += round.totalWin;
+      setWin(cumulativeWin);
+
+      if (sound && round.phase !== "base") {
+        playTones(round.totalWin > 0 ? [392, 523, 659] : [294, 392], 0.08, "triangle", 0.035);
+      }
+
+      await wait(slotMechanicSequenceHoldMs(mechanicSequence, round.phase, turbo));
+      setActiveRound(null);
+
+      const winHold = slotWinSequenceHoldMs(winSequence, turbo);
+      if (winHold > 0) {
+        setWinCells(winCellSet(round.wins));
+        setWinPresentationActive(true);
+        await wait(winHold);
+        setWinPresentationActive(false);
+        setWinCells(new Set());
+      }
+      previousRound = round;
+    }
+
+    setWin(body.spin.totalWin);
+    setWinPresentationActive(false);
+    setWinCells(new Set());
+    setClearingCells(new Set());
+    setCascadeRefilling(false);
+    setActiveRound(null);
+    setCellRound(null);
+    setRoundBanner(null);
+  }
+
   async function spin() {
     if (spinning) return;
-    setSpinning(true); setWinCells(new Set()); setWin(0); setCelebration(null); setMessage("Walzen drehen â¦");
+    setAutoMenuOpen(false);
+    setSpinning(true);
+    setStoppedReels(0);
+    setWinCells(new Set());
+    setDisplayWins([]);
+    setWinPresentationActive(false);
+    setClearingCells(new Set());
+    setCascadeRefilling(false);
+    setWin(0);
+    setCelebration(null);
+    setActiveRound(null);
+    setCellRound(null);
+    setRoundBanner(null);
+    setMessage(turbo ? "Turbo-Spin läuft …" : "Walzen drehen …");
     if (sound) playTones([196, 175, 165], 0.08, "sawtooth", 0.03);
     try {
       const response = await fetch(`/api/player/slots/${game.id}/spins`, {
@@ -108,127 +306,124 @@ export function SlotGame({ game }: Readonly<{ game: GameCard }>) {
       });
       const body = await response.json() as SpinResult & { code?: string };
       if (!response.ok) throw new Error(body.code ?? "SPIN_FAILED");
-      await new Promise((resolve) => window.setTimeout(resolve, turbo ? 160 : 720));
-      setGrid(body.spin.grid);
+      await wait(turbo ? 80 : 260);
+      await revealResult(body);
       setWin(body.spin.totalWin);
-      setWinCells(new Set(body.spin.wins.flatMap((entry) => entry.cells.map(([reel, row]) => `${reel}:${row}`))));
       if (body.jackpots) setJackpots(body.jackpots);
       if (body.spin.totalWin > 0) {
-        setMessage(`${body.spin.winClass ?? "GEWINN"} Â· ${coinNumber(body.spin.totalWin)} Coins`);
+        setMessage(`${body.spin.winClass ?? "GEWINN"} · ${coinNumber(body.spin.totalWin)} Coins`);
         if (sound) playTones([523, 659, 784, 1047], 0.1, "triangle", 0.05);
         const tier = winTierFor(body.spin.winClass, body.spin.totalWin / bet);
         if (tier) setCelebration({ tier, amount: body.spin.totalWin });
       } else {
-        setMessage("Versuch den naechsten Spin");
+        setMessage("Versuch den nächsten Spin");
       }
       if (profile) setProfile({ ...profile, coinBalance: body.coinBalance });
     } catch (cause) {
+      setStoppedReels(5);
+      setAutoRemaining(0);
+      setDisplayWins([]);
+      setWinPresentationActive(false);
+      setWinCells(new Set());
+      setClearingCells(new Set());
+      setCascadeRefilling(false);
+      setActiveRound(null);
+      setCellRound(null);
+      setRoundBanner(null);
       const code = cause instanceof Error ? cause.message : "SPIN_FAILED";
-      if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins fuer diesen Einsatz â hol dir Gratis-Boni im Shop.");
+      if (code === "INSUFFICIENT_FUNDS") setMessage("Nicht genug Coins für diesen Einsatz – hol dir Gratis-Boni im Shop.");
       else if (code === "HIGH_ROLLER_MEMBERSHIP_REQUIRED") setMessage("Dieser Slot ist dem High Roller Club vorbehalten.");
       else if (code === "RATE_LIMITED") setMessage("Zu viele Spins in kurzer Zeit. Kurz durchatmen und weiter geht es.");
       else setMessage("Der Spin konnte nicht abgeschlossen werden. Dein Guthaben ist sicher.");
-    } finally { setSpinning(false); }
+    } finally {
+      setSpinning(false);
+    }
   }
 
-  const themeStyle = { "--slot-primary": game.primary, "--slot-secondary": game.secondary,
-    // Die Cover-Kunst des Slots dient als Blickfang am Bildrand â eigene
-    // Grafik, kein zusaetzliches Asset noetig.
-    "--slot-cover": `url("${game.cover}")` } as React.CSSProperties;
+  function startAutoSpins(rounds: number) {
+    if (!profile || spinning) return;
+    setAutoMenuOpen(false);
+    setAutoRemaining(rounds);
+    setMessage(`Auto-Spin gestartet · ${rounds} Runden`);
+  }
+
+  function stopAutoSpins() {
+    setAutoRemaining(0);
+    setAutoMenuOpen(false);
+    setMessage("Auto-Spin gestoppt");
+  }
+
+  const themeStyle = {
+    "--slot-primary": game.primary,
+    "--slot-secondary": game.secondary,
+    "--slot-cover": `url("${game.cover}")`,
+    "--world-marquee": `"${game.marquee}"`,
+    "--world-mechanic": `"${game.mechanicLabel}"`,
+  } as React.CSSProperties;
+
+  const presentationState = winPresentationActive ? "wins" : activeRound ? "mechanics" : spinning ? "transition" : "idle";
+
   return <AppShell profile={profile}>
-    <section className="slot-stage" aria-labelledby="slot-title" style={themeStyle}>
+    <section
+      className={`slot-stage slot-world-${game.cabinet}`}
+      data-cabinet={game.cabinet}
+      data-spin-phase={activeRound?.phase ?? cellRound?.phase ?? (spinning ? "base" : "idle")}
+      data-presentation-state={presentationState}
+      aria-labelledby="slot-title"
+      aria-describedby="slot-atmosphere"
+      style={themeStyle}
+    >
       <Image className="slot-backdrop" src={game.cover} alt="" fill priority sizes="100vw" quality={55} />
       <div className="slot-overlay" />
-      {!paytable && (
-        <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}>
-          <span className="slot-intro-emblem" aria-hidden="true" />
-          <p className="slot-intro-name">{game.name}</p>
-          <span className="slot-intro-bar" aria-hidden="true"><i /></span>
-        </div>
-      )}
+      <p id="slot-atmosphere" className="slot-atmosphere">{game.atmosphere}</p>
+      {activeRound && <SlotMechanicFx phase={activeRound.phase} index={activeRound.index} totalWin={activeRound.totalWin} events={activeEvents} cabinet={game.cabinet} turbo={turbo} />}
+      {roundBanner && <div key={roundBanner.key} className="slot-round-banner" data-tone={roundBanner.tone} role="status" aria-live="polite"><strong>{roundBanner.label}</strong><span>{roundBanner.detail}</span></div>}
+      {!paytable && <div className="slot-intro" role="status" aria-label={`${game.name} wird geladen`}><span className="slot-intro-emblem" aria-hidden="true" /><p className="slot-intro-name">{game.name}</p><span className="slot-intro-bar" aria-hidden="true"><i /></span></div>}
       <header className="slot-header">
-        <Link href="/" className="back-link" aria-label="Zurueck zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
-        <div><span>{game.name}</span><h1 id="slot-title">Grand {grand ? coinNumber(grand.amount) : "â"}</h1></div>
+        <Link href="/" className="back-link" aria-label="Zurück zur Lobby"><ArrowLeft weight="bold" /> Lobby</Link>
+        <div><span>{game.name}</span><h1 id="slot-title">Grand {grand ? coinNumber(grand.amount) : "—"}</h1></div>
         <div className="slot-actions">
           <button className="icon-button" onClick={() => setInfoOpen(true)} aria-label="Gewinntabelle und Regeln"><Info weight="fill" /></button>
           <button className="icon-button" onClick={() => setSound((value) => !value)} aria-pressed={sound} aria-label={sound ? "Ton aus" : "Ton an"}>{sound ? <SpeakerHigh weight="fill" /> : <SpeakerSlash weight="fill" />}</button>
         </div>
       </header>
       {error && <div className="service-alert" role="status">{error} <button className="alert-retry" onClick={() => void refresh()}>Erneut versuchen</button></div>}
-      <div className="jackpot-strip" aria-label="Progressive Jackpots">
-        {jackpotOrder.map((tier) => {
-          const entry = jackpots.find((jackpot) => jackpot.tier === tier);
-          return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "â"}</strong></span>;
-        })}
-      </div>
-      <div className={`reel-frame ${spinning ? "is-spinning" : ""}`} aria-label="Slot-Raster" aria-busy={spinning}>
-        {reels.map(({ column, reel }) => <div className="reel" key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
-          {/* Laufende Walze: rein dekorativ. Das Ergebnis steht serverseitig
-              fest, bevor sich hier etwas bewegt â die Drehung erzaehlt es nur nach. */}
-          <div className="reel-strip" aria-hidden="true">
-            {[...column, ...column, ...column].map((symbol, index) => {
-              const stripAsset = symbolAsset(game.symbolSet, symbol);
-              return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>
-                {stripAsset
-                  ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} />
-                  : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}
-              </div>;
-            })}
-          </div>
+      <div className="jackpot-strip" aria-label="Progressive Jackpots">{jackpotOrder.map((tier) => { const entry = jackpots.find((jackpot) => jackpot.tier === tier); return <span key={tier}><small>{jackpotLabels[tier]}</small><strong>{entry ? coinNumber(entry.amount) : "—"}</strong></span>; })}</div>
+      <SlotFeatureHud active={Boolean(activeRound)} phase={activeRound?.phase} index={activeRound?.index} totalWin={activeRound?.totalWin} events={activeEvents} mechanicLabel={game.mechanicLabel} cabinet={game.cabinet} />
+      <div className={`reel-frame ${spinning ? "is-spinning" : ""} ${cascadeRefilling ? "is-cascade-refill" : ""}`} aria-label="Slot-Raster" aria-busy={spinning} data-cascade-refill={cascadeRefilling ? "true" : undefined} data-presentation-state={presentationState}>
+        <div className="spin-status" aria-hidden="true"><span>{turbo ? "TURBO" : "SPIN"}</span><i style={{ width: `${Math.max(0, Math.min(100, (stoppedReels / Math.max(1, reels.length)) * 100))}%` }} /></div>
+        <SlotWinOverlay wins={displayWins} grid={grid} active={winOverlayActive} cabinet={game.cabinet} turbo={turbo} />
+        {reels.map(({ column, reel }) => <div className={`reel ${reel < stoppedReels ? "is-stopped" : "is-running"}`} key={reel} style={{ "--reel-delay": `${reel * 140}ms` } as React.CSSProperties}>
+          <div className="reel-strip" aria-hidden="true">{[...column, ...column, ...column].map((symbol, index) => { const stripAsset = symbolAsset(game.symbolSet, symbol); return <div className="symbol strip-symbol" key={`strip-${reel}-${index}`}>{stripAsset ? <Image src={stripAsset} alt="" fill sizes="(max-width: 600px) 18vw, 120px" quality={55} /> : <span className="low-symbol">{lowSymbolLabels[symbol] ?? symbol}</span>}</div>; })}</div>
           {column.map((symbol, row) => {
-          const asset = symbolAsset(game.symbolSet, symbol);
-          return <div className={`symbol ${winCells.has(`${reel}:${row}`) ? "winning" : ""}`} key={`${reel}-${row}`}>{hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winCells.has(`${reel}:${row}`)} /> : asset
-              ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} />
-              : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}</div>;
-        })}</div>)}
+            const asset = symbolAsset(game.symbolSet, symbol);
+            const key = `${reel}:${row}`;
+            const clearing = clearingCells.has(key);
+            const winning = (winPresentationActive || clearing) && winCells.has(key);
+            const cell = presentSlotCell(cellEvents, reel, row, symbol);
+            const title = [cell.description, clearing ? "Gewinnsymbol löst sich für die nächste Kaskade auf" : undefined].filter(Boolean).join(", ") || undefined;
+            return <div className={`symbol ${winning ? "winning" : ""} ${clearing ? "is-cascade-clearing" : ""} ${cell.className}`} key={key} title={title} data-feature-cell={cell.description ? "true" : undefined} data-cascade-clearing={clearing ? "true" : undefined}>
+              {hasSymbolArt(game.symbolSet, symbol) ? <SlotSymbol set={game.symbolSet} code={symbol} winning={winning} /> : asset ? <Image src={asset} alt={`Symbol ${symbol}`} fill sizes="(max-width: 600px) 18vw, 120px" quality={72} /> : <span className="low-symbol" aria-label={`Symbol ${lowSymbolLabels[symbol] ?? symbol}`}>{lowSymbolLabels[symbol] ?? symbol}</span>}
+              {cell.badge && <span className="slot-cell-badge" aria-hidden="true">{cell.badge}</span>}
+              {cell.className && <span className="slot-cell-frame" aria-hidden="true" />}
+              {clearing && <span className="slot-cascade-shatter" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>}
+            </div>;
+          })}
+        </div>)}
       </div>
-      <div className="win-panel" aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(win)}</strong>}</div>
+      <div className={`win-panel ${win > 0 ? "has-win" : ""}`} aria-live="polite"><span>{message}</span>{win > 0 && <strong>GEWINN {coinNumber(animatedWin)}</strong>}</div>
       <div className="slot-controls">
-        <div className="bet-control"><button disabled={spinning || betIndex === 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhoehen"><Plus weight="bold" /></button></div>
+        <div className="bet-control"><button disabled={spinning || betIndex === 0 || autoRemaining > 0} onClick={() => setBetIndex((value) => Math.max(0, value - 1))} aria-label="Einsatz verringern"><Minus weight="bold" /></button><span><small>Einsatz</small><strong>{coinNumber(bet)}</strong></span><button disabled={spinning || betIndex >= bets.length - 1 || autoRemaining > 0} onClick={() => setBetIndex((value) => Math.min(bets.length - 1, value + 1))} aria-label="Einsatz erhöhen"><Plus weight="bold" /></button></div>
         <button className={`turbo-button ${turbo ? "selected" : ""}`} onClick={() => setTurbo((value) => !value)} aria-pressed={turbo}><Lightning weight="fill" /><span>Turbo</span></button>
-        <button className="spin-button" onClick={spin} disabled={spinning || !profile} aria-label={spinning ? "Walzen drehen" : `Fuer ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? "Dreht" : "Spin"}</span></button>
-        <button
-            className={autoRemaining > 0 ? "auto-button running" : "auto-button"}
-            onClick={() => (autoRemaining > 0 ? setAutoRemaining(0) : setAutoRemaining(10))}
-            disabled={!profile}
-            aria-label={autoRemaining > 0 ? "Autoplay stoppen" : "10 Runden automatisch drehen"}
-          ><ArrowsClockwise weight="bold" /><span>Auto<em>{autoRemaining > 0 ? autoRemaining : "10x"}</em></span></button>
-      </div>
-      {celebration?.tier && <WinCelebration
-        tier={celebration.tier}
-        amount={celebration.amount}
-        primary={game.primary}
-        secondary={game.secondary}
-        onDone={() => setCelebration(null)}
-      />}
-      <p className="play-money-notice">Nur zur Unterhaltung Â· Virtuelle Coins haben keinen Geldwert Â· Ergebnisse kommen vom Server</p>
-
-      {infoOpen && <div className="paytable-overlay" role="dialog" aria-modal="true" aria-label="Gewinntabelle" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}>
-        <div className="paytable-panel">
-          <header><h2>{game.name}</h2><button onClick={() => setInfoOpen(false)} aria-label="Schliessen"><X weight="bold" /></button></header>
-          {paytable ? <>
-            <dl className="paytable-facts">
-              <div><dt>RTP (Ziel)</dt><dd>{(paytable.targetRtp * 100).toFixed(2)} %</dd></div>
-              <div><dt>Volatilitaet</dt><dd>{paytable.volatility ?? "â"}</dd></div>
-              <div><dt>Gewinnlinien</dt><dd>{paytable.paylines ?? "â"}</dd></div>
-              <div><dt>Max. Gewinn</dt><dd>{paytable.maxWinMultiplier ? `${coinNumber(paytable.maxWinMultiplier)}Ã` : "â"}</dd></div>
-            </dl>
-            <table className="paytable-table">
-              <thead><tr><th scope="col">Symbol</th><th scope="col">Auszahlung (Ã Einsatz)</th></tr></thead>
-              <tbody>{Object.entries(paytable.symbols ?? {}).map(([symbol, definition]) => {
-                const asset = symbolAsset(game.symbolSet, symbol);
-                const payouts = Object.entries(definition.payouts ?? {}).filter(([, value]) => value > 0);
-                if (payouts.length === 0) return null;
-                return <tr key={symbol}>
-                  <th scope="row">{asset ? <Image src={asset} alt="" width={34} height={34} quality={72} /> : <span>{lowSymbolLabels[symbol] ?? symbol}</span>}<em>{definition.kind === "scatter" ? "Scatter" : definition.kind === "wild" ? "Wild" : symbol}</em></th>
-                  <td>{payouts.map(([count, value]) => `${count}Ã = ${value}`).join(" Â· ")}</td>
-                </tr>;
-              })}</tbody>
-            </table>
-          </> : <p className="section-empty">Gewinntabelle wird geladen â¦</p>}
-          <p className="paytable-note">Alle Ergebnisse werden serverseitig ermittelt. Die veroeffentlichten RTP-Werte werden regelmaessig durch deterministische Simulationen geprueft.</p>
+        <button className="spin-button" onClick={spin} disabled={spinning || !profile || autoRemaining > 0} aria-label={spinning ? "Walzen drehen" : `Für ${coinNumber(bet)} Coins drehen`}>{spinning ? <ArrowsClockwise className="spin-icon" weight="bold" /> : <Play weight="fill" />}<span>{spinning ? `${stoppedReels}/${reels.length}` : "Spin"}</span></button>
+        <div className={`auto-spin-control ${autoMenuOpen ? "is-open" : ""}`}>
+          {autoMenuOpen && autoRemaining === 0 && <div className="auto-spin-menu" role="menu" aria-label="Auto-Spin Runden wählen"><strong>Auto-Spin</strong><small>Anzahl der Runden</small><div>{autoSpinOptions.map((rounds) => <button key={rounds} type="button" role="menuitem" onClick={() => startAutoSpins(rounds)}>{rounds}</button>)}</div></div>}
+          <button className={autoRemaining > 0 ? "auto-button running" : "auto-button"} onClick={() => autoRemaining > 0 ? stopAutoSpins() : setAutoMenuOpen((value) => !value)} disabled={!profile || spinning} aria-expanded={autoMenuOpen} aria-label={autoRemaining > 0 ? `Autoplay stoppen, ${autoRemaining} Runden verbleiben` : "Auto-Spin Auswahl öffnen"}><ArrowsClockwise weight="bold" /><span>{autoRemaining > 0 ? "Stop" : "Auto"}<em>{autoRemaining > 0 ? autoRemaining : "Auswahl"}</em></span></button>
         </div>
-      </div>}
+      </div>
+      {celebration?.tier && <WinCelebration tier={celebration.tier} amount={celebration.amount} primary={game.primary} secondary={game.secondary} onDone={() => setCelebration(null)} />}
+      <p className="play-money-notice">Nur zur Unterhaltung · Virtuelle Coins haben keinen Geldwert · Ergebnisse kommen vom Server</p>
+      {infoOpen && <div className="paytable-overlay" role="dialog" aria-modal="true" aria-label="Gewinntabelle" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}><div className="paytable-panel"><header><h2>{game.name}</h2><button onClick={() => setInfoOpen(false)} aria-label="Schließen"><X weight="bold" /></button></header>{paytable ? <><dl className="paytable-facts"><div><dt>RTP (Ziel)</dt><dd>{(paytable.targetRtp * 100).toFixed(2)} %</dd></div><div><dt>Volatilität</dt><dd>{paytable.volatility ?? "—"}</dd></div><div><dt>Gewinnlinien</dt><dd>{paytable.paylines ?? "—"}</dd></div><div><dt>Max. Gewinn</dt><dd>{paytable.maxWinMultiplier ? `${coinNumber(paytable.maxWinMultiplier)}×` : "—"}</dd></div></dl><table className="paytable-table"><thead><tr><th scope="col">Symbol</th><th scope="col">Auszahlung (× Einsatz)</th></tr></thead><tbody>{Object.entries(paytable.symbols ?? {}).map(([symbol, definition]) => { const asset = symbolAsset(game.symbolSet, symbol); const payouts = Object.entries(definition.payouts ?? {}).filter(([, value]) => value > 0); if (payouts.length === 0) return null; return <tr key={symbol}><th scope="row">{asset ? <Image src={asset} alt="" width={34} height={34} quality={72} /> : <span>{lowSymbolLabels[symbol] ?? symbol}</span>}<em>{definition.kind === "scatter" ? "Scatter" : definition.kind === "wild" ? "Wild" : symbol}</em></th><td>{payouts.map(([count, value]) => `${count}× = ${value}`).join(" · ")}</td></tr>; })}</tbody></table></> : <p className="section-empty">Gewinntabelle wird geladen …</p>}<p className="paytable-note">Alle Ergebnisse werden serverseitig ermittelt. Die veröffentlichten RTP-Werte werden regelmäßig durch deterministische Simulationen geprüft.</p></div></div>}
     </section>
   </AppShell>;
 }

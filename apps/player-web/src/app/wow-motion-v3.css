@@ -1,0 +1,235 @@
+/* Aurora WOW Motion V3 — coherent motion language for lobby, liveops and controls. */
+:root {
+  --wow-ease: cubic-bezier(.2,.8,.2,1);
+  --wow-spring: cubic-bezier(.16,1,.3,1);
+}
+
+.premium-shell:not(.is-slot-route) .page-content > * {
+  animation: wow-section-enter .7s var(--wow-spring) both;
+}
+.premium-shell:not(.is-slot-route) .page-content > *:nth-child(2) { animation-delay: .05s; }
+.premium-shell:not(.is-slot-route) .page-content > *:nth-child(3) { animation-delay: .1s; }
+.premium-shell:not(.is-slot-route) .page-content > *:nth-child(4) { animation-delay: .15s; }
+
+.premium-topbar,
+.premium-side-nav,
+.bottom-nav {
+  animation: wow-shell-enter .55s var(--wow-spring) both;
+}
+
+.wallet-pill,
+.notify-action,
+.settings-action,
+.search-trigger,
+.top-player-card,
+.premium-category-nav a,
+.premium-actions a,
+.premium-actions button,
+.premium-reward-card,
+.premium-jackpot-pool,
+.premium-game-tile,
+.premium-world-card,
+.premium-tournament-card,
+.premium-quest-card,
+.premium-vip-card,
+.premium-season-pass,
+.premium-reward-inbox,
+.premium-achievement-list article,
+.premium-recent-grid article {
+  will-change: transform, filter, box-shadow;
+  transition: transform .28s var(--wow-ease), filter .28s ease, box-shadow .28s ease, border-color .28s ease;
+}
+
+.wallet-pill:hover,
+.notify-action:hover,
+.settings-action:hover,
+.search-trigger:hover,
+.top-player-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.premium-actions a:hover,
+.premium-actions button:hover,
+.premium-reward-card:hover,
+.premium-jackpot-pool:hover,
+.premium-game-tile:hover,
+.premium-world-card:hover,
+.premium-tournament-card:hover,
+.premium-quest-card:hover,
+.premium-vip-card:hover,
+.premium-season-pass:hover,
+.premium-reward-inbox:hover,
+.premium-achievement-list article:hover,
+.premium-recent-grid article:hover {
+  transform: translateY(-6px) scale(1.012);
+  filter: brightness(1.06) saturate(1.06);
+}
+
+.premium-live-layer::after {
+  content: "";
+  position: absolute;
+  inset: -12% -8%;
+  z-index: -1;
+  pointer-events: none;
+  background: conic-gradient(from 180deg at 50% 50%, transparent, rgba(255,73,215,.05), transparent 32%, rgba(66,232,255,.05), transparent 64%, rgba(255,211,91,.04), transparent);
+  animation: wow-ambient-rotate 28s linear infinite;
+}
+
+.premium-season-hero,
+.premium-welcome-card,
+.premium-daily-chest,
+.premium-promo-rotator {
+  transform: translateZ(0);
+}
+.premium-season-hero::before,
+.premium-welcome-card::before,
+.premium-daily-chest::before,
+.premium-promo-rotator::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(112deg, transparent 18%, rgba(255,255,255,.055) 38%, transparent 55%);
+  transform: translateX(-130%);
+  animation: wow-hero-sheen 7s ease-in-out infinite;
+}
+
+.premium-jackpot-core,
+.premium-chest,
+.premium-reward-inbox header>b,
+.notify-action>i {
+  animation: wow-focus-pulse 2.4s ease-in-out infinite;
+}
+
+.premium-progress i,
+.premium-pass-progress i,
+.premium-achievement-progress i,
+.premium-weekly-meter i,
+.vip-rank-card b,
+.top-player-card>i::after {
+  position: relative;
+  overflow: hidden;
+}
+.premium-progress i::after,
+.premium-pass-progress i::after,
+.premium-achievement-progress i::after,
+.premium-weekly-meter i::after,
+.vip-rank-card b::after,
+.top-player-card>i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.48), transparent);
+  transform: translateX(-120%);
+  animation: wow-progress-shine 2.8s ease-in-out infinite;
+}
+
+.premium-category-nav a.active,
+.bottom-nav .active,
+.premium-side-nav nav a.active {
+  animation: wow-active-breathe 2.2s ease-in-out infinite;
+}
+
+button:active,
+a:active {
+  transition-duration: .08s !important;
+}
+.premium-actions a:active,
+.premium-actions button:active,
+.premium-reward-card:active,
+.premium-jackpot-pool:active,
+.premium-game-tile:active,
+.premium-world-card:active,
+.wallet-pill:active,
+.notify-action:active,
+.settings-action:active {
+  transform: translateY(1px) scale(.975) !important;
+}
+
+@keyframes wow-section-enter {
+  from { opacity: 0; transform: translateY(24px) scale(.985); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes wow-shell-enter {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wow-ambient-rotate { to { transform: rotate(360deg) scale(1.04); } }
+@keyframes wow-hero-sheen {
+  0%, 62% { transform: translateX(-130%); }
+  88%, 100% { transform: translateX(130%); }
+}
+@keyframes wow-focus-pulse {
+  50% { filter: brightness(1.15); transform: scale(1.025); }
+}
+@keyframes wow-progress-shine {
+  0%, 58% { transform: translateX(-120%); }
+  86%, 100% { transform: translateX(120%); }
+}
+@keyframes wow-active-breathe {
+  50% { filter: brightness(1.16); box-shadow: 0 0 24px rgba(255,211,91,.18); }
+}
+
+@media (max-width: 760px) {
+  .premium-shell:not(.is-slot-route) .page-content > * {
+    animation-duration: .46s;
+  }
+  .premium-actions a:hover,
+  .premium-actions button:hover,
+  .premium-reward-card:hover,
+  .premium-jackpot-pool:hover,
+  .premium-game-tile:hover,
+  .premium-world-card:hover {
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-shell:not(.is-slot-route) .page-content > *,
+  .premium-topbar,
+  .premium-side-nav,
+  .bottom-nav,
+  .premium-live-layer::after,
+  .premium-season-hero::before,
+  .premium-welcome-card::before,
+  .premium-daily-chest::before,
+  .premium-promo-rotator::after,
+  .premium-jackpot-core,
+  .premium-chest,
+  .premium-reward-inbox header>b,
+  .notify-action>i,
+  .premium-progress i::after,
+  .premium-pass-progress i::after,
+  .premium-achievement-progress i::after,
+  .premium-weekly-meter i::after,
+  .vip-rank-card b::after,
+  .premium-category-nav a.active,
+  .bottom-nav .active,
+  .premium-side-nav nav a.active {
+    animation: none !important;
+  }
+  .wallet-pill,
+  .notify-action,
+  .settings-action,
+  .search-trigger,
+  .top-player-card,
+  .premium-category-nav a,
+  .premium-actions a,
+  .premium-actions button,
+  .premium-reward-card,
+  .premium-jackpot-pool,
+  .premium-game-tile,
+  .premium-world-card,
+  .premium-tournament-card,
+  .premium-quest-card,
+  .premium-vip-card,
+  .premium-season-pass,
+  .premium-reward-inbox,
+  .premium-achievement-list article,
+  .premium-recent-grid article {
+    transition: none !important;
+  }
+}
